@@ -478,6 +478,31 @@ impl PartialEq<Int> for Limb {
 
 impl Eq for Int { }
 
+impl Ord for Int {
+    #[inline]
+    fn cmp(&self, other: &Int) -> Ordering {
+        if self.size < other.size {
+            Ordering::Less
+        } else if self.size > other.size {
+            Ordering::Greater
+        } else { // Same number of digits and same sign
+            // Check for zero
+            if self.size == 0 {
+                return Ordering::Equal;
+            }
+            unsafe {
+                // If both are positive, do `self cmp other`, if both are
+                // negative, do `other cmp self`
+                if self.sign() == 1 {
+                    ll::cmp(self.ptr, other.ptr, self.abs_size())
+                } else {
+                    ll::cmp(other.ptr, self.ptr, self.abs_size())
+                }
+            }
+        }
+    }
+}
+
 impl PartialOrd<Int> for Int {
     fn partial_cmp(&self, other: &Int) -> Option<Ordering> {
         Some(self.cmp(other))
@@ -506,36 +531,7 @@ impl PartialOrd<Limb> for Int {
 impl PartialOrd<Int> for Limb {
     #[inline]
     fn partial_cmp(&self, other: &Int) -> Option<Ordering> {
-        Some(match other.partial_cmp(self).unwrap() {
-            Ordering::Equal => Ordering::Equal,
-            Ordering::Less => Ordering::Greater,
-            Ordering::Greater => Ordering::Less
-        })
-    }
-}
-
-impl Ord for Int {
-    #[inline]
-    fn cmp(&self, other: &Int) -> Ordering {
-        if self.size < other.size {
-            Ordering::Less
-        } else if self.size > other.size {
-            Ordering::Greater
-        } else { // Same number of digits and same sign
-            // Check for zero
-            if self.size == 0 {
-                return Ordering::Equal;
-            }
-            unsafe {
-                // If both are positive, do `self cmp other`, if both are
-                // negative, do `other cmp self`
-                if self.sign() == 1 {
-                    ll::cmp(self.ptr, other.ptr, self.abs_size())
-                } else {
-                    ll::cmp(other.ptr, self.ptr, self.abs_size())
-                }
-            }
-        }
+        other.partial_cmp(self).map(|o| o.reverse())
     }
 }
 
@@ -1590,6 +1586,51 @@ impl PartialEq<Int> for i32 {
     #[inline]
     fn eq(&self, other: &Int) -> bool {
         other.eq(self)
+    }
+}
+
+impl PartialOrd<i32> for Int {
+    #[inline]
+    fn partial_cmp(&self, &other: &i32) -> Option<Ordering> {
+        let self_sign = self.sign();
+        let other_sign = if other < 0 {
+            -1
+        } else if other > 0 {
+            1
+        } else {
+            0
+        };
+
+        // Both are equal
+        if self_sign == 0 && other_sign == 0 {
+            return Some(Ordering::Equal);
+        }
+
+        let ord = if self_sign > other_sign {
+            Ordering::Greater
+        } else if self_sign < other_sign {
+            Ordering::Less
+        } else { // Now both signs are the same, and non-zero
+
+            if self_sign < 0 {
+                if self.abs_size() > 1 {
+                    Ordering::Less
+                } else {
+                    self.to_single_limb().cmp(&Limb(other.abs() as BaseInt)).reverse()
+                }
+            } else {
+                return self.partial_cmp(&Limb(other.abs() as BaseInt));
+            }
+        };
+
+        Some(ord)
+    }
+}
+
+impl PartialOrd<Int> for i32 {
+    #[inline]
+    fn partial_cmp(&self, other: &Int) -> Option<Ordering> {
+        other.partial_cmp(self).map(|o| o.reverse())
     }
 }
 
