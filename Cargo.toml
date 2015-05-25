@@ -12,3 +12,6 @@ repository = "https://github.com/Aatch/ramp"
 [lib]
 name = "ramp"
 path = "src/lib.rs"
+
+[[example]]
+name = "factorial"
