@@ -18,6 +18,8 @@
 #![allow(dead_code)] // Work in progress
 
 #![feature(core, asm, alloc, associated_consts)]
+#![feature(zero_one, step_trait)]
+
 #![cfg_attr(test, feature(test))]
 
 #[cfg(test)] extern crate test;

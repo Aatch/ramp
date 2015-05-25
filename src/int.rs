@@ -20,6 +20,7 @@ use std::cmp::{
 };
 use std::error::Error;
 use std::fmt;
+use std::num::Zero;
 use std::ops::{
     Add, Sub, Mul, Div, Rem,
     Neg
@@ -43,16 +44,9 @@ pub struct Int {
     cap: u32
 }
 
-impl Int {
-    /// Creates a zero-value Int
-    pub fn zero() -> Int {
-        Int {
-            ptr: std::ptr::null_mut(),
-            size: 0,
-            cap: 0
-        }
-    }
+unsafe impl Send for Int { }
 
+impl Int {
     /// Creates a new Int from the given Limb.
     pub fn from_single_limb(limb: Limb) -> Int {
         let mut i = Int::with_capacity(1);
@@ -65,6 +59,9 @@ impl Int {
     }
 
     fn with_capacity(cap: u32) -> Int {
+        if cap == 0 {
+            return Int::zero();
+        }
         unsafe {
             let ptr = mem::allocate(cap as usize);
             Int {
@@ -159,6 +156,7 @@ impl Int {
      * Panics if `base` is less than two or greater than 36.
      */
     pub fn to_str_radix(&self, base: u8, upper: bool) -> String {
+        debug_assert!(self.well_formed());
         if self.size == 0 {
             return "0".to_string();
         }
@@ -257,6 +255,8 @@ impl Int {
      * With N = self, D = other, Q and R satisfy: `N = QD + R`.
      */
     pub fn divmod(&self, other: &Int) -> (Int, Int) {
+        debug_assert!(self.well_formed());
+        debug_assert!(other.well_formed());
         let out_size = if self.abs_size() < other.abs_size() {
             1
         } else {
@@ -280,6 +280,47 @@ impl Int {
         r.adjust_size();
 
         (q, r)
+    }
+
+    /**
+     * Raises self to the power of exp
+     */
+    pub fn pow<I>(self, mut exp: usize) -> Int {
+        debug_assert!(self.well_formed());
+        // TODO: There's almost certainly a better way of doing this calculation
+
+        let mut base = self;
+        let mut ret = Int::from(1);
+
+        while exp > 0 {
+            if (exp & 1) == 1 {
+                ret = ret * &base;
+            }
+
+            base = base.square();
+
+            exp /= 2;
+        }
+
+        return ret;
+    }
+
+    /**
+     * Returns the square of `self`.
+     */
+    pub fn square(self) -> Int {
+        debug_assert!(self.well_formed());
+        if self.sign() == 0 {
+            return Int::zero();
+        }
+        if self.abs_size() == 1 {
+            // Avoid an allocation for when `self` is a single limb
+            let l = self.to_single_limb();
+            return self * l;
+        }
+        // There are slight faster ways of squaring very large numbers, but
+        // but this is good enough for now.
+        &self * &self
     }
 
     fn ensure_capacity(&mut self, cap: u32) {
@@ -336,6 +377,7 @@ impl Int {
                 self.size -= sign;
             }
         }
+        debug_assert!(self.well_formed());
     }
 
     /**
@@ -361,6 +403,10 @@ impl Clone for Int {
     fn clone(&self) -> Int {
         debug_assert!(self.well_formed());
 
+        if self.sign() == 0 {
+            return Int::zero();
+        }
+
         let mut new = Int::with_capacity(self.abs_size() as u32);
         unsafe {
             ll::copy_incr(self.ptr, new.ptr, self.abs_size());
@@ -373,6 +419,10 @@ impl Clone for Int {
         debug_assert!(self.well_formed());
         debug_assert!(other.well_formed());
 
+        if other.sign() == 0 {
+            self.size = 0;
+            return;
+        }
         self.ensure_capacity(other.abs_size() as u32);
         unsafe {
             ll::copy_incr(other.ptr, self.ptr, other.abs_size());
@@ -844,6 +894,7 @@ impl Mul<Limb> for Int {
     type Output = Int;
 
     fn mul(mut self, other: Limb) -> Int {
+        debug_assert!(self.well_formed());
         if other == 0 || self.sign() == 0 {
             self.size = 0;
             return self;
@@ -868,6 +919,8 @@ impl<'a, 'b> Mul<&'a Int> for &'b Int {
     type Output = Int;
 
     fn mul(self, other: &'a Int) -> Int {
+        debug_assert!(self.well_formed());
+        debug_assert!(other.well_formed());
         // This is the main function, since in the general case
         // we need to allocate space for the return. Special cases
         // where this isn't necessary are handled in the other impls
@@ -984,6 +1037,7 @@ impl Div<Limb> for Int {
     type Output = Int;
 
     fn div(mut self, other: Limb) -> Int {
+        debug_assert!(self.well_formed());
         if other == 0 {
             ll::divide_by_zero();
         }
@@ -1006,6 +1060,8 @@ impl<'a, 'b> Div<&'a Int> for &'b Int {
     type Output = Int;
 
     fn div(self, other: &'a Int) -> Int {
+        debug_assert!(self.well_formed());
+        debug_assert!(other.well_formed());
         if other.sign() == 0 {
             ll::divide_by_zero();
         }
@@ -1049,6 +1105,7 @@ impl Rem<Limb> for Int {
     type Output = Int;
 
     fn rem(mut self, other: Limb) -> Int {
+        debug_assert!(self.well_formed());
         if other == 0 {
             ll::divide_by_zero();
         }
@@ -1084,6 +1141,8 @@ impl<'a, 'b> Rem<&'a Int> for &'b Int {
     type Output = Int;
 
     fn rem(self, other: &'a Int) -> Int {
+        debug_assert!(self.well_formed());
+        debug_assert!(other.well_formed());
         if other.sign() == 0 {
             ll::divide_by_zero();
         }
@@ -1126,6 +1185,7 @@ impl Neg for Int {
 
     #[inline]
     fn neg(mut self) -> Int {
+        debug_assert!(self.well_formed());
         self.size *= -1;
         self
     }
@@ -1533,6 +1593,34 @@ impl PartialEq<Int> for i32 {
     }
 }
 
+impl PartialEq<usize> for Int {
+    #[inline]
+    fn eq(&self, &other: &usize) -> bool {
+        return self.eq(&Limb(other as BaseInt));
+    }
+}
+
+impl PartialEq<Int> for usize {
+    #[inline]
+    fn eq(&self, other: &Int) -> bool {
+        other.eq(self)
+    }
+}
+
+impl PartialOrd<usize> for Int {
+    #[inline]
+    fn partial_cmp(&self, &other: &usize) -> Option<Ordering> {
+        self.partial_cmp(&Limb(other as BaseInt))
+    }
+}
+
+impl PartialOrd<Int> for usize {
+    #[inline]
+    fn partial_cmp(&self, other: &Int) -> Option<Ordering> {
+        Limb(*self as BaseInt).partial_cmp(other)
+    }
+}
+
 macro_rules! impl_from_prim (
     (signed $($t:ty),*) => {
         $(impl ::std::convert::From<$t> for Int {
@@ -1733,10 +1821,48 @@ macro_rules! impl_from_for_prim (
 impl_from_for_prim!(signed   i8, i16, i32, i64, isize);
 impl_from_for_prim!(unsigned u8, u16, u32, u64, usize);
 
+impl std::num::Zero for Int {
+    fn zero() -> Int {
+        Int {
+            ptr: std::ptr::null_mut(),
+            size: 0,
+            cap: 0
+        }
+    }
+}
+
+impl std::num::One for Int {
+    fn one() -> Int {
+        Int::from(1)
+    }
+}
+
+impl std::iter::Step for Int {
+    fn step(&self, by: &Int) -> Option<Int> {
+        Some(self + by)
+    }
+
+    fn steps_between(start: &Int, end: &Int, by: &Int) -> Option<usize> {
+        if by.le(&0) { return None; }
+        let mut diff = (start - end).abs();
+        if by.ne(&1) {
+            diff = diff / by;
+        }
+
+        // Check to see if result fits in a usize
+        if diff > !0usize {
+            None
+        } else {
+            Some(usize::from(&diff))
+        }
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
     use std::str::FromStr;
+    use std::num::Zero;
 
     #[test]
     fn from_string_10() {
