@@ -1,0 +1,12 @@
+[package]
+name = "ramp"
+version = "0.1.0"
+authors = ["James Miller <james@aatch.net>"]
+build = "build.rs"
+license = "Apache-2.0"
+readme = "README.md"
+keywords = ["bignum","math","number"]
+
+[lib]
+name = "ramp"
+path = "src/lib.rs"
