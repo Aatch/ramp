@@ -25,6 +25,7 @@ use std::ops::{
     Add, Sub, Mul, Div, Rem,
     Neg
 };
+use std::ptr::Unique;
 use std::str::FromStr;
 
 use ll;
@@ -39,19 +40,17 @@ use mem;
  * You can convert to a primitive integer type by using `From`: `i32::from(&myint)`.
  */
 pub struct Int {
-    ptr: *mut Limb,
+    ptr: Unique<Limb>,
     size: i32,
     cap: u32
 }
-
-unsafe impl Send for Int { }
 
 impl Int {
     /// Creates a new Int from the given Limb.
     pub fn from_single_limb(limb: Limb) -> Int {
         let mut i = Int::with_capacity(1);
         unsafe {
-            *i.ptr = limb;
+            *i.ptr.get_mut() = limb;
         }
         i.size = 1;
 
@@ -65,7 +64,7 @@ impl Int {
         unsafe {
             let ptr = mem::allocate(cap as usize);
             Int {
-                ptr: ptr,
+                ptr: Unique::new(ptr),
                 size: 0,
                 cap: cap
             }
@@ -104,7 +103,7 @@ impl Int {
         if self.sign() == 0 {
             return Limb(0);
         } else {
-            return unsafe { *self.ptr };
+            return unsafe { *self.ptr.get() };
         }
     }
 
@@ -124,7 +123,7 @@ impl Int {
             Ordering::Less
         } else {
             unsafe {
-                ll::cmp(self.ptr, other.ptr, self.abs_size())
+                ll::cmp(self.ptr.get(), other.ptr.get(), self.abs_size())
             }
         }
     }
@@ -140,12 +139,12 @@ impl Int {
         if size == 0 { size = 1; } // Keep space for at least one limb around
 
         unsafe {
-            let old_ptr = self.ptr as *mut u8;
+            let old_ptr = self.ptr.get_mut() as *mut Limb as *mut u8;
             let old_cap = (self.cap as usize) * std::mem::size_of::<Limb>();
             let new_cap = size * std::mem::size_of::<Limb>();
 
             let new_ptr = mem::reallocate(old_ptr, old_cap, new_cap);
-            self.ptr = new_ptr as *mut Limb;
+            self.ptr = Unique::new(new_ptr as *mut Limb);
         }
     }
 
@@ -167,14 +166,14 @@ impl Int {
 
         let size = self.abs_size();
         let num_digits = unsafe {
-            ll::base::num_base_digits(self.ptr, size, base as u32)
+            ll::base::num_base_digits(self.ptr.get(), size, base as u32)
         };
 
         let mut buf : Vec<u8> = Vec::with_capacity(num_digits);
 
         unsafe {
             let bufp = buf.as_mut_ptr();
-            let num = ll::base::to_base(bufp, base as u32, self.ptr, size);
+            let num = ll::base::to_base(bufp, base as u32, self.ptr.get(), size);
             buf.set_len(num);
         }
 
@@ -242,7 +241,7 @@ impl Int {
         let mut i = Int::with_capacity(num_digits as u32);
 
         unsafe {
-            let size = ll::base::from_base(i.ptr, buf.as_ptr(), buf.len() as i32, base as u32);
+            let size = ll::base::from_base(i.ptr.get_mut(), buf.as_ptr(), buf.len() as i32, base as u32);
             i.size = (size as i32) * sign;
         }
 
@@ -271,9 +270,9 @@ impl Int {
         r.size = other.size;
 
         unsafe {
-            ll::divrem(q.ptr, r.ptr,
-                       self.ptr, self.abs_size(),
-                       other.ptr, other.abs_size());
+            ll::divrem(q.ptr.get_mut(), r.ptr.get_mut(),
+                       self.ptr.get(), self.abs_size(),
+                       other.ptr.get(), other.abs_size());
         }
 
         q.adjust_size();
@@ -328,7 +327,7 @@ impl Int {
             unsafe {
 
                 let new_ptr = if self.cap > 0 {
-                    let old_ptr = self.ptr as *mut u8;
+                    let old_ptr = self.ptr.get_mut() as *mut Limb as *mut u8;
                     let old_cap = (self.cap as usize) * std::mem::size_of::<Limb>();
                     let new_cap = (cap as usize) * std::mem::size_of::<Limb>();
                     mem::reallocate(old_ptr, old_cap, new_cap) as *mut Limb
@@ -342,7 +341,7 @@ impl Int {
                     i += 1;
                 }
 
-                self.ptr = new_ptr;
+                self.ptr = Unique::new(new_ptr);
                 self.cap = cap;
             }
         }
@@ -409,7 +408,7 @@ impl Clone for Int {
 
         let mut new = Int::with_capacity(self.abs_size() as u32);
         unsafe {
-            ll::copy_incr(self.ptr, new.ptr, self.abs_size());
+            ll::copy_incr(self.ptr.get(), new.ptr.get_mut(), self.abs_size());
         }
         new.size = self.size;
         new
@@ -425,7 +424,7 @@ impl Clone for Int {
         }
         self.ensure_capacity(other.abs_size() as u32);
         unsafe {
-            ll::copy_incr(other.ptr, self.ptr, other.abs_size());
+            ll::copy_incr(other.ptr.get(), self.ptr.get_mut(), other.abs_size());
             self.size = other.size;
         }
     }
@@ -435,7 +434,7 @@ impl Drop for Int {
     fn drop(&mut self) {
         if self.cap > 0 {
             unsafe {
-                let ptr = self.ptr as *mut u8;
+                let ptr = self.ptr.get_mut() as *mut Limb as *mut u8;
                 let size = (self.cap as usize) * std::mem::size_of::<Limb>();
                 mem::deallocate(ptr, size);
             }
@@ -450,7 +449,7 @@ impl PartialEq<Int> for Int {
     fn eq(&self, other: &Int) -> bool {
         if self.size == other.size {
             unsafe {
-                ll::cmp(self.ptr, other.ptr, self.abs_size()) == Ordering::Equal
+                ll::cmp(self.ptr.get(), other.ptr.get(), self.abs_size()) == Ordering::Equal
             }
         } else {
             false
@@ -465,7 +464,7 @@ impl PartialEq<Limb> for Int {
             return true;
         }
 
-        self.size == 1 && unsafe { *self.ptr == *other }
+        self.size == 1 && unsafe { *self.ptr.get() == *other }
     }
 }
 
@@ -494,9 +493,9 @@ impl Ord for Int {
                 // If both are positive, do `self cmp other`, if both are
                 // negative, do `other cmp self`
                 if self.sign() == 1 {
-                    ll::cmp(self.ptr, other.ptr, self.abs_size())
+                    ll::cmp(self.ptr.get(), other.ptr.get(), self.abs_size())
                 } else {
-                    ll::cmp(other.ptr, self.ptr, self.abs_size())
+                    ll::cmp(other.ptr.get(), self.ptr.get(), self.abs_size())
                 }
             }
         }
@@ -522,7 +521,7 @@ impl PartialOrd<Limb> for Int {
             Some(Ordering::Greater)
         } else {
             unsafe {
-                (*self.ptr).partial_cmp(other)
+                self.ptr.get().partial_cmp(other)
             }
         }
     }
@@ -550,7 +549,7 @@ impl Add<Limb> for Int {
         // This is zero, but has allocated space, so just store `other`
         if self.size == 0 {
             unsafe {
-                *self.ptr = other;
+                *self.ptr.get_mut() = other;
                 self.size = 1;
             }
             return self;
@@ -559,7 +558,7 @@ impl Add<Limb> for Int {
         unsafe {
             let sign = self.sign();
             let size = self.abs_size();
-            let ptr = self.ptr;
+            let ptr = self.ptr.get_mut() as *mut Limb;
 
             // Self is positive, just add `other`
             if sign == 1 {
@@ -598,23 +597,29 @@ impl<'a> Add<&'a Int> for Int {
             return self;
         }
 
+
         if self.sign() == other.sign() {
             // Signs are the same, add the two numbers together and re-apply
             // the sign after.
             let sign = self.sign();
-            // There's a restriction that x-size >= y-size, we can swap the operands
-            // no problem, but we'd like to re-use `self`s memory if possible, so
-            // if `self` is the smaller of the two we make sure it has enough space
-            // for the result
-            let (xp, xs, yp, ys) = if self.abs_size() >= other.abs_size() {
-                (self.ptr, self.abs_size(), other.ptr, other.abs_size())
-            } else {
-                self.ensure_capacity(other.abs_size() as u32);
-                (other.ptr, other.abs_size(), self.ptr, self.abs_size())
-            };
 
             unsafe {
-                let carry = ll::add(self.ptr,
+                // There's a restriction that x-size >= y-size, we can swap the operands
+                // no problem, but we'd like to re-use `self`s memory if possible, so
+                // if `self` is the smaller of the two we make sure it has enough space
+                // for the result
+                let (xp, xs, yp, ys): (*const Limb, _, *const Limb, _) = if self.abs_size() >= other.abs_size() {
+                    (self.ptr.get(), self.abs_size(), other.ptr.get(), other.abs_size())
+                } else {
+                    self.ensure_capacity(other.abs_size() as u32);
+                    (other.ptr.get(), other.abs_size(), self.ptr.get(), self.abs_size())
+                };
+
+                // Fetch the pointer first to make completely sure the compiler
+                // won't make bogus claims about nonaliasing due to the &mut
+                let ptr = self.ptr.get_mut() as *mut Limb;
+
+                let carry = ll::add(ptr,
                                     xp, xs,
                                     yp, ys);
                 self.size = xs * sign;
@@ -630,28 +635,32 @@ impl<'a> Add<&'a Int> for Int {
             // Signs are different, use the sign from the bigger (absolute value)
             // of the two numbers and subtract the smaller one.
 
-            let (xp, xs, yp, ys) = if self.abs_size() > other.abs_size() {
-                (self.ptr, self.size, other.ptr, other.size)
-            } else if self.abs_size() < other.abs_size() {
-                self.ensure_capacity(other.abs_size() as u32);
-                (other.ptr, other.size, self.ptr, self.size)
-            } else {
-                match self.abs_cmp(other) {
-                    Ordering::Equal => {
-                        // They're equal, but opposite signs, so the result
-                        // will be zero, clear `self` and return it
-                        self.size = 0;
-                        return self;
-                    }
-                    Ordering::Greater =>
-                        (self.ptr, self.size, other.ptr, other.size),
-                    Ordering::Less =>
-                        (other.ptr, other.size, self.ptr, self.size)
-                }
-            };
-
             unsafe {
-                let _borrow = ll::sub(self.ptr,
+                let (xp, xs, yp, ys): (*const Limb, _, *const Limb, _) = if self.abs_size() > other.abs_size() {
+                    (self.ptr.get(), self.size, other.ptr.get(), other.size)
+                } else if self.abs_size() < other.abs_size() {
+                    self.ensure_capacity(other.abs_size() as u32);
+                    (other.ptr.get(), other.size, self.ptr.get(), self.size)
+                } else {
+                    match self.abs_cmp(other) {
+                        Ordering::Equal => {
+                            // They're equal, but opposite signs, so the result
+                            // will be zero, clear `self` and return it
+                            self.size = 0;
+                            return self;
+                        }
+                        Ordering::Greater =>
+                            (self.ptr.get(), self.size, other.ptr.get(), other.size),
+                        Ordering::Less =>
+                            (other.ptr.get(), other.size, self.ptr.get(), self.size)
+                    }
+                };
+
+                // Fetch the pointer first to make completely sure the compiler
+                // won't make bogus claims about nonaliasing due to the &mut
+                let ptr = self.ptr.get_mut() as *mut Limb;
+
+                let _borrow = ll::sub(ptr,
                                       xp, xs.abs(),
                                       yp, ys.abs());
                 // There shouldn't be any borrow
@@ -735,7 +744,7 @@ impl Sub<Limb> for Int {
         // This is zero, but has allocated space, so just store `other`
         if self.size == 0 {
             unsafe {
-                *self.ptr = other;
+                *self.ptr.get_mut() = other;
                 self.size = -1;
             }
             return self;
@@ -744,7 +753,7 @@ impl Sub<Limb> for Int {
         unsafe {
             let sign = self.sign();
             let size = self.abs_size();
-            let ptr = self.ptr;
+            let ptr = self.ptr.get_mut() as *mut Limb;
 
             // Self is negative, just "add" `other`
             if sign == -1 {
@@ -763,6 +772,7 @@ impl Sub<Limb> for Int {
             }
         }
 
+        debug_assert!(self.well_formed());
         self
     }
 }
@@ -785,24 +795,28 @@ impl<'a> Sub<&'a Int> for Int {
         }
 
         if self.sign() == other.sign() {
-            // Signs are the same, subtract the smaller one from
-            // the bigger one and adjust the sign as appropriate
-            let (xp, xs, yp, ys, flip) = match self.abs_cmp(other) {
-                Ordering::Equal => {
-                    // x - x, just return zero
-                    self.size = 0;
-                    return self;
-                }
-                Ordering::Less => {
-                    self.ensure_capacity(other.abs_size() as u32);
-                    (other.ptr, other.size, self.ptr, self.size, true)
-                }
-                Ordering::Greater =>
-                    (self.ptr, self.size, other.ptr, other.size, false)
-            };
-
             unsafe {
-                let _borrow = ll::sub(self.ptr, xp, xs.abs(), yp, ys.abs());
+                // Signs are the same, subtract the smaller one from
+                // the bigger one and adjust the sign as appropriate
+                let (xp, xs, yp, ys, flip): (*const Limb, _, *const Limb, _, _) = match self.abs_cmp(other) {
+                    Ordering::Equal => {
+                        // x - x, just return zero
+                        self.size = 0;
+                        return self;
+                    }
+                    Ordering::Less => {
+                        self.ensure_capacity(other.abs_size() as u32);
+                        (other.ptr.get(), other.size, self.ptr.get(), self.size, true)
+                    }
+                    Ordering::Greater =>
+                        (self.ptr.get(), self.size, other.ptr.get(), other.size, false)
+                };
+
+                // Fetch the pointer first to make completely sure the compiler
+                // won't make bogus claims about nonaliasing due to the &mut
+                let ptr = self.ptr.get_mut() as *mut Limb;
+
+                let _borrow = ll::sub(ptr, xp, xs.abs(), yp, ys.abs());
                 debug_assert!(_borrow == 0);
                 self.size = if flip {
                     xs * -1
@@ -818,16 +832,20 @@ impl<'a> Sub<&'a Int> for Int {
                 let res = (-self) + other;
                 return -res;
             } else {
-                // Other is negative, handle as addition
-                let (xp, xs, yp, ys) = if self.abs_size() >= other.abs_size() {
-                    (self.ptr, self.abs_size(), other.ptr, other.abs_size())
-                } else {
-                    self.ensure_capacity(other.abs_size() as u32);
-                    (other.ptr, other.abs_size(), self.ptr, self.abs_size())
-                };
-
                 unsafe {
-                    let carry = ll::add(self.ptr, xp, xs, yp, ys);
+                    // Other is negative, handle as addition
+                    let (xp, xs, yp, ys): (*const Limb, _, *const Limb, _) = if self.abs_size() >= other.abs_size() {
+                        (self.ptr.get(), self.abs_size(), other.ptr.get(), other.abs_size())
+                    } else {
+                        self.ensure_capacity(other.abs_size() as u32);
+                        (other.ptr.get(), other.abs_size(), self.ptr.get(), self.abs_size())
+                    };
+
+                    // Fetch the pointer first to make completely sure the compiler
+                    // won't make bogus claims about nonaliasing due to the &mut
+                    let ptr = self.ptr.get_mut() as *mut Limb;
+
+                    let carry = ll::add(ptr, xp, xs, yp, ys);
                     self.size = xs;
                     if carry != 0 {
                         self.push(carry);
@@ -901,7 +919,11 @@ impl Mul<Limb> for Int {
         }
 
         unsafe {
-            let carry = ll::mul_1(self.ptr, self.ptr, self.abs_size(), other);
+            // Fetch the pointer first to make completely sure the compiler
+            // won't make bogus claims about nonaliasing due to the &mut
+            let ptr = self.ptr.get_mut() as *mut Limb;
+
+            let carry = ll::mul_1(ptr, ptr, self.abs_size(), other);
             if carry != 0 {
                 self.push(carry);
             }
@@ -930,7 +952,7 @@ impl<'a, 'b> Mul<&'a Int> for &'b Int {
 
         if self.abs_size() == 1 {
             unsafe {
-                let mut ret = other.clone() * *self.ptr;
+                let mut ret = other.clone() * *self.ptr.get();
                 let size = ret.abs_size();
                 ret.size = size * out_sign;
                 return ret;
@@ -938,7 +960,7 @@ impl<'a, 'b> Mul<&'a Int> for &'b Int {
         }
         if other.abs_size() == 1 {
             unsafe {
-                let mut ret = self.clone() * *other.ptr;
+                let mut ret = self.clone() * *other.ptr.get();
                 let size = ret.abs_size();
                 ret.size = size * out_sign;
                 return ret;
@@ -952,11 +974,11 @@ impl<'a, 'b> Mul<&'a Int> for &'b Int {
 
         unsafe {
             let (xp, xs, yp, ys) = if self.abs_size() >= other.abs_size() {
-                (self.ptr, self.abs_size(), other.ptr, other.abs_size())
+                (self.ptr.get(), self.abs_size(), other.ptr.get(), other.abs_size())
             } else {
-                (other.ptr, other.abs_size(), self.ptr, self.abs_size())
+                (other.ptr.get(), other.abs_size(), self.ptr.get(), self.abs_size())
             };
-            ll::mul(out.ptr, xp, xs, yp, ys);
+            ll::mul(out.ptr.get_mut(), xp, xs, yp, ys);
 
             // Top limb may be zero
             out.adjust_size();
@@ -978,7 +1000,7 @@ impl<'a> Mul<&'a Int> for Int {
         // `other` is a single limb, reuse the allocation of self
         if other.abs_size() == 1 {
             unsafe {
-                let mut out = self * *other.ptr;
+                let mut out = self * *other.ptr.get();
                 out.size *= other.sign();
                 return out;
             }
@@ -1011,13 +1033,13 @@ impl Mul<Int> for Int {
         // One of them is a single limb big, so we can re-use the
         // allocation of the other
         if self.abs_size() == 1 {
-            let val = unsafe { *self.ptr };
+            let val = unsafe { *self.ptr.get() };
             let mut out = other * val;
             out.size *= self.sign();
             return out;
         }
         if other.abs_size() == 1 {
-            let val = unsafe { *other.ptr };
+            let val = unsafe { *other.ptr.get() };
             let mut out = self * val;
             out.size *= other.sign();
             return out;
@@ -1042,8 +1064,12 @@ impl Div<Limb> for Int {
         }
 
         unsafe {
+            // Fetch the pointer first to make completely sure the compiler
+            // won't make bogus claims about nonaliasing due to the &mut
+            let ptr = self.ptr.get_mut() as *mut Limb;
+
             // Ignore the remainder
-            ll::divrem_1(self.ptr, 0, self.ptr, self.abs_size(), other);
+            ll::divrem_1(ptr, 0, ptr, self.abs_size(), other);
             // Adjust the size if necessary
             self.adjust_size();
         }
@@ -1062,7 +1088,7 @@ impl<'a, 'b> Div<&'a Int> for &'b Int {
             ll::divide_by_zero();
         }
         if other.abs_size() == 1 {
-            let l = unsafe { *other.ptr };
+            let l = unsafe { *other.ptr.get() };
             let out_sign = self.sign() * other.sign();
             let mut out = self.clone() / l;
             out.size = out.abs_size() * out_sign;
@@ -1112,11 +1138,15 @@ impl Rem<Limb> for Int {
         }
 
         unsafe {
-            let rem = ll::divrem_1(self.ptr, 0, self.ptr, self.abs_size(), other);
+            // Fetch the pointer first to make completely sure the compiler
+            // won't make bogus claims about nonaliasing due to the &mut
+            let ptr = self.ptr.get_mut() as *mut Limb;
+
+            let rem = ll::divrem_1(ptr, 0, ptr, self.abs_size(), other);
             // Reuse the space from `self`, taking the sign from the numerator
             // Since `rem` has to satisfy `N = QD + R` and D is always positive,
             // `R` will always be the same sign as the numerator.
-            *self.ptr = rem;
+            *self.ptr.get_mut() = rem;
             let sign = self.sign();
             self.size = sign;
 
@@ -1143,7 +1173,7 @@ impl<'a, 'b> Rem<&'a Int> for &'b Int {
             ll::divide_by_zero();
         }
         if other.abs_size() == 1 {
-            let l = unsafe { *other.ptr };
+            let l = unsafe { *other.ptr.get() };
             return self.clone() % l;
         }
 
@@ -1574,7 +1604,7 @@ impl PartialEq<i32> for Int {
         if sign < 0 {
             if self.abs_size() > 1 { return false; }
             unsafe {
-                return *self.ptr == (other.abs() as BaseInt);
+                return *self.ptr.get() == (other.abs() as BaseInt);
             }
         }
 
@@ -1865,7 +1895,7 @@ impl_from_for_prim!(unsigned u8, u16, u32, u64, usize);
 impl std::num::Zero for Int {
     fn zero() -> Int {
         Int {
-            ptr: std::ptr::null_mut(),
+            ptr: unsafe { Unique::new(std::rt::heap::EMPTY as *mut Limb) },
             size: 0,
             cap: 0
         }
