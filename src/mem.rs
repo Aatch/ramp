@@ -27,6 +27,7 @@ pub unsafe fn allocate_bytes(size: usize) -> *mut u8 {
         let _ = writeln!(io::stderr(), "Failed to allocate memory (size={})", size);
         abort();
     }
+    ptr::write_bytes(ret, 0, size);
     ret
 }
 
@@ -40,6 +41,9 @@ pub unsafe fn reallocate(old: *mut u8, old_size: usize, new_size: usize) -> *mut
         let _ = writeln!(io::stderr(), "Failed to reallocate memory (old size={}, new size={})",
                          old_size, new_size);
         abort();
+    }
+    if old_size < new_size {
+        ptr::write_bytes(ret.offset(old_size as isize), 0, new_size - old_size);
     }
     ret
 }
@@ -67,11 +71,11 @@ impl TmpAllocator {
     }
 
     pub unsafe fn allocate_bytes(&mut self, size: usize) -> *mut u8 {
-        let total_size = size + mem::size_of::<Marker>();
+        let size = size + mem::size_of::<Marker>();
         let ptr = allocate_bytes(size);
 
         let mark = ptr as *mut Marker;
-        (*mark).size = total_size;
+        (*mark).size = size;
         (*mark).next = self.mark;
 
         self.mark = mark;
