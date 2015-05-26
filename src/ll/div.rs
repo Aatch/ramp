@@ -147,11 +147,8 @@ pub unsafe fn divrem(qp: *mut Limb, rp: *mut Limb,
         if let Ordering::Less = ll::cmp(np, dp, ns) {
             *qp = Limb(0);
             ll::copy_incr(np, rp, ns);
-        } else {
-            *qp = Limb(1);
-            ll::sub_n(rp, np, dp, ds);
+            return;
         }
-        return;
     }
 
     match ds {
@@ -190,7 +187,7 @@ pub unsafe fn divrem(qp: *mut Limb, rp: *mut Limb,
             }
 
             let qh = sb_div(qp, np_tmp, ns_tmp, dp_tmp, ds);
-            if cnt > 0 {
+            if qh > 0 {
                 *qp.offset((ns - ds) as isize) = qh;
             }
 
@@ -220,7 +217,6 @@ pub unsafe fn divrem(qp: *mut Limb, rp: *mut Limb,
  *
  * It is also assumed that `ns >= ds`.
  */
-#[inline(never)]
 unsafe fn sb_div(qp: *mut Limb,
                  np: *mut Limb, ns: i32,
                  dp: *const Limb, ds: i32) -> Limb {
@@ -248,7 +244,7 @@ unsafe fn sb_div(qp: *mut Limb,
     np = np.offset(-1);
     let mut nh = *np;
 
-    let mut i = ns - ((ds + 1) as i32);
+    let mut i = ns - (ds + 1) as i32;
     while i > 0 {
         np = np.offset(-1);
 
@@ -271,7 +267,6 @@ unsafe fn sb_div(qp: *mut Limb,
                 q
             }
         };
-
 
         qp = qp.offset(-1);
         *qp = q;

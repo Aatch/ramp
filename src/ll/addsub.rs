@@ -24,8 +24,8 @@ pub unsafe fn add_n(mut wp: *mut Limb, mut xp: *const Limb, mut yp: *const Limb,
     let mut carry = Limb(0);
 
     debug_assert!(n >= 1);
-    debug_assert!(same_or_separate(wp as *const _, n, xp, n));
-    debug_assert!(same_or_separate(wp as *const _, n, yp, n));
+    debug_assert!(same_or_separate(wp, n, xp, n));
+    debug_assert!(same_or_separate(wp, n, yp, n));
 
     loop {
         let xl = *xp;
@@ -58,8 +58,8 @@ pub unsafe fn sub_n(mut wp: *mut Limb, mut xp: *const Limb, mut yp: *const Limb,
     let mut carry = Limb(0);
 
     debug_assert!(n >= 1);
-    debug_assert!(same_or_separate(wp as *const _, n, xp, n));
-    debug_assert!(same_or_separate(wp as *const _, n, yp, n));
+    debug_assert!(same_or_separate(wp, n, xp, n));
+    debug_assert!(same_or_separate(wp, n, yp, n));
 
     loop {
         let xl = *xp;

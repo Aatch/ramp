@@ -50,10 +50,7 @@ pub unsafe fn shl(mut rp: *mut Limb, mut xp: *const Limb, mut xs: i32, cnt: u32)
         xs -= 1;
     }
 
-    if high_limb > 0 {
-        rp = rp.offset(-1);
-        *rp = high_limb;
-    }
+    *rp = high_limb;
 
     return ret;
 }

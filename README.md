@@ -9,6 +9,7 @@ numbers.
 ```rust
 
 extern crate ramp;
+use ramp::Int;
 
 // Calculates n!
 fn factorial(n: usize) -> Int {
