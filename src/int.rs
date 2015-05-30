@@ -275,8 +275,8 @@ impl Int {
                        other.ptr.get(), other.abs_size());
         }
 
-        q.adjust_size();
-        r.adjust_size();
+        q.normalize();
+        r.normalize();
 
         (q, r)
     }
@@ -366,7 +366,7 @@ impl Int {
     /**
      * Adjust the size field so the most significant limb is non-zero
      */
-    fn adjust_size(&mut self) {
+    fn normalize(&mut self) {
         if self.size == 0 { true; }
         let sign = self.sign();
         unsafe {
@@ -623,7 +623,7 @@ impl<'a> Add<&'a Int> for Int {
                                     xp, xs,
                                     yp, ys);
                 self.size = xs * sign;
-                self.adjust_size();
+                self.normalize();
 
                 if carry != 0 {
                     self.push(carry);
@@ -667,7 +667,7 @@ impl<'a> Add<&'a Int> for Int {
                 debug_assert!(_borrow == 0);
 
                 self.size = xs;
-                self.adjust_size();
+                self.normalize();
                 debug_assert!(self.abs_size() > 0);
 
                 return self;
@@ -764,7 +764,7 @@ impl Sub<Limb> for Int {
             } else {
                 // Self is positive, subtract other from self
                 let carry = ll::sub_1(ptr, ptr, size, other);
-                self.adjust_size();
+                self.normalize();
                 if carry != 0 {
                     // There was a carry, ignore it but flip the sign on self
                     self.size = -self.abs_size();
@@ -981,7 +981,7 @@ impl<'a, 'b> Mul<&'a Int> for &'b Int {
             ll::mul(out.ptr.get_mut(), xp, xs, yp, ys);
 
             // Top limb may be zero
-            out.adjust_size();
+            out.normalize();
             return out;
         }
     }
@@ -1071,7 +1071,7 @@ impl Div<Limb> for Int {
             // Ignore the remainder
             ll::divrem_1(ptr, 0, ptr, self.abs_size(), other);
             // Adjust the size if necessary
-            self.adjust_size();
+            self.normalize();
         }
 
         return self;
@@ -1929,8 +1929,30 @@ impl std::iter::Step for Int {
     }
 }
 
+
+#[cfg(test)]
+pub fn rand_int<R: ::rand::Rng>(rng: &mut R, limbs: u32) -> Int {
+    let negative : bool = rng.gen();
+
+    let mut i = Int::with_capacity(limbs);
+    for _ in 0..limbs {
+        let limb = Limb(rng.gen());
+        i.push(limb);
+    }
+
+    i.normalize();
+
+    if negative {
+        -i
+    } else {
+        i
+    }
+}
+
 #[cfg(test)]
 mod test {
+    use rand;
+    use test::{self, Bencher};
     use super::*;
     use std::str::FromStr;
     use std::num::Zero;
@@ -2093,5 +2115,84 @@ mod test {
 
             assert_eq!(l / r, a);
         }
+    }
+
+    #[bench]
+    fn bench_mul_10_10(b: &mut Bencher) {
+        let mut rng = rand::thread_rng();
+
+        let x = rand_int(&mut rng, 10);
+        let y = rand_int(&mut rng, 10);
+
+        b.iter(|| {
+            let z = &x * &y;
+            test::black_box(z);
+        });
+    }
+
+    #[bench]
+    fn bench_mul_2_20(b: &mut Bencher) {
+        let mut rng = rand::thread_rng();
+
+        let x = rand_int(&mut rng, 2);
+        let y = rand_int(&mut rng, 20);
+
+        b.iter(|| {
+            let z = &x * &y;
+            test::black_box(z);
+        });
+    }
+
+    #[bench]
+    fn bench_mul_50_50(b: &mut Bencher) {
+        let mut rng = rand::thread_rng();
+
+        let x = rand_int(&mut rng, 50);
+        let y = rand_int(&mut rng, 50);
+
+        b.iter(|| {
+            let z = &x * &y;
+            test::black_box(z);
+        });
+    }
+
+    #[bench]
+    fn bench_mul_5_50(b: &mut Bencher) {
+        let mut rng = rand::thread_rng();
+
+        let x = rand_int(&mut rng, 5);
+        let y = rand_int(&mut rng, 50);
+
+        b.iter(|| {
+            let z = &x * &y;
+            test::black_box(z);
+        });
+    }
+
+    #[bench]
+    fn bench_mul_250_250(b: &mut Bencher) {
+        let mut rng = rand::thread_rng();
+
+        let x = rand_int(&mut rng, 250);
+        let y = rand_int(&mut rng, 250);
+
+        b.iter(|| {
+            let z = &x * &y;
+            test::black_box(z);
+        });
+    }
+
+
+    #[bench]
+    fn bench_mul_1000_1000(b: &mut Bencher) {
+        let mut rng = rand::thread_rng();
+
+        let x = rand_int(&mut rng, 1000);
+        let y = rand_int(&mut rng, 1000);
+
+        b.iter(|| {
+            let z = &x * &y;
+            test::black_box(z);
+        });
     }
 }

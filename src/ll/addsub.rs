@@ -147,3 +147,31 @@ macro_rules! aors_1 {
 
 aors_1!(add_1, add_overflow);
 aors_1!(sub_1, sub_overflow);
+
+#[inline(always)]
+pub unsafe fn incr(mut ptr: *mut Limb, incr: Limb) {
+    let (x, mut carry) = (*ptr).add_overflow(incr);
+    *ptr = x;
+
+    while carry {
+        ptr = ptr.offset(1);
+        let (x, c) = (*ptr).add_overflow(Limb(1));
+        *ptr = x;
+        carry = c;
+    }
+}
+
+#[inline(always)]
+pub unsafe fn decr(mut ptr: *mut Limb, decr: Limb) {
+    let x = *ptr;
+    *ptr = x - decr;
+
+    if x < decr {
+        loop {
+            ptr = ptr.offset(1);
+            let x = *ptr;
+            *ptr = x - 1;
+            if x != 0 { break; }
+        }
+    }
+}

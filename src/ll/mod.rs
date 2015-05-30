@@ -25,7 +25,7 @@ pub mod limb;
 use self::limb::Limb;
 
 pub use self::bit::{shl, shr};
-pub use self::addsub::{add_n, sub_n, add, sub, add_1, sub_1};
+pub use self::addsub::{add_n, sub_n, add, sub, add_1, sub_1, incr, decr};
 pub use self::mul::{addmul_1, submul_1, mul_1, mul};
 pub use self::div::{divrem_1, divrem};
 
@@ -87,6 +87,20 @@ pub unsafe fn copy_rest(src: *const Limb, dst: *mut Limb, n: i32, start: i32) {
               n - start);
 }
 
+#[inline]
+/**
+ * Returns the size of the integer pointed to by `p` such that the most
+ * significant limb is non-zero.
+ */
+pub unsafe fn normalize(p: *const Limb, mut n: i32) -> i32 {
+    debug_assert!(n >= 0);
+    while n > 0 && *p.offset((n - 1) as isize) == 0 {
+        n -= 1;
+    }
+
+    return n;
+}
+
 /**
  * Called when a divide by zero occurs.
  *
@@ -115,6 +129,14 @@ pub unsafe fn is_zero(mut np: *const Limb, mut nn: i32) -> bool {
     return true;
 }
 
+pub unsafe fn zero(mut np: *mut Limb, mut nn: i32) {
+    while nn > 0 {
+        *np = Limb(0);
+        np = np.offset(1);
+        nn -= 1;
+    }
+}
+
 /**
  * Compares the `n` least-significant limbs of `xp` and `yp`, returning whether
  * {xp, n} is less than, equal to or greater than {yp, n}
@@ -140,18 +162,25 @@ pub unsafe fn cmp(xp: *const Limb, yp: *const Limb, n: i32) -> Ordering {
 #[doc(hidden)]
 #[allow(unused_must_use)]
 #[cold] #[inline(never)]
-pub unsafe fn dump(mut p: *const Limb, mut n: i32) {
+pub unsafe fn dump(lbl: &str, mut p: *const Limb, mut n: i32) {
     use std::io::{self, Write};
     let stdout = io::stdout();
     let mut stdout = stdout.lock();
 
-    stdout.write_all(b"[");
+    stdout.write_all(lbl.as_bytes());
+    write!(stdout, ": ({})", n);
+    stdout.write_all(b"[\n");
+    let mut i = 0;
     while n > 0 {
-        write!(stdout, "{:?}", *p);
+        write!(stdout, "0x{:0>2X}", (*p).0);
         p = p.offset(1);
         n -= 1;
         if n != 0 {
             stdout.write_all(b", ");
+        }
+        i += 1;
+        if (i % 8) == 0 {
+            stdout.write_all(b"\n");
         }
     }
 
@@ -393,6 +422,79 @@ mod test {
         }
 
         assert_eq!(c, [0, !1, 1, 0]);
+
+    }
+
+    #[test]
+    fn test_mul_large() {
+
+        // Warning, dragons lie ahead, mostly to avoid writing out 150-limb numbers
+
+        let a; let b; let mut c;
+        // Abuse the fact that fixed-size arrays and tuples are laid out sequentially in memory
+        let expected : [Limb; 73] = unsafe {
+            ::std::mem::transmute((
+                Limb(1),
+                [Limb(0); 29],
+                [Limb(!0); 13],
+                Limb(!1),
+                [Limb(!0); 29]
+            ))
+        };
+
+        // (B^43 - 1)
+        a = [Limb(!0); 43];
+        // (B^30 - 1)
+        b = [Limb(!0); 30];
+
+        c = [Limb(0); 73];
+
+        {
+            let ap : *const Limb = &a[0];
+            let bp : *const Limb = &b[0];
+            let cp : *mut Limb = &mut c[0];
+
+            unsafe {
+                mul(cp, ap, 43, bp, 30);
+            }
+        }
+
+        let ep : &[Limb] = &expected;
+        let cp : &[Limb] = &c;
+        assert_eq!(cp, ep);
+
+        let a; let b; let mut c;
+        // Abuse the fact that fixed-size arrays and tuples are laid out sequentially in memory
+        let expected : [Limb; 150] = unsafe {
+            ::std::mem::transmute((
+                Limb(1),
+                [Limb(0); 25],
+                [Limb(!0); 98],
+                Limb(!1),
+                [Limb(!0); 25]
+            ))
+        };
+
+        // (B^124 - 1)
+        a = [Limb(!0); 124];
+        // (B^25 - 1)
+        b = [Limb(!0); 26];
+
+        c = [Limb(0); 150];
+
+        {
+            let ap : *const Limb = &a[0];
+            let bp : *const Limb = &b[0];
+            let cp : *mut Limb = &mut c[0];
+
+            unsafe {
+                mul(cp, ap, 124, bp, 26);
+            }
+        }
+
+        let ep : &[Limb] = &expected;
+        let cp : &[Limb] = &c;
+        assert_eq!(cp, ep);
     }
 
     #[test]
