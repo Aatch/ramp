@@ -529,13 +529,61 @@ pub fn add_2(ah: Limb, al: Limb, bh: Limb, bl: Limb) -> (Limb, Limb) {
         fallback:
         #[inline(always)]
         fn add_2_impl(ah: Limb, al: Limb, bh: Limb, bl: Limb) -> (Limb, Limb) {
-            let (low, carry) = al + bl;
+            let (low, carry) = al.add_overflow(bl);
             let high = ah + bh + carry;
 
             (high, low)
         }
     }
     return add_2_impl(ah, al, bh, bl);
+}
+
+/**
+ * Performs the two-word subtraction (ah, al) - (bh, bl), ignoring any borrow.
+ */
+#[inline(always)]
+pub fn sub_2(ah: Limb, al: Limb, bh: Limb, bl: Limb) -> (Limb, Limb) {
+    if_cfg! {
+        #[cfg(target_arch="x86_64")]
+        #[inline(always)]
+        fn sub_2_impl(ah: Limb, al: Limb, bh: Limb, bl: Limb) -> (Limb, Limb) {
+            let mut high: Limb = Limb(0);
+            let mut low: Limb  = Limb(0);
+            unsafe {
+                asm!("subq $4, $0
+                      sbbq $5, $1"
+                     : "=r"(low.0), "=r"(high.0)
+                     : "0"(al.0), "1"(ah.0), "r|e|m"(bl.0), "r|e|m"(bh.0));
+            }
+
+            (high, low)
+        }
+
+        #[cfg(target_arch="x86")]
+        #[inline(always)]
+        fn sub_2_impl(ah: Limb, al: Limb, bh: Limb, bl: Limb) -> (Limb, Limb) {
+            let mut high: Limb = Limb(0);
+            let mut low: Limb  = Limb(0);
+            unsafe {
+                asm!("subl $4, $0
+                      sbbl $5, $1"
+                     : "=r"(low.0), "=r"(high.0)
+                     : "0"(al.0), "1"(ah.0), "r|e|m"(bl.0), "r|e|m"(bh.0));
+            }
+
+            (high, low)
+        }
+
+        fallback:
+        #[inline(always)]
+        fn sub_2_impl(ah: Limb, al: Limb, bh: Limb, bl: Limb) -> (Limb, Limb) {
+            let (low, carry) = al.sub_overflow(bl);
+            let high = ah - bh - carry;
+
+            (high, low)
+        }
+    }
+    return sub_2_impl(ah, al, bh, bl);
 }
 
 /**

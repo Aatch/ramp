@@ -267,7 +267,7 @@ impl Int {
         q.size = out_size * out_sign;
 
         let mut r = Int::with_capacity(other.abs_size() as u32);
-        r.size = other.size;
+        r.size = other.abs_size() * self.sign();
 
         unsafe {
             ll::divrem(q.ptr.get_mut(), r.ptr.get_mut(),
@@ -447,6 +447,8 @@ impl Drop for Int {
 impl PartialEq<Int> for Int {
     #[inline]
     fn eq(&self, other: &Int) -> bool {
+        debug_assert!(self.well_formed());
+        debug_assert!(other.well_formed());
         if self.size == other.size {
             unsafe {
                 ll::cmp(self.ptr.get(), other.ptr.get(), self.abs_size()) == Ordering::Equal
@@ -825,6 +827,7 @@ impl<'a> Sub<&'a Int> for Int {
                 };
             }
 
+            self.normalize();
             return self;
         } else { // Different signs
             if self.sign() == -1 {
@@ -847,10 +850,10 @@ impl<'a> Sub<&'a Int> for Int {
 
                     let carry = ll::add(ptr, xp, xs, yp, ys);
                     self.size = xs;
+                    self.normalize();
                     if carry != 0 {
                         self.push(carry);
                     }
-
                     return self;
                 }
             }
@@ -1951,7 +1954,7 @@ pub fn rand_int<R: ::rand::Rng>(rng: &mut R, limbs: u32) -> Int {
 
 #[cfg(test)]
 mod test {
-    use rand;
+    use rand::{self, Rng};
     use test::{self, Bencher};
     use super::*;
     use std::str::FromStr;
@@ -2106,6 +2109,9 @@ mod test {
             ("-9", "-3", "3"),
             ("1234567891011121314151617", "95123654789852856006", "12978"),
             ("-1234567891011121314151617", "95123654789852856006", "-12978"),
+            ("-1198775410753307067346230628764044530011323809665206377243907561641040294348297309637331525393593945901384203950086960228531308793518800829453656715578105987032036211272103322425770761458186593",
+             "979504192721382235629958845425279521512826176107035761459344386626944187481828320416870752582555",
+             "-1223859397092234843008309150569447886995823751180958876260102037121722431272801092547910923059616")
         ];
 
         for &(l, r, a) in cases.iter() {
@@ -2113,86 +2119,168 @@ mod test {
             let r : Int = r.parse().unwrap();
             let a : Int = a.parse().unwrap();
 
-            assert_eq!(l / r, a);
+            let val = &l / &r;
+            if val != a {
+                println!("\nl / r: {:X}", val);
+                println!("    a: {:X}", a);
+                assert!(val == a);
+            }
         }
+    }
+
+    const RAND_ITER : usize = 1000;
+
+    #[test]
+    fn div_rand() {
+        let mut rng = rand::thread_rng();
+        for _ in (0..RAND_ITER) {
+            let x = rand_int(&mut rng, 10);
+            let y = rand_int(&mut rng, 5);
+
+            let (q, r) = x.divmod(&y);
+            let val = (q * &y) + r;
+
+            if val != x {
+                println!("\n{:X}", val);
+                println!("{:X} / {:X} produces incorrect value", x, y);
+                panic!();
+            }
+        }
+    }
+
+    fn bench_add(b: &mut Bencher, xs: u32, ys: u32) {
+        let mut rng = rand::thread_rng();
+
+        let x = rand_int(&mut rng, xs);
+        let y = rand_int(&mut rng, ys);
+
+        b.iter(|| {
+            let z = &x + &y;
+            test::black_box(z);
+        });
+    }
+
+    #[bench]
+    fn bench_add_1_1(b: &mut Bencher) {
+        bench_add(b, 1, 1);
+    }
+
+    #[bench]
+    fn bench_add_10_10(b: &mut Bencher) {
+        bench_add(b, 10, 10);
+    }
+
+    #[bench]
+    fn bench_add_100_100(b: &mut Bencher) {
+        bench_add(b, 100, 100);
+    }
+
+    #[bench]
+    fn bench_add_1000_1000(b: &mut Bencher) {
+        bench_add(b, 1000, 1000);
+    }
+
+    #[bench]
+    fn bench_add_1000_10(b: &mut Bencher) {
+        bench_add(b, 1000, 10);
+    }
+
+    fn bench_mul(b: &mut Bencher, xs: u32, ys: u32) {
+        let mut rng = rand::thread_rng();
+
+        let x = rand_int(&mut rng, xs);
+        let y = rand_int(&mut rng, ys);
+
+        b.iter(|| {
+            let z = &x * &y;
+            test::black_box(z);
+        });
+    }
+
+    #[bench]
+    fn bench_mul_1_1(b: &mut Bencher) {
+        bench_mul(b, 1, 1);
     }
 
     #[bench]
     fn bench_mul_10_10(b: &mut Bencher) {
-        let mut rng = rand::thread_rng();
-
-        let x = rand_int(&mut rng, 10);
-        let y = rand_int(&mut rng, 10);
-
-        b.iter(|| {
-            let z = &x * &y;
-            test::black_box(z);
-        });
+        bench_mul(b, 10, 10);
     }
 
     #[bench]
     fn bench_mul_2_20(b: &mut Bencher) {
-        let mut rng = rand::thread_rng();
-
-        let x = rand_int(&mut rng, 2);
-        let y = rand_int(&mut rng, 20);
-
-        b.iter(|| {
-            let z = &x * &y;
-            test::black_box(z);
-        });
+        bench_mul(b, 2, 20);
     }
 
     #[bench]
     fn bench_mul_50_50(b: &mut Bencher) {
-        let mut rng = rand::thread_rng();
-
-        let x = rand_int(&mut rng, 50);
-        let y = rand_int(&mut rng, 50);
-
-        b.iter(|| {
-            let z = &x * &y;
-            test::black_box(z);
-        });
+        bench_mul(b, 50, 50);
     }
 
     #[bench]
     fn bench_mul_5_50(b: &mut Bencher) {
-        let mut rng = rand::thread_rng();
-
-        let x = rand_int(&mut rng, 5);
-        let y = rand_int(&mut rng, 50);
-
-        b.iter(|| {
-            let z = &x * &y;
-            test::black_box(z);
-        });
+        bench_mul(b, 5, 50);
     }
 
     #[bench]
     fn bench_mul_250_250(b: &mut Bencher) {
+        bench_mul(b, 250, 250);
+    }
+
+    #[bench]
+    fn bench_mul_1000_1000(b: &mut Bencher) {
+        bench_mul(b, 1000, 1000);
+    }
+
+    #[bench]
+    fn bench_mul_50_1500(b: &mut Bencher) {
+        bench_mul(b, 50, 1500);
+    }
+
+    fn bench_div(b: &mut Bencher, xs: u32, ys: u32) {
         let mut rng = rand::thread_rng();
 
-        let x = rand_int(&mut rng, 250);
-        let y = rand_int(&mut rng, 250);
+        let x = rand_int(&mut rng, xs);
+        let y = rand_int(&mut rng, ys);
 
         b.iter(|| {
-            let z = &x * &y;
+            let z = &x / &y;
             test::black_box(z);
         });
     }
 
+    #[bench]
+    fn bench_div_1_1(b: &mut Bencher) {
+        bench_div(b, 1, 1);
+    }
 
     #[bench]
-    fn bench_mul_1000_1000(b: &mut Bencher) {
-        let mut rng = rand::thread_rng();
+    fn bench_div_10_10(b: &mut Bencher) {
+        bench_div(b, 10, 10);
+    }
 
-        let x = rand_int(&mut rng, 1000);
-        let y = rand_int(&mut rng, 1000);
+    #[bench]
+    fn bench_div_20_2(b: &mut Bencher) {
+        bench_div(b, 20, 2);
+    }
 
-        b.iter(|| {
-            let z = &x * &y;
-            test::black_box(z);
-        });
+    #[bench]
+    fn bench_div_50_50(b: &mut Bencher) {
+        bench_div(b, 50, 50);
+    }
+
+    #[bench]
+    fn bench_div_50_5(b: &mut Bencher) {
+        bench_div(b, 50, 5);
+    }
+
+    #[bench]
+    fn bench_div_250_250(b: &mut Bencher) {
+        bench_div(b, 250, 250);
+    }
+
+    #[bench]
+    fn bench_div_1000_1000(b: &mut Bencher) {
+        bench_div(b, 1000, 1000);
     }
 }

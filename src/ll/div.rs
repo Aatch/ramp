@@ -130,6 +130,113 @@ pub unsafe fn divrem_1(mut qp: *mut Limb, qxn: i32,
     }
 }
 
+pub unsafe fn divrem_2(mut qp: *mut Limb, qxn: i32,
+                       mut np: *mut Limb, ns: i32,
+                       dp: *const Limb) -> Limb {
+    debug_assert!(ns >= 2);
+    debug_assert!(qxn >= 0);
+    debug_assert!((*dp.offset(1)).high_bit_set());
+    debug_assert!(!overlap(qp, ns-2+qxn, np, ns) || qp >= np.offset(2));
+
+    np = np.offset((ns - 2) as isize);
+
+    let d1 = *dp.offset(1);
+    let d0 = *dp.offset(0);
+    let mut r1 = *np.offset(1);
+    let mut r0 = *np.offset(0);
+
+    let mut most_significant_q_limb = 0;
+    if r1 >= d1 && (r1 > d1 || r0 >= d0) {
+        let (r_1, r_0) = ll::limb::sub_2(r1, r0, d1, d0);
+        r1 = r_1;
+        r0 = r_0;
+        most_significant_q_limb = 1;
+    }
+
+    let dinv = invert_pi(d1, d0);
+
+    qp = qp.offset(qxn as isize);
+
+    let mut i = ns - 2 - 1;
+    while i >= 0 {
+        let n0 = *np.offset(-1);
+        let (q, r_1, r_0) = divrem_3by2(r1, r0, n0, d1, d0, dinv);
+        np = np.offset(-1);
+        r1 = r_1;
+        r0 = r_0;
+        *qp.offset(i as isize) = q;
+
+        i -= 1;
+    }
+
+    if qxn != 0 {
+        qp = qp.offset(-qxn as isize);
+        let mut i = qxn - 1;
+        while i >= 0 {
+            let (q, r_1, r_0) = divrem_3by2(r1, r0, Limb(0), d1, d0, dinv);
+            r1 = r_1;
+            r0 = r_0;
+
+            *qp.offset(i as isize) = q;
+
+            i -= 1;
+        }
+    }
+
+    *np.offset(1) = r1;
+    *np = r0;
+
+    return Limb(most_significant_q_limb);
+}
+
+#[inline]
+fn invert_pi(d1: Limb, d0: Limb) -> Limb {
+    let mut v = d1.invert();
+    let (mut p, cy) = (d1 * v).add_overflow(d0);
+    if cy {
+        v = v - 1;
+        let mask = if p >= d1 { Limb(!0) } else { Limb(0) };
+        p = p - d1;
+        v = v + mask;
+        p = p - (mask & d1);
+    }
+
+    let (t1, t0) = d0.mul_hilo(v);
+    p = p + t1;
+    if p < t1 {
+        v = v - 1;
+        if p >= d1 && (p > d1 || t0 >= d0) {
+            v = v - 1;
+        }
+    }
+
+    v
+}
+
+#[inline]
+fn divrem_3by2(n2: Limb, n1: Limb, n0: Limb, d1: Limb, d0: Limb, dinv: Limb) -> (Limb, Limb, Limb) {
+    let (q, ql) = n2.mul_hilo(dinv);
+    let (q, ql) = ll::limb::add_2(q, ql, n2, n1);
+
+    let r1 = n1 - d1 * q;
+    let (r1, r0) = ll::limb::sub_2(r1, n0, d1, d0);
+    let (t1, t0) = d0.mul_hilo(q);
+    let (r1, r0) = ll::limb::sub_2(r1, r0, t1, t0);
+
+    let q = q + 1;
+    let mask = if r1 >= ql { Limb(!0) } else { Limb(0) };
+
+    let q = q + mask;
+    let (r1, r0) = ll::limb::add_2(r1, r0, mask & d1, mask & d0);
+
+    if r1 >= d1 && (r1 > d1 || r0 >= d0) {
+        let (r1, r0) = ll::limb::sub_2(r1, r0, d1, d0);
+        (q + 1, r1, r0)
+    } else {
+        (q, r1, r0)
+    }
+}
+
 /**
  * Divides {np, ns} by {dp, ds}. If ns <= ds, the quotient is stored in {qp, 1}, otherwise
  * the quotient is stored to {qp, (ns - ds) + 1}. The remainder is always stored to {rp, ds}.
@@ -155,6 +262,38 @@ pub unsafe fn divrem(qp: *mut Limb, rp: *mut Limb,
         1 => {
             let r = divrem_1(qp, 0, np, ns, *dp);
             *rp = r;
+        }
+        2 => {
+            let mut tmp = mem::TmpAllocator::new();
+            let dh = *dp.offset((ds - 1) as isize);
+
+            let cnt = dh.leading_zeros() as usize;
+            if cnt == 0 {
+                let np_tmp = tmp.allocate((ns + 1) as usize);
+                ll::copy_incr(np, np_tmp, ns);
+                let qhl = divrem_2(qp, 0, np_tmp, ns, dp);
+                *qp.offset((ns - 2) as isize) = qhl;
+                *rp = *np_tmp;
+                *rp.offset(1) = *np_tmp.offset(1);
+            } else {
+                let dtmp = [*dp << cnt, (*dp.offset(1) << cnt) | *dp >> (Limb::BITS - cnt)];
+                let dp_tmp : *const Limb = &dtmp[0];
+
+                let np_tmp = tmp.allocate((ns + 1) as usize);
+                let c = ll::shl(np_tmp, np, ns, cnt as u32);
+                *np_tmp.offset(ns as isize) = c;
+
+                let ns_tmp = ns + if c == 0 { 0 } else { 1 };
+
+                let qhl = divrem_2(qp, 0, np_tmp, ns_tmp, dp_tmp);
+                if c == 0 {
+                    *qp.offset((ns - 2) as isize) = qhl;
+                }
+
+                *rp = (*np_tmp >> cnt) | (*np_tmp.offset(1) << Limb::BITS - cnt);
+                *rp.offset(1) = *np_tmp.offset(1) >> cnt;
+            }
+            return;
         }
         _ => {
             let mut tmp = mem::TmpAllocator::new();
@@ -186,7 +325,9 @@ pub unsafe fn divrem(qp: *mut Limb, rp: *mut Limb,
                 dp_tmp = dtmp;
             }
 
-            let qh = sb_div(qp, np_tmp, ns_tmp, dp_tmp, ds);
+            let dinv = invert_pi(*dp_tmp.offset((ds - 1) as isize),
+                                 *dp_tmp.offset((ds - 2) as isize));
+            let qh = sb_div(qp, np_tmp, ns_tmp, dp_tmp, ds, dinv);
             if qh > 0 {
                 *qp.offset((ns - ds) as isize) = qh;
             }
@@ -219,8 +360,9 @@ pub unsafe fn divrem(qp: *mut Limb, rp: *mut Limb,
  */
 unsafe fn sb_div(qp: *mut Limb,
                  np: *mut Limb, ns: i32,
-                 dp: *const Limb, ds: i32) -> Limb {
-    debug_assert!(ds > 1);
+                 dp: *const Limb, ds: i32,
+                 dinv: Limb) -> Limb {
+    debug_assert!(ds > 2);
     debug_assert!(ns >= ds);
     debug_assert!((*dp.offset((ds - 1) as isize)).high_bit_set());
 
@@ -238,30 +380,41 @@ unsafe fn sb_div(qp: *mut Limb,
 
     let mut qp = qp.offset((ns - ds) as isize);
 
-    let ds = (ds - 1) as isize;
-    let d = *dp.offset(ds);
+    let ds = (ds - 2) as isize;
 
-    np = np.offset(-1);
-    let mut nh = *np;
+    let d1 = *dp.offset(ds + 1);
+    let d0 = *dp.offset(ds + 0);
 
-    let mut i = ns - (ds + 1) as i32;
+    np = np.offset(-2);
+
+    let mut n2 = *np.offset(1);
+
+    let mut i = ns - (ds + 2) as i32;
     while i > 0 {
         np = np.offset(-1);
+        let n1 = *np.offset(1);
+        let n0 = *np;
 
-        let nl = *np;
-
-        let q = if nh == d {
-            ll::submul_1(np.offset(-ds), dp, (ds + 1) as i32, Limb(!0));
-            nh = *np;
+        let q = if n2 == d1 && n1 == d0 {
+            ll::submul_1(np.offset(-ds), dp, (ds + 2) as i32, Limb(!0));
+            n2 = *np.offset(1);
             Limb(!0)
         } else {
-            let (q, r) = limb::div(nh, nl, d);
-            let c = ll::submul_1(np.offset(-ds), dp, ds as i32, q);
+            let (q, r1, mut r0) = divrem_3by2(n2, n1, n0, d1, d0, dinv);
+            let cy = ll::submul_1(np.offset(-ds), dp, ds as i32, q);
 
-            nh = r - c;
+            n2 = r1;
 
-            if r < c {
-                nh = nh + ll::add_n(np.offset(-ds), np.offset(-ds), dp, (ds + 1) as i32);
+            let cy1 = r0 < cy;
+            r0 = r0 - cy;
+            let cy = n2 < (cy1 as ll::limb::BaseInt);
+            if cy1 {
+                n2 = n2 - 1;
+            }
+            *np = r0;
+
+            if cy {
+                n2 = d1 + n2 + ll::add_n(np.offset(-ds), np.offset(-ds), dp, (ds + 1) as i32);
                 q - 1
             } else {
                 q
@@ -274,7 +427,7 @@ unsafe fn sb_div(qp: *mut Limb,
         i -= 1;
     }
 
-    *np = nh;
+    *np.offset(1) = n2;
 
     return qh;
 }
