@@ -19,11 +19,10 @@ use std::cmp::{
     PartialOrd, PartialEq
 };
 use std::error::Error;
-use std::fmt;
+use std::{fmt, hash};
 use std::num::Zero;
 use std::ops::{
-    Add, Sub, Mul, Div, Rem,
-    Neg
+    Add, Sub, Mul, Div, Rem, Neg
 };
 use std::ptr::Unique;
 use std::str::FromStr;
@@ -84,8 +83,14 @@ use mem;
  * There are also a overloads for a small number of primitive integer types, namely `i32` and
  * `usize`. While automatic type widening isn't done in Rust in general, many operations are much
  * more efficient when working with a single integer. This means you can do `a + 1` knowing that it
- * will be performed as efficiently as possible.
+ * will be performed as efficiently as possible. Comparison with these integer types is also
+ * possible, allowing checks for small constant values to be done easily:
  *
+ *   ```
+ *   # use ramp::Int;
+ *   let big_i   = Int::from(123456789);
+ *   assert!(big_i == 123456789);
+ *   ```
  */
 pub struct Int {
     ptr: Unique<Limb>,
@@ -589,6 +594,27 @@ impl PartialOrd<Int> for Limb {
     #[inline]
     fn partial_cmp(&self, other: &Int) -> Option<Ordering> {
         other.partial_cmp(self).map(|o| o.reverse())
+    }
+}
+
+impl hash::Hash for Int {
+    fn hash<H>(&self, state: &mut H) where H: hash::Hasher {
+        debug_assert!(self.well_formed());
+        let mut size = self.abs_size();
+        if size == 0 {
+            Limb(0).hash(state);
+            return;
+        }
+        unsafe {
+            let mut ptr = self.ptr.get() as *const Limb;
+            while size > 0 {
+                let l = *ptr;
+                l.hash(state);
+
+                ptr = ptr.offset(1);
+                size -= 1;
+            }
+        }
     }
 }
 
@@ -2010,7 +2036,9 @@ pub fn rand_int<R: ::rand::Rng>(rng: &mut R, limbs: u32) -> Int {
 
 #[cfg(test)]
 mod test {
-    use rand::{self, Rng};
+    use std;
+    use std::hash::{Hash, Hasher};
+    use rand;
     use test::{self, Bencher};
     use super::*;
     use std::str::FromStr;
@@ -2204,6 +2232,27 @@ mod test {
         }
     }
 
+    #[test]
+    fn hash_rand() {
+        let mut rng = rand::thread_rng();
+        for _ in (0..RAND_ITER) {
+            let x1 = rand_int(&mut rng, 10);
+            let x2 = x1.clone();
+
+            assert!(x1 == x2);
+
+            let mut hasher = std::hash::SipHasher::new();
+            x1.hash(&mut hasher);
+            let x1_hash = hasher.finish();
+
+            let mut hasher = std::hash::SipHasher::new();
+            x2.hash(&mut hasher);
+            let x2_hash = hasher.finish();
+
+            assert!(x1_hash == x2_hash);
+        }
+    }
+
     fn bench_add(b: &mut Bencher, xs: u32, ys: u32) {
         let mut rng = rand::thread_rng();
 
@@ -2303,6 +2352,7 @@ mod test {
             }
 
             i = i * 100;
+            test::black_box(i);
         });
     }
 
