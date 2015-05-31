@@ -13,6 +13,9 @@ repository = "https://github.com/Aatch/ramp"
 name = "ramp"
 path = "src/lib.rs"
 
+[features]
+unstable = [] # To keep travis-cargo happy
+
 [[example]]
 name = "factorial"
 

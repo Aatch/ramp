@@ -1,5 +1,7 @@
 # RAMP - Rust Arithmetic in Multiple Precision
 
+[![Build Status](https://travis-ci.org/Aatch/ramp.svg?branch=master)](https://travis-ci.org/Aatch/ramp)
+
 Ramp is a high-performance mulitple-precision (aka "BigNum") library for working with numbers
 bigger than can normally be handled. Usage is very easy, you can almost use them as regular
 numbers.
@@ -26,11 +28,15 @@ fn factorial(n: usize) -> Int {
 As you can see, it is very easy to work with these numbers.
 
 Operator overloads have been provided for by-value, which consumes the operand(s) and by-reference,
-which does not. The by-value overloads will attempt to re-use the space for the result.
+which does not. The by-value overloads will attempt to re-use the space for the result (this isn't
+always possible).
 
 Operator overloads have also been provided for `i32` and `usize`, allowing easy (and efficient)
 operations when you have smaller numbers. The above example actually uses the `usize` overload,
 meaning only one `Int` is ever allocated.
+
+**NOTE** Due to use of unstable features (notably inline assembly), Ramp can only be compiled with
+a nightly build of `rustc`.
 
 ## Why another library?
 
