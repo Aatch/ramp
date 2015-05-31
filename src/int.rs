@@ -37,7 +37,55 @@ use mem;
  *
  * This type grows to the size it needs to in order to store the result of any operation.
  *
- * You can convert to a primitive integer type by using `From`: `i32::from(&myint)`.
+ * ## Creation
+ *
+ * An `Int` can be constructed in a number of ways:
+ *
+ * - `Int::zero` and `Int::one` construct a zero- and one-valued `Int` respectively.
+ *
+ * - `Int::from` will convert from any primitive integer type to an `Int` of the same value
+ *
+ *   ```
+ *   # use ramp::Int;
+ *   let four = Int::from(4);
+ *   ```
+ *
+ * - `Int::from_str` (or `str::parse`) will attempt to convert from a string to an `Int`
+ *
+ *   ```
+ *   # use ramp::Int;
+ *   # use std::str::FromStr;
+ *   let i = Int::from_str("123456789").unwrap();
+ *   ```
+ *
+ * ## Output
+ *
+ * `Int` supports all the formatting traits, allowing it to be used just like a regular integer
+ * when used in `format!` and similar macros. `Int` also supports conversion to primitive integer
+ * types, truncating if the `Int` cannot fit into the target type. Conversion to primtive integers
+ * is done with the `From` trait:
+ *
+ *   ```
+ *   # use ramp::Int;
+ *   let big_i   = Int::from(123456789);
+ *   let i = i32::from(&big_i);
+ *   assert_eq!(123456789, i);
+ *   ```
+ *
+ * ## Usage
+ *
+ * `Int` has a number of operator overloads to make working with them as painless as possible.
+ *
+ * The most basic usage is simply `a + b` or similar. Assuming `a` and `b` are of type `Int`, this
+ * operation will consume both operands, reusing the storage from one of them. If you do not wish
+ * your operands to be moved, one or both of them can be references: `&a + &b` works as well, but
+ * requires an entire new `Int` to be allocated for the return value.
+ *
+ * There are also a overloads for a small number of primitive integer types, namely `i32` and
+ * `usize`. While automatic type widening isn't done in Rust in general, many operations are much
+ * more efficient when working with a single integer. This means you can do `a + 1` knowing that it
+ * will be performed as efficiently as possible.
+ *
  */
 pub struct Int {
     ptr: Unique<Limb>,
@@ -46,6 +94,14 @@ pub struct Int {
 }
 
 impl Int {
+    pub fn zero() -> Int {
+        <Int as Zero>::zero()
+    }
+
+    pub fn one() -> Int {
+        <Int as std::num::One>::one()
+    }
+
     /// Creates a new Int from the given Limb.
     pub fn from_single_limb(limb: Limb) -> Int {
         let mut i = Int::with_capacity(1);
@@ -2235,6 +2291,34 @@ mod test {
     #[bench]
     fn bench_mul_50_1500(b: &mut Bencher) {
         bench_mul(b, 50, 1500);
+    }
+
+    #[bench]
+    fn bench_factorial_100(b: &mut Bencher) {
+        b.iter(|| {
+            let mut i = Int::from(1);
+
+            for j in 2..100 {
+                i = i * j;
+            }
+
+            i = i * 100;
+        });
+    }
+
+    #[bench]
+    fn bench_factorial_1000(b: &mut Bencher) {
+        b.iter(|| {
+            let mut i = Int::from(1);
+
+            for j in 2..1000 {
+                i = i * j;
+            }
+
+            i = i * 1000;
+
+            test::black_box(i);
+        });
     }
 
     fn bench_div(b: &mut Bencher, xs: u32, ys: u32) {
