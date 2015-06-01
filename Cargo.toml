@@ -17,9 +17,13 @@ path = "src/lib.rs"
 
 [features]
 unstable = [] # To keep travis-cargo happy
+asm = []
 
 [[example]]
 name = "factorial"
 
 [dev-dependencies]
 rand = "*"
+
+[build-dependencies]
+gcc = "*"

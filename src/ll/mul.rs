@@ -12,6 +12,8 @@
 //    See the License for the specific language governing permissions and
 //    limitations under the License.
 
+#![allow(improper_ctypes)]
+
 use std::cmp::Ordering;
 
 use ll;
@@ -21,16 +23,7 @@ use mem;
 
 const TOOM22_THRESHOLD : i32 = 20;
 
-/**
- * Multiplies the `n` least-significant limbs of `xp` by `vl` storing the `n` least-significant
- * limbs of the product in `{wp, n}`.
- *
- * Returns the highest limb of the product
- */
-pub unsafe fn mul_1(mut wp: *mut Limb, mut xp: *const Limb, mut n: i32, vl: Limb) -> Limb {
-    debug_assert!(n > 0);
-    debug_assert!(same_or_incr(wp, n, xp, n));
-
+unsafe fn mul_1_generic(mut wp: *mut Limb, mut xp: *const Limb, mut n: i32, vl: Limb) -> Limb {
     let mut cl = Limb(0);
     loop {
         let xl = *xp;
@@ -51,10 +44,39 @@ pub unsafe fn mul_1(mut wp: *mut Limb, mut xp: *const Limb, mut n: i32, vl: Limb
 }
 
 /**
- * Multiplies the `n` least-signficiant digits of `xp` by `vl` and adds them to the `n`
- * least-significant digits of `wp`. Returns the highest limb of the result.
+ * Multiplies the `n` least-significant limbs of `xp` by `vl` storing the `n` least-significant
+ * limbs of the product in `{wp, n}`.
+ *
+ * Returns the highest limb of the product
  */
-pub unsafe fn addmul_1(mut wp: *mut Limb, mut xp: *const Limb, mut n: i32, vl: Limb) -> Limb {
+#[cfg(not(asm))]
+#[inline]
+pub unsafe fn mul_1(wp: *mut Limb, xp: *const Limb, n: i32, vl: Limb) -> Limb {
+    debug_assert!(n > 0);
+    debug_assert!(same_or_incr(wp, n, xp, n));
+
+    mul_1_generic(wp, xp, n, vl)
+}
+
+/**
+ * Multiplies the `n` least-significant limbs of `xp` by `vl` storing the `n` least-significant
+ * limbs of the product in `{wp, n}`.
+ *
+ * Returns the highest limb of the product
+ */
+#[cfg(asm)]
+#[inline]
+pub unsafe fn mul_1(wp: *mut Limb, xp: *const Limb, n: i32, vl: Limb) -> Limb {
+    debug_assert!(n > 0);
+    debug_assert!(same_or_incr(wp, n, xp, n));
+    extern "C" {
+        fn ramp_mul_1(wp: *mut Limb, xp: *const Limb, n: i32, vl: Limb) -> Limb;
+    }
+
+    ramp_mul_1(wp, xp, n, vl)
+}
+
+unsafe fn addmul_1_generic(mut wp: *mut Limb, mut xp: *const Limb, mut n: i32, vl: Limb) -> Limb {
     debug_assert!(n > 0);
     debug_assert!(same_or_separate(wp, n, xp, n));
 
@@ -78,6 +100,30 @@ pub unsafe fn addmul_1(mut wp: *mut Limb, mut xp: *const Limb, mut n: i32, vl: L
     }
 
     return cl;
+}
+
+/**
+ * Multiplies the `n` least-signficiant digits of `xp` by `vl` and adds them to the `n`
+ * least-significant digits of `wp`. Returns the highest limb of the result.
+ */
+#[cfg(not(asm))]
+#[inline]
+pub unsafe fn addmul_1(wp: *mut Limb, xp: *const Limb, n: i32, vl: Limb) -> Limb {
+    addmul_1_generic(wp, xp, n, vl)
+}
+
+/**
+ * Multiplies the `n` least-signficiant digits of `xp` by `vl` and adds them to the `n`
+ * least-significant digits of `wp`. Returns the highest limb of the result.
+ */
+#[cfg(asm)]
+#[inline]
+pub unsafe fn addmul_1(wp: *mut Limb, xp: *const Limb, n: i32, vl: Limb) -> Limb {
+    extern "C" {
+        fn ramp_addmul_1(wp: *mut Limb, xp: *const Limb, n: i32, vl: Limb) -> Limb;
+    }
+
+    ramp_addmul_1(wp, xp, n, vl)
 }
 
 /**

@@ -1,5 +1,7 @@
 #![allow(unused_must_use)]
 
+extern crate gcc;
+
 use std::mem;
 use std::env;
 use std::fs::File;
@@ -14,6 +16,37 @@ fn main() {
     let mut f = File::create(&dest_path).unwrap();
 
     gen_bases(&mut f);
+
+    if let Ok(_) = env::var("CARGO_FEATURE_ASM") {
+        compile_asm();
+    }
+}
+
+// Compile the asm implementations of operations. This is currently very dumb
+// and should probably be a little smarter in how it does the job. I'll probably
+// need to split out the generic impls and handle that too...
+fn compile_asm() {
+    if let Ok(target) = env::var("TARGET") {
+        if let Ok(host) = env::var("HOST") {
+            if host != target { panic!("Cross compiling not currently supported"); }
+
+            // Currently only supported for 64-bit linux
+            if (target.contains("x86-64") || target.contains("x86_64")) && target.contains("linux")  {
+
+                let asm_srcs = &[
+                    "src/ll/asm/add_n.asm",
+                    "src/ll/asm/sub_n.asm",
+                    "src/ll/asm/mul_1.asm",
+                    "src/ll/asm/addmul_1.asm",
+                ];
+
+                gcc::compile_library("libasm.a", asm_srcs);
+                // Use a cfg param so turning the feature on when we don't have
+                // asm impls available doesn't cause compile errors
+                println!("cargo:rustc-cfg=asm");
+            }
+        }
+    }
 }
 
 fn gen_bases(f: &mut File) {

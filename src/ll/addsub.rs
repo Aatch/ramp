@@ -12,20 +12,15 @@
 //    See the License for the specific language governing permissions and
 //    limitations under the License.
 
+#![allow(improper_ctypes)]
+
 use ll::limb::Limb;
 use super::{copy_rest, same_or_separate};
 
-/**
- * Adds the `n` least signficant limbs of `xp` and `yp`, storing the result in {wp, n}.
- * If there was a carry, it is returned.
- */
-pub unsafe fn add_n(mut wp: *mut Limb, mut xp: *const Limb, mut yp: *const Limb,
-                    mut n: i32) -> Limb {
-    let mut carry = Limb(0);
+unsafe fn add_n_generic(mut wp: *mut Limb, mut xp: *const Limb, mut yp: *const Limb,
+                        mut n: i32) -> Limb {
 
-    debug_assert!(n >= 1);
-    debug_assert!(same_or_separate(wp, n, xp, n));
-    debug_assert!(same_or_separate(wp, n, yp, n));
+    let mut carry = Limb(0);
 
     loop {
         let xl = *xp;
@@ -50,11 +45,41 @@ pub unsafe fn add_n(mut wp: *mut Limb, mut xp: *const Limb, mut yp: *const Limb,
 }
 
 /**
- * Subtracts the `n` least signficant limbs of `yp` from `xp`, storing the result in {wp, n}.
- * If there was a borrow from a higher-limb (i.e., the result would be negative), it is returned.
+ * Adds the `n` least signficant limbs of `xp` and `yp`, storing the result in {wp, n}.
+ * If there was a carry, it is returned.
  */
-pub unsafe fn sub_n(mut wp: *mut Limb, mut xp: *const Limb, mut yp: *const Limb,
-                    mut n: i32) -> Limb {
+#[inline]
+#[cfg(asm)]
+pub unsafe fn add_n(wp: *mut Limb, xp: *const Limb, yp: *const Limb,
+                    n: i32) -> Limb {
+    #[cfg(target_arch="x86_64")]
+    extern "C" { fn ramp_add_n(wp: *mut Limb, xp: *const Limb, yp: *const Limb,
+                               n: i32) -> Limb; }
+
+    debug_assert!(n >= 1);
+    debug_assert!(same_or_separate(wp, n, xp, n));
+    debug_assert!(same_or_separate(wp, n, yp, n));
+
+    return ramp_add_n(wp, xp, yp, n);
+}
+
+/**
+ * Adds the `n` least signficant limbs of `xp` and `yp`, storing the result in {wp, n}.
+ * If there was a carry, it is returned.
+ */
+#[cfg(not(asm))]
+#[inline]
+pub unsafe fn add_n(wp: *mut Limb, xp: *const Limb, yp: *const Limb,
+                    n: i32) -> Limb {
+    debug_assert!(n >= 1);
+    debug_assert!(same_or_separate(wp, n, xp, n));
+    debug_assert!(same_or_separate(wp, n, yp, n));
+
+    add_n_generic(wp, xp, yp, n)
+}
+
+unsafe fn sub_n_generic(mut wp: *mut Limb, mut xp: *const Limb, mut yp: *const Limb,
+                        mut n: i32) -> Limb {
     let mut carry = Limb(0);
 
     debug_assert!(n >= 1);
@@ -81,6 +106,33 @@ pub unsafe fn sub_n(mut wp: *mut Limb, mut xp: *const Limb, mut yp: *const Limb,
     }
 
     carry
+}
+
+/**
+ * Subtracts the `n` least signficant limbs of `yp` from `xp`, storing the result in {wp, n}.
+ * If there was a borrow from a higher-limb (i.e., the result would be negative), it is returned.
+ */
+#[cfg(asm)]
+#[inline]
+pub unsafe fn sub_n(wp: *mut Limb, xp: *const Limb, yp: *const Limb,
+                    n: i32) -> Limb {
+    extern "C" {
+        fn ramp_sub_n(wp: *mut Limb, xp: *const Limb, yp: *const Limb,
+                      n: i32) -> Limb;
+    }
+
+    ramp_sub_n(wp, xp, yp, n)
+}
+
+/**
+ * Subtracts the `n` least signficant limbs of `yp` from `xp`, storing the result in {wp, n}.
+ * If there was a borrow from a higher-limb (i.e., the result would be negative), it is returned.
+ */
+#[cfg(not(asm))]
+#[inline]
+pub unsafe fn sub_n(wp: *mut Limb, xp: *const Limb, yp: *const Limb,
+                    n: i32) -> Limb {
+    sub_n_generic(wp, xp, yp, n)
 }
 
 macro_rules! aors {
