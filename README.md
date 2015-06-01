@@ -2,6 +2,8 @@
 
 [![Build Status](https://travis-ci.org/Aatch/ramp.svg?branch=master)](https://travis-ci.org/Aatch/ramp)
 
+**[Documentation](https://aatch.github.io/ramp/ramp)**
+
 Ramp is a high-performance mulitple-precision (aka "BigNum") library for working with numbers
 bigger than can normally be handled. Usage is very easy, you can almost use them as regular
 numbers.

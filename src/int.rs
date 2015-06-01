@@ -23,7 +23,7 @@ use std::{fmt, hash};
 use std::num::Zero;
 use std::ops::{
     Add, Sub, Mul, Div, Rem, Neg,
-    Shl
+    Shl, Shr
 };
 use std::ptr::Unique;
 use std::str::FromStr;
@@ -1363,6 +1363,52 @@ impl<'a> Shl<usize> for &'a Int {
     }
 }
 
+impl Shr<usize> for Int {
+    type Output = Int;
+
+    #[inline]
+    fn shr(mut self, mut cnt: usize) -> Int {
+        debug_assert!(self.well_formed());
+        if self.sign() == 0 { return self; }
+
+        if cnt >= Limb::BITS as usize {
+            let removed_limbs = (cnt / Limb::BITS as usize) as u32;
+            let size = self.abs_size();
+            if removed_limbs as i32 >= size {
+                return Int::zero();
+            }
+            debug_assert!(removed_limbs > 0);
+            cnt = cnt % Limb::BITS as usize;
+
+            unsafe {
+                let ptr = self.ptr.get_mut() as *mut Limb;
+                let shift = self.ptr.offset(removed_limbs as isize);
+
+                // Shift down a whole number of limbs
+                ll::copy_incr(shift, ptr, size);
+                // Zero out the high limbs
+                ll::zero(ptr.offset((size - (removed_limbs as i32)) as isize),
+                         removed_limbs as i32);
+
+                self.size -= (removed_limbs as i32) * self.sign();
+            }
+        }
+
+        debug_assert!(cnt < Limb::BITS as usize);
+        if cnt == 0 { return self; }
+
+        let size = self.abs_size();
+
+        unsafe {
+            let ptr = self.ptr.get_mut() as *mut Limb;
+            ll::shr(ptr, ptr, size, cnt as u32);
+            self.normalize();
+        }
+
+        return self;
+    }
+}
+
 macro_rules! impl_arith_prim (
     (signed $t:ty) => (
         // Limbs are unsigned, so make sure we account for the sign
@@ -2314,6 +2360,20 @@ mod test {
             let mul = x * mul_by;
 
             assert!(shift == mul);
+        }
+    }
+
+    #[test]
+    fn shr_rand() {
+        let mut rng = rand::thread_rng();
+        for _ in (0..RAND_ITER) {
+            let pow : usize = rng.gen_range(64, 8196);
+            let x = rand_int(&mut rng, 10);
+
+            let shift_up = &x << pow;
+            let shift_down = shift_up >> pow;
+
+            assert!(shift_down == x);
         }
     }
 

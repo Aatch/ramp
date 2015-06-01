@@ -1,13 +1,15 @@
 [package]
 name = "ramp"
 description = "A high-performance multiple-precision arithmetic library"
-version = "0.1.4"
+version = "0.1.5"
 authors = ["James Miller <james@aatch.net>"]
 build = "build.rs"
 license = "Apache-2.0"
 readme = "README.md"
 keywords = ["bignum","math","number"]
+
 repository = "https://github.com/Aatch/ramp"
+documentation = "https://aatch.github.io/ramp/ramp/"
 
 [lib]
 name = "ramp"
