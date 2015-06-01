@@ -126,13 +126,11 @@ pub unsafe fn mul(wp: *mut Limb, xp: *const Limb, xs: i32, yp: *const Limb, ys: 
         mul_basecase(wp, xp, xs, yp, ys);
     } else {
         let mut tmp = mem::TmpAllocator::new();
-        // Each recursion in mul_toom22 uses ~xs scratch space, and
-        // the size of xs halves each time since 1 + 1/2 + 1/4 + ... = 2
-        // we need about xs*2 scratch space. Less, actually, since the
-        // base case doesn't use any scratch space
         let scratch = tmp.allocate((xs * 2) as usize);
 
-        if xs >= (ys * 2) {
+        // Can't use xs >= (ys * 2) because if xs is odd, some other invariants
+        // in toom22 don't hold
+        if (xs * 2) >= (ys * 3) {
             mul_unbalanced(wp, xp, xs, yp, ys, scratch);
         } else {
             mul_toom22(wp, xp, xs, yp, ys, scratch);
@@ -164,7 +162,7 @@ unsafe fn mul_rec(wp: *mut Limb,
            scratch: *mut Limb) {
     if ys < TOOM22_THRESHOLD {
         mul_basecase(wp, xp, xs, yp, ys);
-    } else if xs >= (ys*2) {
+    } else if (xs * 2) >= (ys*3) {
         mul_unbalanced(wp, xp, xs, yp, ys, scratch);
     } else {
         mul_toom22(wp, xp, xs, yp, ys, scratch);
@@ -195,14 +193,17 @@ unsafe fn mul_toom22(wp: *mut Limb,
     //
     // So z1 = zx1*zy1
 
-    debug_assert!(xs >= ys && xs < ys*2);
+    debug_assert!(xs >= ys && xs < ys*2,
+                  "assertion failed: `xs >= ys && xs < ys*2` xs: {}, ys: {}", xs, ys);
 
     let xh = xs >> 1; // Number of high limbs in x
     let nl = xs - xh; // Number of low limbs
     let yh = ys - nl; // Number of high limbs in y
 
     debug_assert!(0 < xh && xh <= nl);
-    debug_assert!(0 < yh && yh <= xh);
+    debug_assert!(0 < yh && yh <= xh,
+                  "assertion failed: 0 < yh && yh <= xh, xs: {}, ys: {}, xh: {}, yh: {}",
+                  xs, ys, xh, yh);
 
     let x0 = xp; // nl limbs
     let y0 = yp; // nl limbs
@@ -336,9 +337,11 @@ unsafe fn mul_unbalanced(mut wp: *mut Limb,
     wp = wp.offset(ys as isize);
 
     // Temporary storage for the output of the multiplication
-    // in the loop, no more than ys*2 limbs
+    // in the loop, the loop only needs ys*2 limbs, but the last
+    // multiplication needs slightly more than that, but no more
+    // than ys*3
     let mut tmp = mem::TmpAllocator::new();
-    let w_tmp = tmp.allocate((ys * 2) as usize);
+    let w_tmp = tmp.allocate((ys * 3) as usize);
 
     while xs >= (ys * 2) {
         mul_toom22(w_tmp, xp, ys, yp, ys, scratch);
@@ -353,7 +356,11 @@ unsafe fn mul_unbalanced(mut wp: *mut Limb,
         wp = wp.offset(ys as isize);
     }
 
-    mul_toom22(w_tmp, xp, xs, yp, ys, scratch);
+    if xs >= ys {
+        mul_rec(w_tmp, xp, xs, yp, ys, scratch);
+    } else {
+        mul_rec(w_tmp, yp, ys, xp, xs, scratch);
+    }
 
     let cy = ll::add_n(wp, wp, w_tmp, ys);
     ll::copy_incr(w_tmp.offset(ys as isize),

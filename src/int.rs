@@ -22,7 +22,8 @@ use std::error::Error;
 use std::{fmt, hash};
 use std::num::Zero;
 use std::ops::{
-    Add, Sub, Mul, Div, Rem, Neg
+    Add, Sub, Mul, Div, Rem, Neg,
+    Shl
 };
 use std::ptr::Unique;
 use std::str::FromStr;
@@ -345,7 +346,7 @@ impl Int {
     /**
      * Raises self to the power of exp
      */
-    pub fn pow<I>(self, mut exp: usize) -> Int {
+    pub fn pow(self, mut exp: usize) -> Int {
         debug_assert!(self.well_formed());
         // TODO: There's almost certainly a better way of doing this calculation
 
@@ -600,11 +601,8 @@ impl PartialOrd<Int> for Limb {
 impl hash::Hash for Int {
     fn hash<H>(&self, state: &mut H) where H: hash::Hasher {
         debug_assert!(self.well_formed());
+        self.sign().hash(state);
         let mut size = self.abs_size();
-        if size == 0 {
-            Limb(0).hash(state);
-            return;
-        }
         unsafe {
             let mut ptr = self.ptr.get() as *const Limb;
             while size > 0 {
@@ -1309,7 +1307,60 @@ impl<'a> Neg for &'a Int {
     fn neg(self) -> Int {
         self.clone().neg()
     }
+}
 
+impl Shl<usize> for Int {
+    type Output = Int;
+
+    #[inline]
+    fn shl(mut self, mut cnt: usize) -> Int {
+        debug_assert!(self.well_formed());
+        if self.sign() == 0 { return self; }
+
+        if cnt >= Limb::BITS as usize {
+            let extra_limbs = (cnt / Limb::BITS as usize) as u32;
+            debug_assert!(extra_limbs >= 1);
+            cnt = cnt % Limb::BITS as usize;
+
+            let size = self.abs_size() as u32;
+            // Extend for the extra limbs, then another one for any potential extra limbs
+            self.ensure_capacity(extra_limbs + size + 1);
+
+            unsafe {
+                let ptr = self.ptr.get_mut() as *mut Limb;
+                let shift = ptr.offset(extra_limbs as isize);
+                ll::copy_decr(ptr, shift, self.abs_size());
+                ll::zero(ptr, extra_limbs as i32);
+            }
+
+            self.size += (extra_limbs as i32) * self.sign();
+        }
+
+        debug_assert!(cnt < Limb::BITS as usize);
+
+        if cnt == 0 { return self; }
+
+        let size = self.abs_size();
+
+        unsafe {
+            let ptr = self.ptr.get_mut() as *mut Limb;
+            let c = ll::shl(ptr, ptr, size, cnt as u32);
+            if c > 0 {
+                self.push(c);
+            }
+        }
+
+        return self;
+    }
+}
+
+impl<'a> Shl<usize> for &'a Int {
+    type Output = Int;
+
+    #[inline]
+    fn shl(self, cnt: usize) -> Int {
+        self.clone() << cnt
+    }
 }
 
 macro_rules! impl_arith_prim (
@@ -2038,7 +2089,7 @@ pub fn rand_int<R: ::rand::Rng>(rng: &mut R, limbs: u32) -> Int {
 mod test {
     use std;
     use std::hash::{Hash, Hasher};
-    use rand;
+    use rand::{self, Rng};
     use test::{self, Bencher};
     use super::*;
     use std::str::FromStr;
@@ -2229,6 +2280,40 @@ mod test {
                 println!("{:X} / {:X} produces incorrect value", x, y);
                 panic!();
             }
+        }
+    }
+
+    #[test]
+    fn shl_rand() {
+        let mut rng = rand::thread_rng();
+        for _ in (0..RAND_ITER) {
+            let x = rand_int(&mut rng, 10);
+
+            let shift_1 = &x << 1;
+            let mul_2 = &x * 2;
+
+            assert!(shift_1 == mul_2);
+
+            let shift_3 = &x << 3;
+            let mul_8 = &x * 8;
+
+            assert!(shift_3 == mul_8);
+        }
+    }
+
+    #[test]
+    fn shl_rand_large() {
+        let mut rng = rand::thread_rng();
+        for _ in (0..RAND_ITER) {
+            let pow : usize = rng.gen_range(64, 8196);
+            let mul_by = Int::from(2).pow(pow);
+
+            let x = rand_int(&mut rng, 10);
+
+            let shift = &x << pow;
+            let mul = x * mul_by;
+
+            assert!(shift == mul);
         }
     }
 

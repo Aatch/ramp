@@ -55,7 +55,7 @@ pub unsafe fn same_or_decr(xp: *const Limb, xs: i32, yp: *const Limb, ys: i32) -
  */
 #[inline]
 pub unsafe fn copy_incr(src: *const Limb, dst: *mut Limb, n: i32) {
-    debug_assert!(same_or_incr(src, n, dst as *const _, n));
+    debug_assert!(same_or_incr(dst, n, src, n));
 
     let mut i = 0;
     while i < n {
@@ -69,7 +69,7 @@ pub unsafe fn copy_incr(src: *const Limb, dst: *mut Limb, n: i32) {
  */
 #[inline]
 pub unsafe fn copy_decr(src: *const Limb, dst: *mut Limb, mut n: i32) {
-    debug_assert!(same_or_decr(src, n, dst as *const _, n));
+    debug_assert!(same_or_decr(dst, n, src, n));
 
     n -= 1;
     while n >= 0 {
