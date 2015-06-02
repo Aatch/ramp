@@ -23,7 +23,7 @@ use std::{fmt, hash};
 use std::num::Zero;
 use std::ops::{
     Add, Sub, Mul, Div, Rem, Neg,
-    Shl, Shr
+    Shl, Shr, BitAnd,
 };
 use std::ptr::Unique;
 use std::str::FromStr;
@@ -1409,6 +1409,207 @@ impl Shr<usize> for Int {
     }
 }
 
+struct ComplementSplit {
+    ptr: *const Limb,
+    split_idx: i32,
+    len: i32
+}
+
+impl ComplementSplit {
+    fn low_len(&self) -> i32 { self.split_idx }
+
+    fn has_high_limbs(&self) -> bool {
+        self.split_idx + 1 < self.len
+    }
+    fn high_ptr(&self) -> *const Limb {
+        debug_assert!(self.has_high_limbs());
+        unsafe {
+            self.ptr.offset((self.split_idx + 1) as isize)
+        }
+    }
+    fn high_len(&self) -> i32 { self.len - (self.split_idx + 1) }
+
+    unsafe fn split_limb(&self) -> Limb {
+        *self.ptr.offset(self.split_idx as isize)
+    }
+}
+
+/*
+ * Helper function for the bitwise operations below.
+ *
+ * The bitwise operations act as if the numbers are stored as two's complement integers, rather
+ * than the signed magnitude representation that is actually used. Since converting to and from a
+ * two's complement representation would be horribly inefficient, we split the number into three
+ * segments: A number of high limbs, a single limb, the remaining zero limbs. The first segment is
+ * the limbs that would be inverted in a two's complement form, the single limb is the limb
+ * containing the first `1` bit. By definition, the remaining limbs must all be zero.
+ *
+ * This works due to the fact that `-n == !n + 1`. Consider the following bitstring, with 4-bit
+ * limbs:
+ *
+ *     0011 0011 1101 1000 1100 0000 0000
+ *
+ * The two's complement of this number (with an additional "sign" bit) is:
+ *
+ *   1 1100 1100 0010 0111 0100 0000 0000
+ *
+ * As you can see, all the trailing zeros are preserved and the remaining bits are all inverted
+ * with the exception of the first `1` bit. Since we prefer to work with whole limbs and not
+ * individual bits we can simply take the two's complement of the limb containing that bit
+ * directly.
+ */
+unsafe fn complement_split(np: *const Limb, len: i32) -> ComplementSplit {
+    debug_assert!(len > 0);
+
+    let bit_idx = ll::scan_1(np, len);
+    let split_idx = (bit_idx / (Limb::BITS as u32)) as i32;
+
+    ComplementSplit {
+        ptr: np,
+        split_idx: split_idx,
+        len: len
+    }
+}
+
+impl<'a> BitAnd<&'a Int> for Int {
+    type Output = Int;
+
+    fn bitand(mut self, other: &'a Int) -> Int {
+        unsafe {
+            let other_sign = other.sign();
+            let self_sign = self.sign();
+
+            // x & 0 == 0
+            if other_sign == 0 || self_sign == 0 {
+                self.size = 0;
+                return self;
+            }
+
+            // Special case -1 as the two's complement is all 1s
+            if *other == -1 {
+                return self;
+            }
+
+            if self == -1 {
+                self.clone_from(other);
+                return self;
+            }
+
+            let self_ptr = self.ptr.get_mut() as *mut Limb;
+            let other_ptr = other.ptr.get() as *const Limb;
+
+            // Nice easy case both are positive
+            if other_sign > 0 && self_sign > 0 {
+                let size = std::cmp::min(self.abs_size(), other.abs_size());
+                ll::and_n(self_ptr, self_ptr, other_ptr, size);
+                self.size = size;
+
+                self.normalize();
+                return self;
+            }
+
+            // Both are negative
+            if other_sign == self_sign {
+                let size = std::cmp::max(self.abs_size(), other.abs_size());
+                self.ensure_capacity(size as u32);
+                // Copy the high limbs from other to self, if self is smaller than other
+                if size > self.abs_size() {
+                    ll::copy_rest(other_ptr, self_ptr, size, self.abs_size());
+                }
+                self.size = -size;
+
+                let min_size = std::cmp::min(self.abs_size(), other.abs_size());
+
+                let self_split = complement_split(self_ptr, min_size);
+                let other_split = complement_split(other_ptr, min_size);
+
+                let mut zero_limbs = std::cmp::max(self_split.low_len(), other_split.low_len());
+                if zero_limbs > 0 {
+                    ll::zero(self_ptr, zero_limbs);
+                }
+
+                // If the limb we split it is different for self and other, it'd be
+                // zeroed out by the above step
+                if self_split.low_len() == other_split.low_len() {
+                    let split_ptr = self_ptr.offset(self_split.low_len() as isize);
+                    *split_ptr = -(*split_ptr) & -(*other_ptr.offset(self_split.low_len() as isize));
+                    zero_limbs += 1;
+                }
+
+                if zero_limbs < min_size {
+                    let high_limbs = min_size - zero_limbs;
+                    // Use de Morgan's Rule: !x & !y == !(x | y)
+                    let self_ptr = self_ptr.offset(zero_limbs as isize);
+                    let other_ptr = other_ptr.offset(zero_limbs as isize);
+
+                    ll::nor_n(self_ptr, self_ptr, other_ptr, high_limbs);
+                }
+
+                self.normalize();
+                return self;
+            }
+
+            // If we got here one is positive, the other is negative
+
+            let (xp, yp, n) = if other_sign < 0 {
+                (self_ptr as *const Limb, other_ptr, self.abs_size())
+            } else {
+                if other.abs_size() > self.abs_size() {
+                    self.ensure_capacity(other.abs_size() as u32);
+                    // Copy the high limbs from other to self
+                    ll::copy_rest(other_ptr, self_ptr, other.abs_size(), self.abs_size());
+                }
+                (other_ptr, self_ptr as *const Limb, other.abs_size())
+            };
+
+            // x > 0, y < 0
+            let self_ptr = self.ptr.get_mut() as *mut Limb;
+            let y_split = complement_split(yp, n);
+
+            let split = y_split.split_idx as isize;
+            ll::zero(self_ptr, y_split.low_len());
+
+            *self_ptr.offset(split) = *xp.offset(split) & -y_split.split_limb();
+
+            if y_split.has_high_limbs() {
+                ll::and_not_n(self_ptr.offset(split + 1), xp.offset(split + 1), y_split.high_ptr(),
+                              y_split.high_len());
+            }
+
+            self.size = n;
+            self.normalize();
+            return self;
+        }
+    }
+}
+
+impl<'a> BitAnd<Int> for &'a Int {
+    type Output = Int;
+
+    #[inline]
+    fn bitand(self, other: Int) -> Int {
+        other.bitand(self)
+    }
+}
+
+impl<'a, 'b> BitAnd<&'a Int> for &'b Int {
+    type Output = Int;
+
+    #[inline]
+    fn bitand(self, other: &'a Int) -> Int {
+        self.clone().bitand(other)
+    }
+}
+
+impl BitAnd<Int> for Int {
+    type Output = Int;
+
+    #[inline]
+    fn bitand(self, other: Int) -> Int {
+        self.bitand(&other)
+    }
+}
+
 macro_rules! impl_arith_prim (
     (signed $t:ty) => (
         // Limbs are unsigned, so make sure we account for the sign
@@ -2141,6 +2342,19 @@ mod test {
     use std::str::FromStr;
     use std::num::Zero;
 
+    macro_rules! assert_mp_eq (
+        ($l:expr, $r:expr) => (
+            {
+                let l = $l;
+                let r = $r;
+                if l != r {
+                    println!("assertion failed: {} == {}", stringify!($l), stringify!($r));
+                    panic!("{} != {}", l, r);
+                }
+            }
+        )
+    );
+
     #[test]
     fn from_string_10() {
         let cases = [
@@ -2228,7 +2442,7 @@ mod test {
             let r : Int = r.parse().unwrap();
             let a : Int = a.parse().unwrap();
 
-            assert_eq!(l + r, a);
+            assert_mp_eq!(l + r, a);
         }
     }
 
@@ -2254,7 +2468,7 @@ mod test {
             let r : Int = r.parse().unwrap();
             let a : Int = a.parse().unwrap();
 
-            assert_eq!(l - r, a);
+            assert_mp_eq!(l - r, a);
         }
     }
 
@@ -2277,7 +2491,7 @@ mod test {
             let r : Int = r.parse().unwrap();
             let a : Int = a.parse().unwrap();
 
-            assert_eq!(l * r, a);
+            assert_mp_eq!(l * r, a);
         }
     }
 
@@ -2301,11 +2515,26 @@ mod test {
             let a : Int = a.parse().unwrap();
 
             let val = &l / &r;
-            if val != a {
-                println!("\nl / r: {:X}", val);
-                println!("    a: {:X}", a);
-                assert!(val == a);
-            }
+            assert_mp_eq!(val, a);
+        }
+    }
+
+    #[test]
+    fn bitand() {
+        let cases = [
+            ("0", "543253451643657932075830214751263521", "0"),
+            ("-1", "543253451643657932075830214751263521", "543253451643657932075830214751263521"),
+            ("47398217493274092174042109472", "9843271092740214732017421", "152974816756326460458496"),
+            ("87641324986400000000000", "31470973247490321000000000000000", "2398658832415825854464")
+        ];
+
+        for &(l, r, a) in cases.iter() {
+            let l : Int = l.parse().unwrap();
+            let r : Int = r.parse().unwrap();
+            let a : Int = a.parse().unwrap();
+
+            let val = &l & &r;
+            assert_mp_eq!(val, a);
         }
     }
 
@@ -2321,11 +2550,7 @@ mod test {
             let (q, r) = x.divmod(&y);
             let val = (q * &y) + r;
 
-            if val != x {
-                println!("\n{:X}", val);
-                println!("{:X} / {:X} produces incorrect value", x, y);
-                panic!();
-            }
+            assert_mp_eq!(val, x);
         }
     }
 
@@ -2338,12 +2563,12 @@ mod test {
             let shift_1 = &x << 1;
             let mul_2 = &x * 2;
 
-            assert!(shift_1 == mul_2);
+            assert_mp_eq!(shift_1, mul_2);
 
             let shift_3 = &x << 3;
             let mul_8 = &x * 8;
 
-            assert!(shift_3 == mul_8);
+            assert_mp_eq!(shift_3, mul_8);
         }
     }
 
@@ -2359,7 +2584,7 @@ mod test {
             let shift = &x << pow;
             let mul = x * mul_by;
 
-            assert!(shift == mul);
+            assert_mp_eq!(shift, mul);
         }
     }
 
@@ -2373,7 +2598,18 @@ mod test {
             let shift_up = &x << pow;
             let shift_down = shift_up >> pow;
 
-            assert!(shift_down == x);
+            assert_mp_eq!(shift_down, x);
+        }
+    }
+
+    #[test]
+    fn bitand_rand() {
+        let mut rng = rand::thread_rng();
+        for _ in (0..RAND_ITER) {
+            let x = rand_int(&mut rng, 10);
+            let y = rand_int(&mut rng, 10);
+
+            let _ = x & y;
         }
     }
 

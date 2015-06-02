@@ -24,7 +24,13 @@ pub mod base;
 pub mod limb;
 use self::limb::Limb;
 
-pub use self::bit::{shl, shr};
+pub use self::bit::{
+    shl, shr,
+    and_n, and_not_n, nand_n,
+    or_n, nor_n, xor_n,
+    not,
+    scan_1, scan_0
+};
 pub use self::addsub::{add_n, sub_n, add, sub, add_1, sub_1, incr, decr};
 pub use self::mul::{addmul_1, submul_1, mul_1, mul};
 pub use self::div::{divrem_1, divrem_2, divrem};

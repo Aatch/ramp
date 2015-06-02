@@ -15,7 +15,7 @@
 use std;
 use std::ops::{
     Add, Sub, Mul, Div, Rem, Neg,
-    Shl, Shr, Not, BitAnd, BitOr
+    Shl, Shr, Not, BitAnd, BitOr, BitXor
 };
 use std::cmp::{Ordering, PartialEq, PartialOrd};
 use std::fmt;
@@ -358,6 +358,15 @@ impl BitOr<Limb> for Limb {
     #[inline(always)]
     fn bitor(self, other: Limb) -> Limb {
         Limb(self.0 | other.0)
+    }
+}
+
+impl BitXor<Limb> for Limb {
+    type Output = Limb;
+
+    #[inline(always)]
+    fn bitxor(self, other: Limb) -> Limb {
+        Limb(self.0 ^ other.0)
     }
 }
 

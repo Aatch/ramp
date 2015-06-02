@@ -93,3 +93,146 @@ pub unsafe fn shr(mut rp: *mut Limb, mut xp: *const Limb, mut xs: i32, cnt: u32)
 
     return ret;
 }
+
+// Common function for the operations below, since they're all essentially the same
+#[inline(always)]
+unsafe fn bitop<F: Fn(Limb, Limb) -> Limb>(mut wp: *mut Limb,
+                                           mut xp: *const Limb, mut yp: *const Limb,
+                                           n: i32, op: F) {
+    debug_assert!(same_or_incr(wp, n, xp, n));
+    debug_assert!(same_or_incr(wp, n, yp, n));
+
+    let mut i = 0;
+    while i < n {
+        *wp = op(*xp, *yp);
+        wp = wp.offset(1);
+        xp = xp.offset(1);
+        yp = yp.offset(1);
+        i += 1;
+    }
+}
+
+/**
+ * Performs a bitwise "and" (`&`) of the n least signficant limbs of `xp` and `yp`, storing the
+ * result in `wp`
+ */
+pub unsafe fn and_n(wp: *mut Limb,
+                    xp: *const Limb, yp: *const Limb,
+                    n: i32) {
+    bitop(wp, xp, yp, n, |x, y| x & y);
+}
+
+/**
+ * Performs a bitwise of the n least signficant limbs of `xp` and `yp`, with the limbs of `yp`
+ * being first inverted. The result is stored in `wp`.
+ *
+ * The operation is x & !y
+ */
+pub unsafe fn and_not_n(wp: *mut Limb,
+                     xp: *const Limb, yp: *const Limb,
+                     n: i32) {
+    bitop(wp, xp, yp, n, |x, y| x & !y);
+}
+
+/**
+ * Performs a bitwise "nand" of the n least signficant limbs of `xp` and `yp`, storing the
+ * result in `wp`
+ *
+ * The operation is !(x & y)
+ */
+pub unsafe fn nand_n(wp: *mut Limb,
+                     xp: *const Limb, yp: *const Limb,
+                     n: i32) {
+    bitop(wp, xp, yp, n, |x, y| !(x & y));
+}
+
+/**
+ * Performs a bitwise "or" (`|`) of the n least signficant limbs of `xp` and `yp`, storing the
+ * result in `wp`
+ */
+pub unsafe fn or_n(wp: *mut Limb,
+                    xp: *const Limb, yp: *const Limb,
+                    n: i32) {
+    bitop(wp, xp, yp, n, |x, y| x | y);
+}
+
+/**
+ * Performs a bitwise "nor" of the n least signficant limbs of `xp` and `yp`, storing the
+ * result in `wp`
+ *
+ * The operation is !(x | y)
+ */
+pub unsafe fn nor_n(wp: *mut Limb,
+                    xp: *const Limb, yp: *const Limb,
+                    n: i32) {
+    bitop(wp, xp, yp, n, |x, y| !(x | y));
+}
+
+/**
+ * Performs a bitwise "xor" (`^`) of the n least signficant limbs of `xp` and `yp`, storing the
+ * result in `wp`
+ */
+pub unsafe fn xor_n(wp: *mut Limb,
+                    xp: *const Limb, yp: *const Limb,
+                    n: i32) {
+    bitop(wp, xp, yp, n, |x, y| x ^ y);
+}
+
+/**
+ * Performs a bitwise inversion ("not") of the n least signficant limbs of `xp`, storing the
+ * result in `wp`
+ */
+pub unsafe fn not(mut wp: *mut Limb, mut xp: *const Limb, n: i32) {
+    debug_assert!(same_or_incr(wp, n, xp, n));
+
+    let mut i = 0;
+    while i < n {
+        *wp = !*xp;
+        wp = wp.offset(1);
+        xp = xp.offset(1);
+        i += 1;
+    }
+}
+
+/**
+ * Scans for the first 1 bit starting from the least-significant bit the the most, returning
+ * the bit index.
+ */
+pub unsafe fn scan_1(mut xp: *const Limb, mut xs: i32) -> u32 {
+    debug_assert!(xs > 0);
+    let mut cnt = 0u32;
+
+    while *xp == 0 {
+        cnt += Limb::BITS as u32;
+        xp = xp.offset(1);
+        xs -= 1;
+        if xs == 0 { return cnt; }
+    }
+    xp = xp.offset(1);
+    cnt += (*xp).trailing_zeros() as u32;
+
+    return cnt;
+}
+
+/**
+ * Scans for the first 0 bit starting from the least-significant bit the the most, returning
+ * the bit index.
+ */
+pub unsafe fn scan_0(mut xp: *const Limb, mut xs: i32) -> u32 {
+    debug_assert!(xs > 0);
+    let mut cnt = 0u32;
+
+    while *xp == !0 {
+        cnt += Limb::BITS as u32;
+        xp = xp.offset(1);
+        xs -= 1;
+        if xs == 0 { return cnt; }
+    }
+    let mut last = (*xp.offset(1)).0;
+    while last & 1 != 0 {
+        cnt += 1;
+        last >>= 1;
+    }
+
+    return cnt;
+}
