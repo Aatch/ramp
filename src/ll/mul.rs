@@ -126,11 +126,7 @@ pub unsafe fn addmul_1(wp: *mut Limb, xp: *const Limb, n: i32, vl: Limb) -> Limb
     ramp_addmul_1(wp, xp, n, vl)
 }
 
-/**
- * Multiplies the `n` least-signficiant digits of `xp` by `vl` and subtracts them from the `n`
- * least-significant digits of `wp`. Returns the highest limb of the result, adjust for borrow.
- */
-pub unsafe fn submul_1(mut wp: *mut Limb, mut xp: *const Limb, mut n: i32, vl: Limb) -> Limb {
+unsafe fn submul_1_generic(mut wp: *mut Limb, mut xp: *const Limb, mut n: i32, vl: Limb) -> Limb {
     debug_assert!(n > 0);
     debug_assert!(same_or_separate(wp, n, xp, n));
 
@@ -154,6 +150,30 @@ pub unsafe fn submul_1(mut wp: *mut Limb, mut xp: *const Limb, mut n: i32, vl: L
     }
 
     return cl;
+}
+
+/**
+ * Multiplies the `n` least-signficiant digits of `xp` by `vl` and subtracts them from the `n`
+ * least-significant digits of `wp`. Returns the highest limb of the result, adjust for borrow.
+ */
+#[cfg(not(asm))]
+#[inline]
+pub unsafe fn submul_1(wp: *mut Limb, xp: *const Limb, n: i32, vl: Limb) -> Limb {
+    submul_1_generic(wp, xp, n, vl)
+}
+
+/**
+ * Multiplies the `n` least-signficiant digits of `xp` by `vl` and subtracts them from the `n`
+ * least-significant digits of `wp`. Returns the highest limb of the result, adjust for borrow.
+ */
+#[cfg(asm)]
+#[inline]
+pub unsafe fn submul_1(wp: *mut Limb, xp: *const Limb, n: i32, vl: Limb) -> Limb {
+    extern "C" {
+        fn ramp_submul_1(wp: *mut Limb, xp: *const Limb, n: i32, vl: Limb) -> Limb;
+    }
+
+    ramp_submul_1(wp, xp, n, vl)
 }
 
 /**

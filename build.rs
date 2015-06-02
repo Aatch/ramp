@@ -34,10 +34,9 @@ fn compile_asm() {
             if (target.contains("x86-64") || target.contains("x86_64")) && target.contains("linux")  {
 
                 let asm_srcs = &[
-                    "src/ll/asm/add_n.s",
-                    "src/ll/asm/sub_n.s",
-                    "src/ll/asm/mul_1.s",
-                    "src/ll/asm/addmul_1.s",
+                    "src/ll/asm/addsub_n.S",
+                    "src/ll/asm/mul_1.S",
+                    "src/ll/asm/addmul_1.S",
                 ];
 
                 gcc::compile_library("libasm.a", asm_srcs);
