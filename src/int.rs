@@ -20,6 +20,7 @@ use std::cmp::{
 };
 use std::error::Error;
 use std::{fmt, hash};
+use std::io;
 use std::num::Zero;
 use std::ops::{
     Add, Sub, Mul, Div, Rem, Neg,
@@ -231,7 +232,6 @@ impl Int {
      * Panics if `base` is less than two or greater than 36.
      */
     pub fn to_str_radix(&self, base: u8, upper: bool) -> String {
-        debug_assert!(self.well_formed());
         if self.size == 0 {
             return "0".to_string();
         }
@@ -242,35 +242,37 @@ impl Int {
 
         let size = self.abs_size();
         let num_digits = unsafe {
-            ll::base::num_base_digits(self.ptr.get(), size, base as u32)
+            ll::base::num_base_digits(self.ptr.get(), size - 1, base as u32)
         };
 
         let mut buf : Vec<u8> = Vec::with_capacity(num_digits);
 
-        unsafe {
-            let bufp = buf.as_mut_ptr();
-            let num = ll::base::to_base(bufp, base as u32, self.ptr.get(), size);
-            buf.set_len(num);
+        self.write_radix(&mut buf, base, upper).unwrap();
+
+        unsafe { String::from_utf8_unchecked(buf) }
+    }
+
+    pub fn write_radix<W: io::Write>(&self, w: &mut W, base: u8, upper: bool) -> io::Result<()> {
+        debug_assert!(self.well_formed());
+
+        if self.sign() == -1 {
+            try!(w.write_all(b"-"));
         }
 
         let letter = if upper { b'A' } else { b'a' };
-        for c in &mut buf {
-            if *c < 10 {
-                *c = *c + b'0';
-            } else {
-                *c = (*c - 10) + letter;
-            }
+        let size = self.abs_size();
+
+        unsafe {
+            ll::base::to_base(base as u32, self.ptr.get(), size, |b| {
+                if b < 10 {
+                    w.write_all(&[b + b'0']).unwrap();
+                } else {
+                    w.write_all(&[(b - 10) + letter]).unwrap();
+                }
+            });
         }
 
-        let mut s = unsafe {
-            String::from_utf8_unchecked(buf)
-        };
-
-        if self.sign() == -1 {
-            s.insert(0, '-');
-        }
-
-        return s;
+        Ok(())
     }
 
     /**
@@ -2499,7 +2501,7 @@ mod test {
                 let r = $r;
                 if l != r {
                     println!("assertion failed: {} == {}", stringify!($l), stringify!($r));
-                    panic!("{:#X} != {:#X}", l, r);
+                    panic!("{:} != {:}", l, r);
                 }
             }
         )

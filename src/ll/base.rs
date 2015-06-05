@@ -49,10 +49,13 @@ pub unsafe fn num_base_digits(p: *const Limb, n: i32, base: u32) -> usize {
         let big_base = BASES.get_unchecked(base as usize).big_base.0 as usize;
         (total_bits + big_base - 1) / big_base
     } else {
-        // TODO: Smarter calculation for the number of digits in a non-power-of-two
-        // base
-        let digits_per_limb = BASES.get_unchecked(base as usize).digits_per_limb as usize;
-        (digits_per_limb * (n as usize)) as usize
+        // Not sure if using floating-point arithmetic here is the best idea,
+        // but it should be a reasonable accurate result, maybe a little high
+        let total_bits = total_bits as f64;
+
+        let lg2b = (base as f64).log2();
+        let digits = total_bits / lg2b;
+        return digits.ceil() as usize;
     }
 }
 
@@ -74,7 +77,7 @@ pub fn base_digits_to_len(num: usize, base: u32) -> usize {
  * The values in `out` are the raw values of the base. Conversion for output should be done as a second
  * step.
  */
-pub unsafe fn to_base(mut out: *mut u8, base: u32, np: *const Limb, nn: i32) -> usize {
+pub unsafe fn to_base<F: FnMut(u8)>(base: u32, np: *const Limb, nn: i32, mut out_byte: F) {
     debug_assert!(nn >= 0);
     debug_assert!(base < BASES.len() as u32);
     debug_assert!(base >= 2);
@@ -82,8 +85,8 @@ pub unsafe fn to_base(mut out: *mut u8, base: u32, np: *const Limb, nn: i32) -> 
     assume(base >= 2);
 
     if nn <= 0 {
-        *out = 0;
-        return 1;
+        out_byte(0);
+        return;
     }
     // Fast path for powers-of-two, since each limb is already in base B^m format
     if base.is_power_of_two() {
@@ -101,15 +104,13 @@ pub unsafe fn to_base(mut out: *mut u8, base: u32, np: *const Limb, nn: i32) -> 
 
         let mut bit_pos : isize = (bits - (nn as usize - 1) * Limb::BITS) as isize;
 
-        let mut sz = 0;
         let mut i = nn - 1;
         // Convert each limb by shifting and masking to get the value for each output digit
         loop {
             bit_pos -= bits_per_digit as isize;
             while bit_pos >= 0 {
-                *out = ((n1 >> (bit_pos as usize)) & ((Limb(1) << bits_per_digit) - 1)).0 as u8;
-                out = out.offset(1);
-                sz += 1;
+                let b = ((n1 >> (bit_pos as usize)) & ((Limb(1) << bits_per_digit) - 1)).0 as u8;
+                out_byte(b);
                 bit_pos -= bits_per_digit as isize;
             }
             i -= 1;
@@ -124,19 +125,16 @@ pub unsafe fn to_base(mut out: *mut u8, base: u32, np: *const Limb, nn: i32) -> 
             //
             //    bbbbbbbb bbbbbbbb
             //          ^---^         Bits for next digit
-            *out = (n0 | (n1 >> (bit_pos as usize))).0 as u8;
-            out = out.offset(1);
-            sz += 1;
+            let b = (n0 | (n1 >> (bit_pos as usize))).0 as u8;
+            out_byte(b);
         }
-
-        return sz;
+        return;
     }
     // TODO: Use divide-and-conquer for large numbers
-    to_base_impl(out, 0, base, np, nn)
+    to_base_impl(0, base, np, nn, out_byte);
 }
 
-unsafe fn to_base_impl(mut out: *mut u8, mut len: usize,
-                        base: u32, np: *const Limb, mut nn: i32) -> usize {
+unsafe fn to_base_impl<F: FnMut(u8)>(mut len: u32, base: u32, np: *const Limb, mut nn: i32, mut out_byte: F) {
     debug_assert!(base > 2);
 
     let buf_len = num_base_digits(np, nn, base);
@@ -220,20 +218,16 @@ unsafe fn to_base_impl(mut out: *mut u8, mut len: usize,
 
     // Output any leading zeros we may want
     while l < len {
-        *out = 0;
-        out = out.offset(1);
+        out_byte(0);
         len -= 1;
     }
 
     // Copy the temporary buffer into the output string
     while l != 0 {
-        *out = *s;
-        out = out.offset(1);
+        out_byte(*s);
         s = s.offset(1);
         l -= 1;
     }
-
-    return sz;
 }
 
 /**
@@ -371,60 +365,4 @@ unsafe fn from_base_small(out: *mut Limb, mut bp: *const u8, bs: i32, base: u32)
     }
 
     return size;
-}
-
-#[cfg(test)]
-mod test {
-    use std::mem;
-    use ll;
-    use ll::limb::Limb;
-    use super::*;
-
-    #[test]
-    fn test_to_base() {
-        let mut num : [Limb; 4] = unsafe { mem::transmute([0 as ll::limb::BaseInt, 0, 0, 1]) };
-
-        // num is 2^64, for either platform
-        let (num, len) : (&mut [Limb], _) = if cfg!(target_pointer_width = "64") {
-            (&mut num[2..], 2)
-        } else {
-            (&mut num, 4)
-        };
-        // Add 3 to num
-        num[0] = Limb(3);
-        let mut out = [0; 20];
-
-        let out_len = unsafe {
-            to_base(&mut out[0], 10, &num[0], len as i32)
-        };
-
-        {
-            let out_str = &mut out[..out_len];
-            for b in out_str.iter_mut() {
-                *b += b'0';
-            }
-
-            let out_str = unsafe { ::std::str::from_utf8_unchecked(out_str) };
-            assert_eq!("18446744073709551619", out_str);
-        }
-
-        {
-            let out_len = unsafe {
-                to_base(&mut out[0], 16, &num[0], len as i32)
-            };
-
-            let out_str = &mut out[..out_len];
-            for b in out_str.iter_mut() {
-                if *b < 10 {
-                    *b += b'0';
-                } else {
-                    *b = (*b - 10) + b'a';
-                }
-            }
-
-            let out_str = unsafe { ::std::str::from_utf8_unchecked(out_str) };
-
-            assert_eq!("10000000000000003", out_str);
-        }
-    }
 }
