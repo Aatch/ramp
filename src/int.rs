@@ -23,7 +23,7 @@ use std::{fmt, hash};
 use std::num::Zero;
 use std::ops::{
     Add, Sub, Mul, Div, Rem, Neg,
-    Shl, Shr, BitAnd,
+    Shl, Shr, BitAnd, BitOr
 };
 use std::ptr::Unique;
 use std::str::FromStr;
@@ -92,6 +92,20 @@ use mem;
  *   let big_i   = Int::from(123456789);
  *   assert!(big_i == 123456789);
  *   ```
+ *
+ * ### Semantics
+ *
+ * Addition, subtraction and multiplication follow the expected rules for integers. Division of two
+ * integers, `N / D` is defined as producing two values: a quotient, `Q`, and a remainder, `R`,
+ * such that the following equation holds: `N = Q*D + R`. The division operator itself returns `Q`
+ * while the remainder/modulo operator returns `R`.
+ *
+ * The "bit-shift" operations are defined as being multiplication and division by a power-of-two for
+ * shift-left and shift-right respectively. The sign of the number is unaffected.
+ *
+ * The remaining bitwise operands act as if the numbers are stored in two's complement format and as
+ * if the two inputs have the same number of bits.
+ *
  */
 pub struct Int {
     ptr: Unique<Limb>,
@@ -1610,6 +1624,142 @@ impl BitAnd<Int> for Int {
     }
 }
 
+impl<'a> BitOr<&'a Int> for Int {
+    type Output = Int;
+
+    fn bitor(mut self, other: &'a Int) -> Int {
+        unsafe {
+            if *other == 0 {
+                return self;
+            }
+            if self == 0 {
+                self.clone_from(other);
+                return self;
+            }
+
+            if *other == -1 || self == -1 {
+                self.size = -1;
+                *self.ptr.get_mut() = Limb(1);
+                return self;
+            }
+
+            let self_sign = self.sign();
+            let other_sign = other.sign();
+
+            let self_ptr = self.ptr.get_mut() as *mut Limb;
+            let other_ptr = other.ptr.get() as *const Limb;
+
+            if self_sign > 0 && other_sign > 0 {
+                let size = std::cmp::max(self.abs_size(), other.abs_size());
+                self.ensure_capacity(size as u32);
+                if size > self.abs_size() {
+                    ll::copy_rest(other_ptr, self_ptr, size, self.abs_size());
+                }
+
+                let min_size = std::cmp::min(self.abs_size(), other.abs_size());
+                ll::or_n(self_ptr, self_ptr, other_ptr, min_size);
+
+                self.size = size;
+                return self;
+            }
+
+            if self_sign == other_sign {
+                let min_size = std::cmp::min(self.abs_size(), other.abs_size());
+
+                let self_split = complement_split(self_ptr, min_size);
+                let other_split = complement_split(other_ptr, min_size);
+
+                if self_split.low_len() > other_split.low_len() {
+                    let mut p = self_ptr.offset(other_split.low_len() as isize);
+
+                    *p = -other_split.split_limb();
+                    p = p.offset(1);
+                    let mut o = other_ptr.offset((other_split.low_len() + 1) as isize);
+                    let mut n = (self_split.low_len() - other_split.low_len()) - 1;
+
+                    while n > 0 {
+                        *p = !(*o);
+                        p = p.offset(1);
+                        o = o.offset(1);
+                        n -= 1;
+                    }
+                }
+
+                let low_limbs = std::cmp::max(self_split.low_len(), other_split.low_len()) + 1;
+                if low_limbs < min_size {
+                    let high_limbs = min_size - low_limbs;
+                    let o = other_ptr.offset(low_limbs as isize);
+                    let s = self_ptr.offset(low_limbs as isize);
+                    // de Morgan's Rule: !x | !y == !(x & y)
+                    ll::nand_n(s, s, o, high_limbs);
+                }
+
+                self.size = -min_size;
+                self.normalize();
+
+                return self;
+            }
+
+
+            // If we got here one is positive, the other is negative
+
+            let n = std::cmp::max(other.abs_size(), self.abs_size());
+            self.ensure_capacity(n as u32);
+            let (xp, yp) = if other_sign < 0 {
+                (self_ptr as *const Limb, other_ptr)
+            } else {
+                (other_ptr, self_ptr as *const Limb)
+            };
+
+            // x > 0, y < 0
+            let y_split = complement_split(yp, n);
+            let split = y_split.low_len() as isize;
+
+            if xp != self_ptr {
+                ll::copy_incr(xp, self_ptr, y_split.low_len());
+            }
+
+            *self_ptr.offset(split) = *xp.offset(split) | -y_split.split_limb();
+
+            if y_split.has_high_limbs() {
+                ll::or_not_n(self_ptr.offset(split + 1), xp.offset(split + 1), y_split.high_ptr(),
+                             y_split.high_len());
+            }
+
+            self.size = -n;
+            self.normalize();
+            return self;
+        }
+    }
+}
+
+impl<'a> BitOr<Int> for &'a Int {
+    type Output = Int;
+
+    #[inline]
+    fn bitor(self, other: Int) -> Int {
+        other.bitor(self)
+    }
+}
+
+impl<'a, 'b> BitOr<&'a Int> for &'b Int {
+    type Output = Int;
+
+    #[inline]
+    fn bitor(self, other: &'a Int) -> Int {
+        self.clone().bitor(other)
+    }
+}
+
+impl BitOr<Int> for Int {
+    type Output = Int;
+
+    #[inline]
+    fn bitor(self, other: Int) -> Int {
+        self.bitor(&other)
+    }
+}
+
 macro_rules! impl_arith_prim (
     (signed $t:ty) => (
         // Limbs are unsigned, so make sure we account for the sign
@@ -2224,10 +2374,10 @@ macro_rules! impl_from_for_prim (
                 if sign == 0 {
                     return 0;
                 }
-                if ::std::mem::size_of::<BaseInt>() > ::std::mem::size_of::<$t>() {
+                let mask = !0 >> 1;
+                if ::std::mem::size_of::<BaseInt>() < ::std::mem::size_of::<$t>() {
                     // Handle conversion where BaseInt = u32 and $t = i64
                     if i.abs_size() >= 2 { // Fallthrough if there's only one limb
-                        let mask = !0 >> 1;
                         let lower = i.to_single_limb().0 as $t;
                         // Clear the highest bit of the high limb
                         let higher = (unsafe { (*i.ptr.offset(1)).0 } & mask) as $t;
@@ -2253,7 +2403,7 @@ macro_rules! impl_from_for_prim (
                 if i.sign() == 0 {
                     return 0;
                 }
-                if ::std::mem::size_of::<BaseInt>() > ::std::mem::size_of::<$t>() {
+                if ::std::mem::size_of::<BaseInt>() < ::std::mem::size_of::<$t>() {
                     // Handle conversion where BaseInt = u32 and $t = u64
                     if i.abs_size() >= 2 { // Fallthrough if there's only one limb
                         let lower = i.to_single_limb().0 as $t;
@@ -2349,7 +2499,7 @@ mod test {
                 let r = $r;
                 if l != r {
                     println!("assertion failed: {} == {}", stringify!($l), stringify!($r));
-                    panic!("{} != {}", l, r);
+                    panic!("{:#X} != {:#X}", l, r);
                 }
             }
         )
@@ -2363,6 +2513,7 @@ mod test {
             ("0123",     123),
             ("000000",   0),
             ("-0",       0),
+            ("-1",       -1),
             ("-123456", -123456),
             ("-0123",   -123),
         ];
@@ -2411,6 +2562,7 @@ mod test {
         let cases = [
             ("0",        Int::zero()),
             ("1",        Int::from(1)),
+            ("-1",       Int::from(-1)),
             ("abc",      Int::from(0xabc)),
             ("-456",     Int::from(-0x456)),
             ("987654321012345678910111213",
@@ -2534,6 +2686,25 @@ mod test {
             let a : Int = a.parse().unwrap();
 
             let val = &l & &r;
+            assert_mp_eq!(val, a);
+        }
+    }
+
+    #[test]
+    fn bitor() {
+        let cases = [
+            ("0", "543253451643657932075830214751263521", "543253451643657932075830214751263521"),
+            ("-1", "543253451643657932075830214751263521", "-1"),
+            ("47398217493274092174042109472", "9843271092740214732017421","47407907789550076062313668397"),
+            ("87641324986400000000000", "31470973247490321000000000000000", "31470973332732987153984174145536"),
+        ];
+
+        for &(l, r, a) in cases.iter() {
+            let l : Int = l.parse().unwrap();
+            let r : Int = r.parse().unwrap();
+            let a : Int = a.parse().unwrap();
+
+            let val = &l | &r;
             assert_mp_eq!(val, a);
         }
     }

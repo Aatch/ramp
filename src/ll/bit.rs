@@ -123,7 +123,7 @@ pub unsafe fn and_n(wp: *mut Limb,
 }
 
 /**
- * Performs a bitwise of the n least signficant limbs of `xp` and `yp`, with the limbs of `yp`
+ * Performs a bitwise and of the n least signficant limbs of `xp` and `yp`, with the limbs of `yp`
  * being first inverted. The result is stored in `wp`.
  *
  * The operation is x & !y
@@ -154,6 +154,16 @@ pub unsafe fn or_n(wp: *mut Limb,
                     xp: *const Limb, yp: *const Limb,
                     n: i32) {
     bitop(wp, xp, yp, n, |x, y| x | y);
+}
+
+/**
+ * Performs a bitwise "or" of the n least signficant limbs of `xp` and `yp`, with the limbs of `yp`
+ * being first inverted. The result is stored in `wp`.
+ */
+pub unsafe fn or_not_n(wp: *mut Limb,
+                    xp: *const Limb, yp: *const Limb,
+                    n: i32) {
+    bitop(wp, xp, yp, n, |x, y| x | !y);
 }
 
 /**

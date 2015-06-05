@@ -27,7 +27,7 @@ use self::limb::Limb;
 pub use self::bit::{
     shl, shr,
     and_n, and_not_n, nand_n,
-    or_n, nor_n, xor_n,
+    or_n, or_not_n, nor_n, xor_n,
     not,
     scan_1, scan_0
 };
