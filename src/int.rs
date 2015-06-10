@@ -966,7 +966,7 @@ impl<'a> Sub<Int> for &'a Int {
         }
         if other.sign() == 0 {
             other.clone_from(self);
-            return -other;
+            return other;
         }
 
         -(other.sub(self))
@@ -2622,6 +2622,9 @@ mod test {
             let r : Int = r.parse().unwrap();
             let a : Int = a.parse().unwrap();
 
+            assert_mp_eq!(&l - &r, a.clone());
+            assert_mp_eq!(&l - r.clone(), a.clone());
+            assert_mp_eq!(l.clone() - &r, a.clone());
             assert_mp_eq!(l - r, a);
         }
     }
