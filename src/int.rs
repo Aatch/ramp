@@ -371,8 +371,27 @@ impl Int {
             1 => self.clone(),
             2 => self.square(),
             _ => {
-                let mut base = self.clone();
-                let mut ret = Int::from(1);
+                let mut signum = self.sign();
+                if signum == 0 {
+                    return Int::zero();
+                }
+                if exp & 1 == 0 {
+                    signum = 1
+                }
+                let mut base = self.clone().abs();
+                let mut ret = Int::one();
+
+                let mut shift = 0;
+                while base.to_single_limb() == 0 {
+                    base = base >> Limb::BITS;
+                    shift += Limb::BITS
+                }
+
+                let trailer : usize = base.to_single_limb().trailing_zeros() as usize;
+                shift += trailer;
+                base = base >> trailer;
+
+                shift *= exp;
 
                 while exp > 0 {
                     if (exp & 1) == 1 {
@@ -383,7 +402,7 @@ impl Int {
 
                     exp /= 2;
                 }
-                ret
+                (ret << shift) * signum
             }
         }
     }
@@ -398,9 +417,9 @@ impl Int {
             Int::zero()
         } else if self.abs_size() == 1 {
             let a = self.clone() * self.to_single_limb();
-            if (s == -1) {
+            if s == -1 {
                 a.abs()
-            } else if (s == 1) {
+            } else if s == 1 {
                 a
             } else {
                 unreachable!()
@@ -2889,6 +2908,18 @@ mod test {
         });
     }
 
+    fn bench_pow(b: &mut Bencher, xs: u32, ys: usize) {
+        let mut rng = rand::thread_rng();
+
+        let x = rand_int(&mut rng, xs);
+        let y : usize = rng.gen_range(0, ys);
+
+        b.iter(|| {
+            let z = &x.pow(y);
+            test::black_box(z);
+        });
+    }
+    
     #[bench]
     fn bench_mul_1_1(b: &mut Bencher) {
         bench_mul(b, 1, 1);
@@ -2926,6 +2957,46 @@ mod test {
 
     #[bench]
     fn bench_mul_50_1500(b: &mut Bencher) {
+        bench_mul(b, 50, 1500);
+    }
+    
+    #[bench]
+    fn bench_pow_1_1(b: &mut Bencher) {
+        bench_pow(b, 1, 1);
+    }
+
+    #[bench]
+    fn bench_pow_10_10(b: &mut Bencher) {
+        bench_pow(b, 10, 10);
+    }
+
+    #[bench]
+    fn bench_pow_2_20(b: &mut Bencher) {
+        bench_pow(b, 2, 20);
+    }
+
+    #[bench]
+    fn bench_pow_50_50(b: &mut Bencher) {
+        bench_pow(b, 50, 50);
+    }
+
+    #[bench]
+    fn bench_pow_5_50(b: &mut Bencher) {
+        bench_mul(b, 5, 50);
+    }
+
+    #[bench]
+    fn bench_pow_250_250(b: &mut Bencher) {
+        bench_mul(b, 250, 250);
+    }
+
+    #[bench]
+    fn bench_pow_1000_1000(b: &mut Bencher) {
+        bench_mul(b, 1000, 1000);
+    }
+
+    #[bench]
+    fn bench_pow_50_1500(b: &mut Bencher) {
         bench_mul(b, 50, 1500);
     }
 
