@@ -362,42 +362,54 @@ impl Int {
     /**
      * Raises self to the power of exp
      */
-    pub fn pow(self, mut exp: usize) -> Int {
+    pub fn pow(&self, mut exp: usize) -> Int {
         debug_assert!(self.well_formed());
         // TODO: There's almost certainly a better way of doing this calculation
 
-        let mut base = self;
-        let mut ret = Int::from(1);
+        match exp {
+            0 => Int::one(),
+            1 => self.clone(),
+            2 => self.square(),
+            _ => {
+                let mut base = self.clone();
+                let mut ret = Int::from(1);
 
-        while exp > 0 {
-            if (exp & 1) == 1 {
-                ret = ret * &base;
+                while exp > 0 {
+                    if (exp & 1) == 1 {
+                        ret = ret * &base;
+                    }
+
+                    base = base.square();
+
+                    exp /= 2;
+                }
+                ret
             }
-
-            base = base.square();
-
-            exp /= 2;
         }
-
-        return ret;
     }
 
     /**
      * Returns the square of `self`.
      */
-    pub fn square(self) -> Int {
+    pub fn square(&self) -> Int {
         debug_assert!(self.well_formed());
-        if self.sign() == 0 {
-            return Int::zero();
+        let s = self.sign();
+        if s == 0 {
+            Int::zero()
+        } else if self.abs_size() == 1 {
+            let a = self.clone() * self.to_single_limb();
+            if (s == -1) {
+                a.abs()
+            } else if (s == 1) {
+                a
+            } else {
+                unreachable!()
+            }
+        } else {
+            // There are slight faster ways of squaring very large numbers, but
+            // but this is good enough for now.
+            self * self
         }
-        if self.abs_size() == 1 {
-            // Avoid an allocation for when `self` is a single limb
-            let l = self.to_single_limb();
-            return self * l;
-        }
-        // There are slight faster ways of squaring very large numbers, but
-        // but this is good enough for now.
-        &self * &self
     }
 
     fn ensure_capacity(&mut self, cap: u32) {
@@ -2573,6 +2585,24 @@ mod test {
 
         for &(s, ref n) in cases.iter() {
             assert_eq!(s, &n.to_str_radix(16, false));
+        }
+    }
+
+    #[test]
+    fn pow() {
+        let bases = ["0", "1", "190000000000000", "192834857324591531",
+                     "100000000", "-1", "-100", "-200", "-192834857324591531",
+                     "-431343873217510631841"];
+
+        for b in bases.iter() {
+            let b : Int = b.parse().unwrap();
+            let mut x = Int::one();
+            for e in 0..100 {
+                let a = &b.pow(e);
+                // println!("b={}, e={}, a={}, x={}", &b, &e, &a, &x);
+                assert_mp_eq!(a.clone(), x.clone());
+                x = &x * &b
+            }
         }
     }
 
