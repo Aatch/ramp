@@ -362,42 +362,73 @@ impl Int {
     /**
      * Raises self to the power of exp
      */
-    pub fn pow(self, mut exp: usize) -> Int {
+    pub fn pow(&self, mut exp: usize) -> Int {
         debug_assert!(self.well_formed());
         // TODO: There's almost certainly a better way of doing this calculation
 
-        let mut base = self;
-        let mut ret = Int::from(1);
+        match exp {
+            0 => Int::one(),
+            1 => self.clone(),
+            2 => self.square(),
+            _ => {
+                let mut signum = self.sign();
+                if signum == 0 {
+                    return Int::zero();
+                }
+                if exp & 1 == 0 {
+                    signum = 1
+                }
+                let mut base = self.clone().abs();
+                let mut ret = Int::one();
 
-        while exp > 0 {
-            if (exp & 1) == 1 {
-                ret = ret * &base;
+                let mut shift = 0;
+                while base.to_single_limb() == 0 {
+                    base = base >> Limb::BITS;
+                    shift += Limb::BITS
+                }
+
+                let trailer : usize = base.to_single_limb().trailing_zeros() as usize;
+                shift += trailer;
+                base = base >> trailer;
+
+                shift *= exp;
+
+                while exp > 0 {
+                    if (exp & 1) == 1 {
+                        ret = ret * &base;
+                    }
+
+                    base = base.square();
+
+                    exp /= 2;
+                }
+                (ret << shift) * signum
             }
-
-            base = base.square();
-
-            exp /= 2;
         }
-
-        return ret;
     }
 
     /**
      * Returns the square of `self`.
      */
-    pub fn square(self) -> Int {
+    pub fn square(&self) -> Int {
         debug_assert!(self.well_formed());
-        if self.sign() == 0 {
-            return Int::zero();
+        let s = self.sign();
+        if s == 0 {
+            Int::zero()
+        } else if self.abs_size() == 1 {
+            let a = self.clone() * self.to_single_limb();
+            if s == -1 {
+                a.abs()
+            } else if s == 1 {
+                a
+            } else {
+                unreachable!()
+            }
+        } else {
+            // There are slight faster ways of squaring very large numbers, but
+            // but this is good enough for now.
+            self * self
         }
-        if self.abs_size() == 1 {
-            // Avoid an allocation for when `self` is a single limb
-            let l = self.to_single_limb();
-            return self * l;
-        }
-        // There are slight faster ways of squaring very large numbers, but
-        // but this is good enough for now.
-        &self * &self
     }
 
     fn ensure_capacity(&mut self, cap: u32) {
@@ -2577,6 +2608,24 @@ mod test {
     }
 
     #[test]
+    fn pow() {
+        let bases = ["0", "1", "190000000000000", "192834857324591531",
+                     "100000000", "-1", "-100", "-200", "-192834857324591531",
+                     "-431343873217510631841"];
+
+        for b in bases.iter() {
+            let b : Int = b.parse().unwrap();
+            let mut x = Int::one();
+            for e in 0..100 {
+                let a = &b.pow(e);
+                // println!("b={}, e={}, a={}, x={}", &b, &e, &a, &x);
+                assert_mp_eq!(a.clone(), x.clone());
+                x = &x * &b
+            }
+        }
+    }
+
+    #[test]
     fn add() {
         let cases = [
             ("0", "0", "0"),
@@ -2859,6 +2908,18 @@ mod test {
         });
     }
 
+    fn bench_pow(b: &mut Bencher, xs: u32, ys: usize) {
+        let mut rng = rand::thread_rng();
+
+        let x = rand_int(&mut rng, xs);
+        let y : usize = rng.gen_range(0, ys);
+
+        b.iter(|| {
+            let z = &x.pow(y);
+            test::black_box(z);
+        });
+    }
+    
     #[bench]
     fn bench_mul_1_1(b: &mut Bencher) {
         bench_mul(b, 1, 1);
@@ -2896,6 +2957,46 @@ mod test {
 
     #[bench]
     fn bench_mul_50_1500(b: &mut Bencher) {
+        bench_mul(b, 50, 1500);
+    }
+    
+    #[bench]
+    fn bench_pow_1_1(b: &mut Bencher) {
+        bench_pow(b, 1, 1);
+    }
+
+    #[bench]
+    fn bench_pow_10_10(b: &mut Bencher) {
+        bench_pow(b, 10, 10);
+    }
+
+    #[bench]
+    fn bench_pow_2_20(b: &mut Bencher) {
+        bench_pow(b, 2, 20);
+    }
+
+    #[bench]
+    fn bench_pow_50_50(b: &mut Bencher) {
+        bench_pow(b, 50, 50);
+    }
+
+    #[bench]
+    fn bench_pow_5_50(b: &mut Bencher) {
+        bench_mul(b, 5, 50);
+    }
+
+    #[bench]
+    fn bench_pow_250_250(b: &mut Bencher) {
+        bench_mul(b, 250, 250);
+    }
+
+    #[bench]
+    fn bench_pow_1000_1000(b: &mut Bencher) {
+        bench_mul(b, 1000, 1000);
+    }
+
+    #[bench]
+    fn bench_pow_50_1500(b: &mut Bencher) {
         bench_mul(b, 50, 1500);
     }
 
