@@ -364,8 +364,7 @@ impl Int {
      */
     pub fn pow(&self, mut exp: usize) -> Int {
         debug_assert!(self.well_formed());
-        // TODO: There's almost certainly a better way of doing this calculation
-
+        const CUTOFF : usize = 2 << 8;
         match exp {
             0 => Int::one(),
             1 => self.clone(),
@@ -393,14 +392,49 @@ impl Int {
 
                 shift *= exp;
 
-                while exp > 0 {
-                    if (exp & 1) == 1 {
-                        ret = ret * &base;
+                if exp < CUTOFF {
+                    // Simple binary
+                    while exp > 0 {
+                        if (exp & 1) == 1 {
+                            ret = ret * &base;
+                        }
+
+                        base = base.dsquare();
+
+                        exp /= 2;
                     }
+                } else {
+                    // m-ary method from Gordon, D. M. (1998). "A
+                    // Survey of Fast Exponentiation Methods". Journal
+                    // of Algorithms 27: 129–146.
 
-                    base = base.square();
+                    let mut acc = Int::one();
+                    // Is there a less awful way to do this?
+                    let precomp = [{ acc = acc * &base; acc.clone() },
+                                   { acc = acc * &base; acc.clone() },
+                                   { acc = acc * &base; acc.clone() },
+                                   { acc = acc * &base; acc.clone() },
+                                   { acc = acc * &base; acc.clone() },
+                                   { acc = acc * &base; acc.clone() },
+                                   { acc = acc * &base; acc.clone() },
+                                   { acc = acc * &base; acc.clone() },
+                                   { acc = acc * &base; acc.clone() },
+                                   { acc = acc * &base; acc.clone() },
+                                   { acc = acc * &base; acc.clone() },
+                                   { acc = acc * &base; acc.clone() },
+                                   { acc = acc * &base; acc.clone() },
+                                   { acc = acc * &base; acc.clone() },
+                                   { acc = acc * &base; acc.clone() }];
 
-                    exp /= 2;
+                    while exp > 0 {
+                        let idx = exp & 15;
+                        if idx != 0 {
+                            ret = ret * &precomp[idx - 1];
+                        }
+
+                        base = base.dsquare().dsquare().dsquare().dsquare();
+                        exp = exp >> 4
+                    }
                 }
                 (ret << shift) * signum
             }
@@ -428,6 +462,29 @@ impl Int {
             // There are slight faster ways of squaring very large numbers, but
             // but this is good enough for now.
             self * self
+        }
+    }
+
+    // DESTRUCTIVE square. Is there a more idiomatic way of doing this?
+    pub fn dsquare(mut self) -> Int {
+        debug_assert!(self.well_formed());
+        let s = self.sign();
+        if s == 0 {
+            Int::zero()
+        } else if self.abs_size() == 1 {
+            let l = self.to_single_limb();
+            self = self * l;
+            if s == -1 {
+                self.abs()
+            } else if s == 1 {
+                self
+            } else {
+                unreachable!()
+            }
+        } else {
+            // There are slight faster ways of squaring very large numbers, but
+            // but this is good enough for now.
+            &self * &self
         }
     }
 
@@ -2616,7 +2673,7 @@ mod test {
         for b in bases.iter() {
             let b : Int = b.parse().unwrap();
             let mut x = Int::one();
-            for e in 0..100 {
+            for e in 0..512 {
                 let a = &b.pow(e);
                 // println!("b={}, e={}, a={}, x={}", &b, &e, &a, &x);
                 assert_mp_eq!(a.clone(), x.clone());
