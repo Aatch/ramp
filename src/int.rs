@@ -2554,7 +2554,7 @@ impl std::iter::Step for Int {
     }
 }
 
-trait RandomInt {
+pub trait RandomInt {
     fn gen_int(&mut self, bits: usize) -> Int;
 }
 
@@ -2600,10 +2600,9 @@ pub fn rand_int<R: ::rand::Rng>(rng: &mut R, limbs: u32) -> Int {
 mod test {
     use std;
     use std::hash::{Hash, Hasher};
-    use rand::{self, Rng, StdRng};
+    use rand::{self, Rng};
     use test::{self, Bencher};
     use super::*;
-    use super::{ RandomInt };
     use std::str::FromStr;
     use std::num::Zero;
 

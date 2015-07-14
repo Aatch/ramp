@@ -36,3 +36,4 @@ pub mod int;
 // Re-exports
 
 pub use int::Int;
+pub use int::RandomInt;
