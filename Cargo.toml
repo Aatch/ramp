@@ -21,8 +21,6 @@ asm = []
 
 [dependencies]
 num = "*"
-
-[dev-dependencies]
 rand = "*"
 
 [build-dependencies]

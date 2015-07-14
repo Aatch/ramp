@@ -19,7 +19,6 @@
 
 #![feature(core_intrinsics, asm, heap_api, associated_consts)]
 #![feature(zero_one, step_trait, unique)]
-#![feature(rand)]
 
 #![cfg_attr(test, feature(test))]
 
