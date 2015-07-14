@@ -28,6 +28,8 @@ use std::ops::{
 };
 use std::ptr::Unique;
 use std::str::FromStr;
+use rand::Rng;
+use num::Integer;
 
 use ll;
 use ll::limb::{BaseInt, Limb};
@@ -2552,6 +2554,28 @@ impl std::iter::Step for Int {
     }
 }
 
+trait RandomInt {
+    fn gen_int(&mut self, bits: usize) -> Int;
+}
+
+impl<R: Rng> RandomInt for R {
+    fn gen_int(&mut self, bits: usize) -> Int {
+        let (digits, rem) = bits.div_rem(&ll::limb::Limb::BITS);
+        let mut data = Int::with_capacity(digits as u32);
+        for _ in (0 .. digits) {
+            let limb = Limb(self.gen());
+            data.push(limb);
+        }
+        if rem > 0 {
+            let final_digit = Limb(self.gen());
+            data.push(final_digit >> (&ll::limb::Limb::BITS - rem));
+        }
+
+        data.normalize();
+
+        data
+    }
+}
 
 #[cfg(test)]
 pub fn rand_int<R: ::rand::Rng>(rng: &mut R, limbs: u32) -> Int {
@@ -2576,9 +2600,10 @@ pub fn rand_int<R: ::rand::Rng>(rng: &mut R, limbs: u32) -> Int {
 mod test {
     use std;
     use std::hash::{Hash, Hasher};
-    use rand::{self, Rng};
+    use rand::{self, Rng, StdRng};
     use test::{self, Bencher};
     use super::*;
+    use super::{ RandomInt };
     use std::str::FromStr;
     use std::num::Zero;
 
@@ -2594,6 +2619,15 @@ mod test {
             }
         )
     );
+
+    #[test]
+    fn gen_int() {
+        let mut rng = rand::thread_rng();
+
+        let big_i = rng.gen_int(7);
+
+        println!("{}", big_i);
+    }
 
     #[test]
     fn from_string_10() {
@@ -2976,7 +3010,7 @@ mod test {
             test::black_box(z);
         });
     }
-    
+
     #[bench]
     fn bench_mul_1_1(b: &mut Bencher) {
         bench_mul(b, 1, 1);
@@ -3016,7 +3050,7 @@ mod test {
     fn bench_mul_50_1500(b: &mut Bencher) {
         bench_mul(b, 50, 1500);
     }
-    
+
     #[bench]
     fn bench_pow_1_1(b: &mut Bencher) {
         bench_pow(b, 1, 1);

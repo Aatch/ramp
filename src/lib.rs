@@ -19,11 +19,14 @@
 
 #![feature(core_intrinsics, asm, heap_api, associated_consts)]
 #![feature(zero_one, step_trait, unique)]
+#![feature(rand)]
 
 #![cfg_attr(test, feature(test))]
 
 #[cfg(test)] extern crate test;
-#[cfg(test)] extern crate rand;
+
+extern crate rand;
+extern crate num;
 
 pub mod ll;
 mod mem;
