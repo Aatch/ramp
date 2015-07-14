@@ -2573,7 +2573,24 @@ impl<R: Rng> RandomInt for R {
 
         data.normalize();
 
-        data
+        let r = if data == Int::zero() {
+             // ...except that if the BigUint is zero, we need to try
+             // again with probability 0.5. This is because otherwise,
+             // the probability of generating a zero BigInt would be
+             // double that of any other number.
+             if self.gen() {
+                 return self.gen_int(bits);
+             } else {
+                 data
+             }
+         } else if self.gen() {
+        // let r = if self.gen() {
+            -data
+        } else {
+            data
+        };
+
+        r
     }
 }
 
