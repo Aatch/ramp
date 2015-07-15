@@ -20,7 +20,6 @@ unstable = [] # To keep travis-cargo happy
 asm = []
 
 [dependencies]
-num = "*"
 rand = "*"
 
 [build-dependencies]

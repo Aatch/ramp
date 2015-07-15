@@ -29,7 +29,6 @@ use std::ops::{
 use std::ptr::Unique;
 use std::str::FromStr;
 use rand::Rng;
-use num::Integer;
 
 use ll;
 use ll::limb::{BaseInt, Limb};
@@ -2560,12 +2559,17 @@ pub trait RandomInt {
 
 impl<R: Rng> RandomInt for R {
     fn gen_int(&mut self, bits: usize) -> Int {
-        let (digits, rem) = bits.div_rem(&ll::limb::Limb::BITS);
+
+        let digits = bits / &ll::limb::Limb::BITS;
+        let rem = bits % &ll::limb::Limb::BITS;
+
         let mut data = Int::with_capacity(digits as u32);
+
         for _ in (0 .. digits) {
             let limb = Limb(self.gen());
             data.push(limb);
         }
+        
         if rem > 0 {
             let final_digit = Limb(self.gen());
             data.push(final_digit >> (&ll::limb::Limb::BITS - rem));
@@ -2574,17 +2578,16 @@ impl<R: Rng> RandomInt for R {
         data.normalize();
 
         let r = if data == Int::zero() {
-             // ...except that if the BigUint is zero, we need to try
-             // again with probability 0.5. This is because otherwise,
-             // the probability of generating a zero BigInt would be
-             // double that of any other number.
-             if self.gen() {
-                 return self.gen_int(bits);
-             } else {
-                 data
-             }
-         } else if self.gen() {
-        // let r = if self.gen() {
+            // ...except that if the BigUint is zero, we need to try
+            // again with probability 0.5. This is because otherwise,
+            // the probability of generating a zero BigInt would be
+            // double that of any other number.
+            if self.gen() {
+             return self.gen_int(bits);
+            } else {
+             data
+            }
+        } else if self.gen() {
             -data
         } else {
             data

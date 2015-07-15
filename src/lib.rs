@@ -25,7 +25,6 @@
 #[cfg(test)] extern crate test;
 
 extern crate rand;
-extern crate num;
 
 pub mod ll;
 mod mem;
