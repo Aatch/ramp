@@ -2554,22 +2554,24 @@ impl std::iter::Step for Int {
 }
 
 pub trait RandomInt {
+    fn gen_uint(&mut self, bigs: usize) -> Int;
     fn gen_int(&mut self, bits: usize) -> Int;
+    fn gen_uint_below(&mut self, bound: &Int) -> Int;
+    fn gen_uint_range(&mut self, lbound: &Int, ubound: &Int) -> Int;
 }
 
 impl<R: Rng> RandomInt for R {
-    fn gen_int(&mut self, bits: usize) -> Int {
-
-        let digits = bits / &ll::limb::Limb::BITS;
+    fn gen_uint(&mut self, bits: usize) -> Int {
+        let digits = (bits / &ll::limb::Limb::BITS) as u32;
         let rem = bits % &ll::limb::Limb::BITS;
 
-        let mut data = Int::with_capacity(digits as u32);
+        let mut data = Int::with_capacity(digits + 1);
 
         for _ in (0 .. digits) {
             let limb = Limb(self.gen());
             data.push(limb);
         }
-        
+
         if rem > 0 {
             let final_digit = Limb(self.gen());
             data.push(final_digit >> (&ll::limb::Limb::BITS - rem));
@@ -2577,13 +2579,20 @@ impl<R: Rng> RandomInt for R {
 
         data.normalize();
 
+        data
+    }
+
+    fn gen_int(&mut self, bits: usize) -> Int {
+
+        let data = self.gen_uint(bits);
+
         let r = if data == Int::zero() {
             // ...except that if the BigUint is zero, we need to try
             // again with probability 0.5. This is because otherwise,
             // the probability of generating a zero BigInt would be
             // double that of any other number.
             if self.gen() {
-             return self.gen_int(bits);
+             return self.gen_uint(bits);
             } else {
              data
             }
@@ -2594,6 +2603,26 @@ impl<R: Rng> RandomInt for R {
         };
 
         r
+    }
+
+    fn gen_uint_below(&mut self, bound: &Int) -> Int {
+        assert!(*bound > Int::zero());
+
+        let mut i = (*bound).clone();
+        i.normalize();
+
+        let lz = bound.to_single_limb().leading_zeros() as i32;
+        let bits = ((bound.abs_size() * Limb::BITS as i32) - lz) as usize;
+
+        loop {
+            let n = self.gen_uint(bits);
+            if n < *bound { return n; }
+        }
+    }
+
+    fn gen_uint_range(&mut self, lbound: &Int, ubound: &Int) -> Int {
+        assert!(*lbound < *ubound);
+        return lbound + self.gen_uint_below(&(ubound - lbound));
     }
 }
 
@@ -2644,6 +2673,33 @@ mod test {
         let mut rng = rand::thread_rng();
 
         let big_i = rng.gen_int(7);
+
+        println!("{}", big_i);
+    }
+
+    #[test]
+    fn gen_uint() {
+        let mut rng = rand::thread_rng();
+
+        let big_i = rng.gen_uint(32);
+
+        println!("{}", big_i);
+    }
+
+    #[test]
+    fn gen_uint_below() {
+        let mut rng = rand::thread_rng();
+
+        let big_i = rng.gen_uint_below(&Int::from(20));
+
+        println!("{}", big_i);
+    }
+
+    #[test]
+    fn gen_uint_range() {
+        let mut rng = rand::thread_rng();
+
+        let big_i = rng.gen_uint_range(&Int::from(20), &Int::from(50));
 
         println!("{}", big_i);
     }
