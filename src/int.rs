@@ -785,6 +785,32 @@ impl Int {
         }
         self.size = -self.size;
     }
+
+    /// Calculates the Greatest Common Divisor (GCD) of the number and `other`.
+    ///
+    /// The result is always positive.
+    #[inline]
+    pub fn gcd(&self, other: &Int) -> Int {
+        // Use Euclid's algorithm
+        let mut m = (*self).clone();
+        let mut n = (*other).clone();
+
+        while  m != Int::zero() {
+            let temp = m;
+            m = n % &temp;
+            // FIXME this should be done by rem
+            m.normalize();
+            n = temp;
+        }
+
+        n.abs()
+    }
+
+    /// Calculates the Lowest Common Multiple (LCM) of the number and `other`.
+    #[inline]
+    pub fn lcm(&self, other: &Int) -> Int {
+        ((self * other) / self.gcd(other)).abs()
+    }
 }
 
 impl Clone for Int {
@@ -4194,6 +4220,59 @@ mod test {
             let z = &x + &y;
             test::black_box(z);
         });
+    }
+
+    #[test]
+    fn test_gcd() {
+        fn check(a: isize, b: isize, c: isize) {
+            let big_a: Int = Int::from(a);
+            let big_b: Int = Int::from(b);
+            let big_c: Int = Int::from(c);
+
+            assert_eq!(big_a.gcd(&big_b), big_c);
+        }
+
+        check(10, 2, 2);
+        check(10, 3, 1);
+        check(0, 3, 3);
+        check(3, 3, 3);
+        check(56, 42, 14);
+
+        check(10, 2, 2);
+        check(10, 3, 1);
+        check(0, 3, 3);
+        check(3, 3, 3);
+        check(56, 42, 14);
+        check(3, -3, 3);
+        check(-6, 3, 3);
+        check(-4, -2, 2);
+    }
+
+    #[test]
+    fn test_lcm() {
+        fn check(a: isize, b: isize, c: isize) {
+            let big_a: Int = Int::from(a);
+            let big_b: Int = Int::from(b);
+            let big_c: Int = Int::from(c);
+
+            assert_eq!(big_a.lcm(&big_b), big_c);
+        }
+
+        check(1, 0, 0);
+        check(0, 1, 0);
+        check(1, 1, 1);
+        check(8, 9, 72);
+        check(11, 5, 55);
+        check(99, 17, 1683);
+
+        check(1, 0, 0);
+        check(0, 1, 0);
+        check(1, 1, 1);
+        check(-1, 1, 1);
+        check(1, -1, 1);
+        check(-1, -1, 1);
+        check(8, 9, 72);
+        check(11, 5, 55);
     }
 
     #[bench]
