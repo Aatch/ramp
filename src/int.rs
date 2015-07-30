@@ -2553,6 +2553,23 @@ impl std::iter::Step for Int {
     }
 }
 
+/// Trait for generating random `Int`.
+///
+/// # Example
+///
+/// Generate a random `Int` of size `256` bits:
+///
+/// ```
+/// extern crate rand;
+/// extern crate ramp;
+///
+/// use ramp::RandomInt;
+///
+/// fn main() {
+///     let mut rng = rand::thread_rng();
+///     let big_i = rng.gen_int(256);
+/// }
+/// ```
 pub trait RandomInt {
     /// Generate a random unsigned `Int` of given bit size.
     fn gen_uint(&mut self, bits: usize) -> Int;
