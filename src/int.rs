@@ -2554,9 +2554,16 @@ impl std::iter::Step for Int {
 }
 
 pub trait RandomInt {
-    fn gen_uint(&mut self, bigs: usize) -> Int;
+    /// Generate a random unsigned `Int` of given bit size.
+    fn gen_uint(&mut self, bits: usize) -> Int;
+    /// Generate a random `Int` of given bit size.
     fn gen_int(&mut self, bits: usize) -> Int;
+    /// Generate a random unsigned `Int` less than the given bound.
+    /// Fails when the bound is zero or negative.
     fn gen_uint_below(&mut self, bound: &Int) -> Int;
+    /// Generate a random unsigned `Int` within the given range.
+    /// The lower bound is inclusive; the upper bound is exclusive.
+    /// Fails when the upper bound is not greater than the lower bound.
     fn gen_uint_range(&mut self, lbound: &Int, ubound: &Int) -> Int;
 }
 
