@@ -2586,6 +2586,8 @@ pub trait RandomInt {
 
 impl<R: Rng> RandomInt for R {
     fn gen_uint(&mut self, bits: usize) -> Int {
+        assert!(bits > 0);
+
         let digits = (bits / &ll::limb::Limb::BITS) as u32;
         let rem = bits % &ll::limb::Limb::BITS;
 
@@ -2607,7 +2609,6 @@ impl<R: Rng> RandomInt for R {
     }
 
     fn gen_int(&mut self, bits: usize) -> Int {
-
         let data = self.gen_uint(bits);
 
         let r = if data == Int::zero() {
@@ -2691,42 +2692,6 @@ mod test {
             }
         )
     );
-
-    #[test]
-    fn gen_int() {
-        let mut rng = rand::thread_rng();
-
-        let big_i = rng.gen_int(7);
-
-        println!("{}", big_i);
-    }
-
-    #[test]
-    fn gen_uint() {
-        let mut rng = rand::thread_rng();
-
-        let big_i = rng.gen_uint(32);
-
-        println!("{}", big_i);
-    }
-
-    #[test]
-    fn gen_uint_below() {
-        let mut rng = rand::thread_rng();
-
-        let big_i = rng.gen_uint_below(&Int::from(20));
-
-        println!("{}", big_i);
-    }
-
-    #[test]
-    fn gen_int_range() {
-        let mut rng = rand::thread_rng();
-
-        let big_i = rng.gen_int_range(&Int::from(-20), &Int::from(20));
-
-        println!("{}", big_i);
-    }
 
     #[test]
     fn from_string_10() {
@@ -3048,6 +3013,74 @@ mod test {
             assert!(x1_hash == x2_hash);
         }
     }
+
+    #[test]
+    #[should_panic]
+    fn gen_uint_with_zero_bits() {
+        let mut rng = rand::thread_rng();
+        rng.gen_uint(0);
+    }
+
+    #[test]
+    #[should_panic]
+    fn gen_int_with_zero_bits() {
+        let mut rng = rand::thread_rng();
+        rng.gen_int(0);
+    }
+
+    #[test]
+    #[should_panic]
+    fn gen_uint_below_zero_or_negative() {
+        let mut rng = rand::thread_rng();
+
+        let i = Int::from(0);
+        rng.gen_uint_below(&i);
+
+        let j = Int::from(-1);
+        rng.gen_uint_below(&j);
+    }
+
+    #[test]
+    #[should_panic]
+    fn gen_int_range_zero() {
+        let mut rng = rand::thread_rng();
+
+        let b = Int::from(123);
+        rng.gen_int_range(&b, &b);
+    }
+
+    #[test]
+    #[should_panic]
+    fn gen_int_range_negative() {
+        let mut rng = rand::thread_rng();
+
+        let lb = Int::from(123);
+        let ub = Int::from(321);
+
+        rng.gen_int_range(&ub, &lb);
+    }
+
+    #[test]
+    fn gen_int_range() {
+        let mut rng = rand::thread_rng();
+
+        for _ in 0..10 {
+            let i = rng.gen_int_range(&Int::from(236), &Int::from(237));
+            assert_eq!(i, Int::from(236));
+        }
+
+        let l = Int::from(403469000 + 2352);
+        let u = Int::from(403469000 + 3513);
+        for _ in 0..1000 {
+            let n: Int = rng.gen_uint_below(&u);
+            assert!(n < u);
+
+            let n: Int = rng.gen_int_range(&l, &u);
+            assert!(n >= l);
+            assert!(n < u);
+        }
+    }
+
 
     fn bench_add(b: &mut Bencher, xs: u32, ys: u32) {
         let mut rng = rand::thread_rng();
