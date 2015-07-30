@@ -2561,10 +2561,10 @@ pub trait RandomInt {
     /// Generate a random unsigned `Int` less than the given bound.
     /// Fails when the bound is zero or negative.
     fn gen_uint_below(&mut self, bound: &Int) -> Int;
-    /// Generate a random unsigned `Int` within the given range.
+    /// Generate a random `Int` within the given range.
     /// The lower bound is inclusive; the upper bound is exclusive.
     /// Fails when the upper bound is not greater than the lower bound.
-    fn gen_uint_range(&mut self, lbound: &Int, ubound: &Int) -> Int;
+    fn gen_int_range(&mut self, lbound: &Int, ubound: &Int) -> Int;
 }
 
 impl<R: Rng> RandomInt for R {
@@ -2627,7 +2627,7 @@ impl<R: Rng> RandomInt for R {
         }
     }
 
-    fn gen_uint_range(&mut self, lbound: &Int, ubound: &Int) -> Int {
+    fn gen_int_range(&mut self, lbound: &Int, ubound: &Int) -> Int {
         assert!(*lbound < *ubound);
         return lbound + self.gen_uint_below(&(ubound - lbound));
     }
@@ -2703,10 +2703,10 @@ mod test {
     }
 
     #[test]
-    fn gen_uint_range() {
+    fn gen_int_range() {
         let mut rng = rand::thread_rng();
 
-        let big_i = rng.gen_uint_range(&Int::from(20), &Int::from(50));
+        let big_i = rng.gen_int_range(&Int::from(-20), &Int::from(20));
 
         println!("{}", big_i);
     }
