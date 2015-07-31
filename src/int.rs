@@ -2588,30 +2588,30 @@ impl<R: Rng> RandomInt for R {
     fn gen_uint(&mut self, bits: usize) -> Int {
         assert!(bits > 0);
 
-        let digits = (bits / &ll::limb::Limb::BITS) as u32;
-        let rem = bits % &ll::limb::Limb::BITS;
+        let limbs = (bits / &Limb::BITS) as u32;
+        let rem = bits % &Limb::BITS;
 
-        let mut data = Int::with_capacity(digits + 1);
+        let mut i = Int::with_capacity(limbs + 1);
 
-        for _ in (0 .. digits) {
+        for _ in (0 .. limbs) {
             let limb = Limb(self.gen());
-            data.push(limb);
+            i.push(limb);
         }
 
         if rem > 0 {
-            let final_digit = Limb(self.gen());
-            data.push(final_digit >> (&ll::limb::Limb::BITS - rem));
+            let final_limb = Limb(self.gen());
+            i.push(final_limb >> (&Limb::BITS - rem));
         }
 
-        data.normalize();
+        i.normalize();
 
-        data
+        i
     }
 
     fn gen_int(&mut self, bits: usize) -> Int {
-        let data = self.gen_uint(bits);
+        let i = self.gen_uint(bits);
 
-        let r = if data == Int::zero() {
+        let r = if i == Int::zero() {
             // ...except that if the BigUint is zero, we need to try
             // again with probability 0.5. This is because otherwise,
             // the probability of generating a zero BigInt would be
@@ -2619,12 +2619,12 @@ impl<R: Rng> RandomInt for R {
             if self.gen() {
              return self.gen_uint(bits);
             } else {
-             data
+             i
             }
         } else if self.gen() {
-            -data
+            -i
         } else {
-            data
+            i
         };
 
         r
