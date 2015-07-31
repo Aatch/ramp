@@ -2652,31 +2652,13 @@ impl<R: Rng> RandomInt for R {
 }
 
 #[cfg(test)]
-pub fn rand_int<R: ::rand::Rng>(rng: &mut R, limbs: u32) -> Int {
-    let negative : bool = rng.gen();
-
-    let mut i = Int::with_capacity(limbs);
-    for _ in 0..limbs {
-        let limb = Limb(rng.gen());
-        i.push(limb);
-    }
-
-    i.normalize();
-
-    if negative {
-        -i
-    } else {
-        i
-    }
-}
-
-#[cfg(test)]
 mod test {
     use std;
     use std::hash::{Hash, Hasher};
     use rand::{self, Rng};
     use test::{self, Bencher};
     use super::*;
+    use ll::limb::Limb;
     use std::str::FromStr;
     use std::num::Zero;
 
@@ -2924,8 +2906,8 @@ mod test {
     fn div_rand() {
         let mut rng = rand::thread_rng();
         for _ in (0..RAND_ITER) {
-            let x = rand_int(&mut rng, 10);
-            let y = rand_int(&mut rng, 5);
+            let x = rng.gen_int(640);
+            let y = rng.gen_int(320);
 
             let (q, r) = x.divmod(&y);
             let val = (q * &y) + r;
@@ -2938,7 +2920,7 @@ mod test {
     fn shl_rand() {
         let mut rng = rand::thread_rng();
         for _ in (0..RAND_ITER) {
-            let x = rand_int(&mut rng, 10);
+            let x = rng.gen_int(640);
 
             let shift_1 = &x << 1;
             let mul_2 = &x * 2;
@@ -2959,7 +2941,7 @@ mod test {
             let pow : usize = rng.gen_range(64, 8196);
             let mul_by = Int::from(2).pow(pow);
 
-            let x = rand_int(&mut rng, 10);
+            let x = rng.gen_int(640);
 
             let shift = &x << pow;
             let mul = x * mul_by;
@@ -2973,7 +2955,7 @@ mod test {
         let mut rng = rand::thread_rng();
         for _ in (0..RAND_ITER) {
             let pow : usize = rng.gen_range(64, 8196);
-            let x = rand_int(&mut rng, 10);
+            let x = rng.gen_int(640);
 
             let shift_up = &x << pow;
             let shift_down = shift_up >> pow;
@@ -2986,8 +2968,8 @@ mod test {
     fn bitand_rand() {
         let mut rng = rand::thread_rng();
         for _ in (0..RAND_ITER) {
-            let x = rand_int(&mut rng, 10);
-            let y = rand_int(&mut rng, 10);
+            let x = rng.gen_int(640);
+            let y = rng.gen_int(640);
 
             let _ = x & y;
         }
@@ -2997,7 +2979,7 @@ mod test {
     fn hash_rand() {
         let mut rng = rand::thread_rng();
         for _ in (0..RAND_ITER) {
-            let x1 = rand_int(&mut rng, 10);
+            let x1 = rng.gen_int(640);
             let x2 = x1.clone();
 
             assert!(x1 == x2);
@@ -3082,11 +3064,11 @@ mod test {
     }
 
 
-    fn bench_add(b: &mut Bencher, xs: u32, ys: u32) {
+    fn bench_add(b: &mut Bencher, xs: usize, ys: usize) {
         let mut rng = rand::thread_rng();
 
-        let x = rand_int(&mut rng, xs);
-        let y = rand_int(&mut rng, ys);
+        let x = rng.gen_int(xs * Limb::BITS);
+        let y = rng.gen_int(ys * Limb::BITS);
 
         b.iter(|| {
             let z = &x + &y;
@@ -3119,11 +3101,11 @@ mod test {
         bench_add(b, 1000, 10);
     }
 
-    fn bench_mul(b: &mut Bencher, xs: u32, ys: u32) {
+    fn bench_mul(b: &mut Bencher, xs: usize, ys: usize) {
         let mut rng = rand::thread_rng();
 
-        let x = rand_int(&mut rng, xs);
-        let y = rand_int(&mut rng, ys);
+        let x = rng.gen_int(xs * Limb::BITS);
+        let y = rng.gen_int(ys * Limb::BITS);
 
         b.iter(|| {
             let z = &x * &y;
@@ -3131,10 +3113,10 @@ mod test {
         });
     }
 
-    fn bench_pow(b: &mut Bencher, xs: u32, ys: usize) {
+    fn bench_pow(b: &mut Bencher, xs: usize, ys: usize) {
         let mut rng = rand::thread_rng();
 
-        let x = rand_int(&mut rng, xs);
+        let x = rng.gen_int(xs * Limb::BITS);
         let y : usize = rng.gen_range(0, ys);
 
         b.iter(|| {
@@ -3252,11 +3234,11 @@ mod test {
         });
     }
 
-    fn bench_div(b: &mut Bencher, xs: u32, ys: u32) {
+    fn bench_div(b: &mut Bencher, xs: usize, ys: usize) {
         let mut rng = rand::thread_rng();
 
-        let x = rand_int(&mut rng, xs);
-        let y = rand_int(&mut rng, ys);
+        let x = rng.gen_int(xs * Limb::BITS);
+        let y = rng.gen_int(ys * Limb::BITS);
 
         b.iter(|| {
             let z = &x / &y;
