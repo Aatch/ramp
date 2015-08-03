@@ -23,7 +23,8 @@
 #![cfg_attr(test, feature(test))]
 
 #[cfg(test)] extern crate test;
-#[cfg(test)] extern crate rand;
+
+extern crate rand;
 
 pub mod ll;
 mod mem;
@@ -33,3 +34,4 @@ pub mod int;
 // Re-exports
 
 pub use int::Int;
+pub use int::RandomInt;

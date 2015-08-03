@@ -28,6 +28,7 @@ use std::ops::{
 };
 use std::ptr::Unique;
 use std::str::FromStr;
+use rand::Rng;
 
 use ll;
 use ll::limb::{BaseInt, Limb};
@@ -2552,23 +2553,101 @@ impl std::iter::Step for Int {
     }
 }
 
+/// Trait for generating random `Int`.
+///
+/// # Example
+///
+/// Generate a random `Int` of size `256` bits:
+///
+/// ```
+/// extern crate rand;
+/// extern crate ramp;
+///
+/// use ramp::RandomInt;
+///
+/// fn main() {
+///     let mut rng = rand::thread_rng();
+///     let big_i = rng.gen_int(256);
+/// }
+/// ```
+pub trait RandomInt {
+    /// Generate a random unsigned `Int` of given bit size.
+    fn gen_uint(&mut self, bits: usize) -> Int;
+    /// Generate a random `Int` of given bit size.
+    fn gen_int(&mut self, bits: usize) -> Int;
+    /// Generate a random unsigned `Int` less than the given bound.
+    /// Fails when the bound is zero or negative.
+    fn gen_uint_below(&mut self, bound: &Int) -> Int;
+    /// Generate a random `Int` within the given range.
+    /// The lower bound is inclusive; the upper bound is exclusive.
+    /// Fails when the upper bound is not greater than the lower bound.
+    fn gen_int_range(&mut self, lbound: &Int, ubound: &Int) -> Int;
+}
 
-#[cfg(test)]
-pub fn rand_int<R: ::rand::Rng>(rng: &mut R, limbs: u32) -> Int {
-    let negative : bool = rng.gen();
+impl<R: Rng> RandomInt for R {
+    fn gen_uint(&mut self, bits: usize) -> Int {
+        assert!(bits > 0);
 
-    let mut i = Int::with_capacity(limbs);
-    for _ in 0..limbs {
-        let limb = Limb(rng.gen());
-        i.push(limb);
+        let limbs = (bits / &Limb::BITS) as u32;
+        let rem = bits % &Limb::BITS;
+
+        let mut i = Int::with_capacity(limbs + 1);
+
+        for _ in (0 .. limbs) {
+            let limb = Limb(self.gen());
+            i.push(limb);
+        }
+
+        if rem > 0 {
+            let final_limb = Limb(self.gen());
+            i.push(final_limb >> (&Limb::BITS - rem));
+        }
+
+        i.normalize();
+
+        i
     }
 
-    i.normalize();
+    fn gen_int(&mut self, bits: usize) -> Int {
+        let i = self.gen_uint(bits);
 
-    if negative {
-        -i
-    } else {
-        i
+        let r = if i == Int::zero() {
+            // ...except that if the BigUint is zero, we need to try
+            // again with probability 0.5. This is because otherwise,
+            // the probability of generating a zero BigInt would be
+            // double that of any other number.
+            if self.gen() {
+             return self.gen_uint(bits);
+            } else {
+             i
+            }
+        } else if self.gen() {
+            -i
+        } else {
+            i
+        };
+
+        r
+    }
+
+    fn gen_uint_below(&mut self, bound: &Int) -> Int {
+        assert!(*bound > Int::zero());
+
+        let mut i = (*bound).clone();
+        i.normalize();
+
+        let lz = bound.to_single_limb().leading_zeros() as i32;
+        let bits = ((bound.abs_size() * Limb::BITS as i32) - lz) as usize;
+
+        loop {
+            let n = self.gen_uint(bits);
+            if n < *bound { return n; }
+        }
+    }
+
+    fn gen_int_range(&mut self, lbound: &Int, ubound: &Int) -> Int {
+        assert!(*lbound < *ubound);
+        return lbound + self.gen_uint_below(&(ubound - lbound));
     }
 }
 
@@ -2579,6 +2658,7 @@ mod test {
     use rand::{self, Rng};
     use test::{self, Bencher};
     use super::*;
+    use ll::limb::Limb;
     use std::str::FromStr;
     use std::num::Zero;
 
@@ -2826,8 +2906,8 @@ mod test {
     fn div_rand() {
         let mut rng = rand::thread_rng();
         for _ in (0..RAND_ITER) {
-            let x = rand_int(&mut rng, 10);
-            let y = rand_int(&mut rng, 5);
+            let x = rng.gen_int(640);
+            let y = rng.gen_int(320);
 
             let (q, r) = x.divmod(&y);
             let val = (q * &y) + r;
@@ -2840,7 +2920,7 @@ mod test {
     fn shl_rand() {
         let mut rng = rand::thread_rng();
         for _ in (0..RAND_ITER) {
-            let x = rand_int(&mut rng, 10);
+            let x = rng.gen_int(640);
 
             let shift_1 = &x << 1;
             let mul_2 = &x * 2;
@@ -2861,7 +2941,7 @@ mod test {
             let pow : usize = rng.gen_range(64, 8196);
             let mul_by = Int::from(2).pow(pow);
 
-            let x = rand_int(&mut rng, 10);
+            let x = rng.gen_int(640);
 
             let shift = &x << pow;
             let mul = x * mul_by;
@@ -2875,7 +2955,7 @@ mod test {
         let mut rng = rand::thread_rng();
         for _ in (0..RAND_ITER) {
             let pow : usize = rng.gen_range(64, 8196);
-            let x = rand_int(&mut rng, 10);
+            let x = rng.gen_int(640);
 
             let shift_up = &x << pow;
             let shift_down = shift_up >> pow;
@@ -2888,8 +2968,8 @@ mod test {
     fn bitand_rand() {
         let mut rng = rand::thread_rng();
         for _ in (0..RAND_ITER) {
-            let x = rand_int(&mut rng, 10);
-            let y = rand_int(&mut rng, 10);
+            let x = rng.gen_int(640);
+            let y = rng.gen_int(640);
 
             let _ = x & y;
         }
@@ -2899,7 +2979,7 @@ mod test {
     fn hash_rand() {
         let mut rng = rand::thread_rng();
         for _ in (0..RAND_ITER) {
-            let x1 = rand_int(&mut rng, 10);
+            let x1 = rng.gen_int(640);
             let x2 = x1.clone();
 
             assert!(x1 == x2);
@@ -2916,11 +2996,79 @@ mod test {
         }
     }
 
-    fn bench_add(b: &mut Bencher, xs: u32, ys: u32) {
+    #[test]
+    #[should_panic]
+    fn gen_uint_with_zero_bits() {
+        let mut rng = rand::thread_rng();
+        rng.gen_uint(0);
+    }
+
+    #[test]
+    #[should_panic]
+    fn gen_int_with_zero_bits() {
+        let mut rng = rand::thread_rng();
+        rng.gen_int(0);
+    }
+
+    #[test]
+    #[should_panic]
+    fn gen_uint_below_zero_or_negative() {
         let mut rng = rand::thread_rng();
 
-        let x = rand_int(&mut rng, xs);
-        let y = rand_int(&mut rng, ys);
+        let i = Int::from(0);
+        rng.gen_uint_below(&i);
+
+        let j = Int::from(-1);
+        rng.gen_uint_below(&j);
+    }
+
+    #[test]
+    #[should_panic]
+    fn gen_int_range_zero() {
+        let mut rng = rand::thread_rng();
+
+        let b = Int::from(123);
+        rng.gen_int_range(&b, &b);
+    }
+
+    #[test]
+    #[should_panic]
+    fn gen_int_range_negative() {
+        let mut rng = rand::thread_rng();
+
+        let lb = Int::from(123);
+        let ub = Int::from(321);
+
+        rng.gen_int_range(&ub, &lb);
+    }
+
+    #[test]
+    fn gen_int_range() {
+        let mut rng = rand::thread_rng();
+
+        for _ in 0..10 {
+            let i = rng.gen_int_range(&Int::from(236), &Int::from(237));
+            assert_eq!(i, Int::from(236));
+        }
+
+        let l = Int::from(403469000 + 2352);
+        let u = Int::from(403469000 + 3513);
+        for _ in 0..1000 {
+            let n: Int = rng.gen_uint_below(&u);
+            assert!(n < u);
+
+            let n: Int = rng.gen_int_range(&l, &u);
+            assert!(n >= l);
+            assert!(n < u);
+        }
+    }
+
+
+    fn bench_add(b: &mut Bencher, xs: usize, ys: usize) {
+        let mut rng = rand::thread_rng();
+
+        let x = rng.gen_int(xs * Limb::BITS);
+        let y = rng.gen_int(ys * Limb::BITS);
 
         b.iter(|| {
             let z = &x + &y;
@@ -2953,11 +3101,11 @@ mod test {
         bench_add(b, 1000, 10);
     }
 
-    fn bench_mul(b: &mut Bencher, xs: u32, ys: u32) {
+    fn bench_mul(b: &mut Bencher, xs: usize, ys: usize) {
         let mut rng = rand::thread_rng();
 
-        let x = rand_int(&mut rng, xs);
-        let y = rand_int(&mut rng, ys);
+        let x = rng.gen_int(xs * Limb::BITS);
+        let y = rng.gen_int(ys * Limb::BITS);
 
         b.iter(|| {
             let z = &x * &y;
@@ -2965,10 +3113,10 @@ mod test {
         });
     }
 
-    fn bench_pow(b: &mut Bencher, xs: u32, ys: usize) {
+    fn bench_pow(b: &mut Bencher, xs: usize, ys: usize) {
         let mut rng = rand::thread_rng();
 
-        let x = rand_int(&mut rng, xs);
+        let x = rng.gen_int(xs * Limb::BITS);
         let y : usize = rng.gen_range(0, ys);
 
         b.iter(|| {
@@ -2976,7 +3124,7 @@ mod test {
             test::black_box(z);
         });
     }
-    
+
     #[bench]
     fn bench_mul_1_1(b: &mut Bencher) {
         bench_mul(b, 1, 1);
@@ -3016,7 +3164,7 @@ mod test {
     fn bench_mul_50_1500(b: &mut Bencher) {
         bench_mul(b, 50, 1500);
     }
-    
+
     #[bench]
     fn bench_pow_1_1(b: &mut Bencher) {
         bench_pow(b, 1, 1);
@@ -3086,11 +3234,11 @@ mod test {
         });
     }
 
-    fn bench_div(b: &mut Bencher, xs: u32, ys: u32) {
+    fn bench_div(b: &mut Bencher, xs: usize, ys: usize) {
         let mut rng = rand::thread_rng();
 
-        let x = rand_int(&mut rng, xs);
-        let y = rand_int(&mut rng, ys);
+        let x = rng.gen_int(xs * Limb::BITS);
+        let y = rng.gen_int(ys * Limb::BITS);
 
         b.iter(|| {
             let z = &x / &y;
