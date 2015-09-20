@@ -794,6 +794,15 @@ impl Int {
         let mut a = (*self).clone();
         let mut b = (*other).clone();
         let r: *mut Limb = &mut Limb(1);
+
+        if a == Int::zero() {
+            return b;
+        }
+
+        if b == Int::zero() {
+            return a;
+        }
+
         unsafe {
             ll::gcd(r, a.ptr.get_mut(), a.abs_size(), b.ptr.get_mut(), b.abs_size());
             Int::from_single_limb(*r)
@@ -4252,9 +4261,9 @@ mod test {
 
         check(10, 2, 2);
         check(10, 3, 1);
-        // check(3, 0, 3);
-        // check(0, 3, 3);
-        // check(0, 0, 0);
+        check(3, 0, 3);
+        check(0, 3, 3);
+        check(0, 0, 0);
         check(3, 3, 3);
         check(56, 42, 14);
         check(3, -3, 3);

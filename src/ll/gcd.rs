@@ -1,49 +1,42 @@
 use ll;
-use ll::limb::{self, Limb};
+use mem;
+use ll::limb::Limb;
 
 pub unsafe fn gcd(gp: *mut Limb, ap: *mut Limb, an: i32, bp: *mut Limb, bn: i32) -> i32 {
-
     let mut g = &mut Limb(1);
 
-    if ll::is_zero(ap, an) {
-        *gp = *ap;
-        return an;
-    }
-
-    if ll::is_zero(bp, bn) {
-        *gp = *bp;
-        return bn;
-    }
-
     while is_even(ap) && is_even(bp) && !ll::is_zero(ap, an) && !ll::is_zero(bp, bn) {
-        *ap = *ap >> 1;
-        *bp = *bp >> 1;
+        ll::shr(ap, ap, an, 1);
+        ll::shr(bp, bp, bn, 1);
         *g = *g << 1;
     }
+
+    let mut tmp = mem::TmpAllocator::new();
+    let t = tmp.allocate(an as usize);
 
     while !ll::is_zero(ap, an) {
 
         while is_even(ap) && !ll::is_zero(ap, an) {
-            *ap = *ap >> 1;
+            ll::shr(ap, ap, an, 1);
         }
 
         while is_even(bp) && !ll::is_zero(bp, bn) {
-            *bp = *bp >> 1;
+            ll::shr(bp, bp, bn, 1);
         }
 
-        // let diff = *ap - *bp;
         let (_ , of) = (*ap).sub_overflow(*bp);
-        // let t = (*ap - *bp) >> 1;
-        let t = if of {
-            (*bp - *ap) >> 1
+        if of {
+            // (*bp - *ap) >> 1
+            ll::shr(t, &(*bp - *ap), an, 1);
         } else {
-            (*ap - *bp) >> 1
-        };
+            // (*ap - *bp) >> 1
+            ll::shr(t, &(*ap - *bp), an, 1);
+        }
 
         if *ap >= *bp {
-            *ap = t;
+            *ap = *t;
         } else {
-            *bp = t;
+            *bp = *t;
         }
     }
 
@@ -53,7 +46,6 @@ pub unsafe fn gcd(gp: *mut Limb, ap: *mut Limb, an: i32, bp: *mut Limb, bn: i32)
 
 unsafe fn is_even(n: *const Limb) -> bool {
     *n % 2 == 0
-    // ll::scan_0(&n, 1) == 0
 }
 
 #[cfg(test)]
