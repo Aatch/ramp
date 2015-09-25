@@ -18,12 +18,13 @@
 #![allow(dead_code)] // Work in progress
 
 #![feature(core_intrinsics, asm, heap_api, associated_consts)]
-#![feature(zero_one, step_trait, unique)]
+#![feature(zero_one, step_trait, unique, alloc)]
 
 #![cfg_attr(test, feature(test))]
 
 #[cfg(test)] extern crate test;
 
+extern crate alloc;
 extern crate rand;
 
 pub mod ll;

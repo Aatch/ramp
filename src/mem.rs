@@ -15,7 +15,7 @@
 //! Memory management functions. The base functions align to a pointer-width, so they shouldn't
 //! be used for anything that requires an alignment greater than that.
 
-use std::rt::heap;
+use alloc::heap;
 use std::mem;
 use std::intrinsics::abort;
 use std::io::{self, Write};
