@@ -607,6 +607,13 @@ impl Clone for Int {
     }
 }
 
+impl std::default::Default for Int {
+    #[inline]
+    fn default() -> Int {
+        Int::zero()
+    }
+}
+
 impl Drop for Int {
     fn drop(&mut self) {
         if self.cap > 0 {
