@@ -24,11 +24,14 @@ use std::io;
 use std::num::Zero;
 use std::ops::{
     Add, Sub, Mul, Div, Rem, Neg,
+    AddAssign, SubAssign, MulAssign, DivAssign,
     Shl, Shr, BitAnd, BitOr
 };
 use std::ptr::Unique;
 use std::str::FromStr;
 use rand::Rng;
+
+use alloc;
 
 use ll;
 use ll::limb::{BaseInt, Limb};
@@ -489,6 +492,13 @@ impl Int {
         }
     }
 
+    /**
+     * Negates `self` in-place
+     */
+    pub fn negate(&mut self) {
+        self.size *= -1;
+    }
+
     fn ensure_capacity(&mut self, cap: u32) {
         if cap > self.cap {
             unsafe {
@@ -721,17 +731,15 @@ impl hash::Hash for Int {
     }
 }
 
-impl Add<Limb> for Int {
-    type Output = Int;
-
-    fn add(mut self, other: Limb) -> Int {
+impl AddAssign<Limb> for Int {
+    fn add_assign(&mut self, other: Limb) {
         debug_assert!(self.well_formed());
-        if other == 0 { return self; }
+        if other == 0 { return; }
 
-        // No capacity means `self` is zero. Make a new `Int` and store
-        // `other` in it
+        // No capacity means `self` is zero. Just push `other` into it
         if self.cap == 0 {
-            return Int::from_single_limb(other);
+            self.push(other);
+            return;
         }
         // This is zero, but has allocated space, so just store `other`
         if self.size == 0 {
@@ -739,7 +747,6 @@ impl Add<Limb> for Int {
                 *self.ptr.get_mut() = other;
                 self.size = 1;
             }
-            return self;
         }
         // `self` is non-zero, reuse the storage for the result.
         unsafe {
@@ -763,25 +770,31 @@ impl Add<Limb> for Int {
                 }
             }
         }
+    }
+}
 
+impl Add<Limb> for Int {
+    type Output = Int;
+
+    #[inline]
+    fn add(mut self, other: Limb) -> Int {
+        self += other;
         self
     }
 }
 
-impl<'a> Add<&'a Int> for Int {
-    type Output = Int;
-
-    fn add(mut self, other: &'a Int) -> Int {
+impl<'a> AddAssign<&'a Int> for Int {
+    fn add_assign(&mut self, other: &'a Int) {
         debug_assert!(self.well_formed());
         debug_assert!(other.well_formed());
 
         if self.sign() == 0 {
             // Try to reuse the allocation from `self`
             self.clone_from(other);
-            return self;
+            return;
         }
         if other.sign() == 0 {
-            return self;
+            return;
         }
 
 
@@ -815,8 +828,6 @@ impl<'a> Add<&'a Int> for Int {
                 if carry != 0 {
                     self.push(carry);
                 }
-
-                return self;
             }
         } else {
             // Signs are different, use the sign from the bigger (absolute value)
@@ -832,9 +843,9 @@ impl<'a> Add<&'a Int> for Int {
                     match self.abs_cmp(other) {
                         Ordering::Equal => {
                             // They're equal, but opposite signs, so the result
-                            // will be zero, clear `self` and return it
+                            // will be zero, clear `self` and return
                             self.size = 0;
-                            return self;
+                            return;
                         }
                         Ordering::Greater =>
                             (self.ptr.get(), self.size, other.ptr.get(), other.size),
@@ -856,16 +867,25 @@ impl<'a> Add<&'a Int> for Int {
                 self.size = xs;
                 self.normalize();
                 debug_assert!(self.abs_size() > 0);
-
-                return self;
             }
         }
+    }
+}
+
+impl<'a> Add<&'a Int> for Int {
+    type Output = Int;
+
+    #[inline]
+    fn add(mut self, other: &'a Int) -> Int {
+        self += other;
+        self
     }
 }
 
 impl<'a> Add<Int> for &'a Int {
     type Output = Int;
 
+    #[inline]
     fn add(self, other: Int) -> Int {
         // Forward to other + self
         other.add(self)
@@ -875,6 +895,7 @@ impl<'a> Add<Int> for &'a Int {
 impl Add<Int> for Int {
     type Output = Int;
 
+    #[inline]
     fn add(self, other: Int) -> Int {
         // Check for self or other being zero.
         if self.sign() == 0 {
@@ -894,9 +915,18 @@ impl Add<Int> for Int {
     }
 }
 
+impl AddAssign<Int> for Int {
+    #[inline]
+    fn add_assign(&mut self, other: Int) {
+        let this = std::mem::replace(self, Int::zero());
+        *self = this + other;
+    }
+}
+
 impl<'a, 'b> Add<&'a Int> for &'b Int {
     type Output = Int;
 
+    #[inline]
     fn add(self, other: &'a Int) -> Int {
         if self.sign() == 0 {
             return other.clone();
@@ -914,19 +944,16 @@ impl<'a, 'b> Add<&'a Int> for &'b Int {
     }
 }
 
-impl Sub<Limb> for Int {
-    type Output = Int;
-
-    fn sub(mut self, other: Limb) -> Int {
+impl SubAssign<Limb> for Int {
+    fn sub_assign(&mut self, other: Limb) {
         debug_assert!(self.well_formed());
-        if other == 0 { return self; }
+        if other == 0 { return; }
 
-        // No capacity means `self` is zero. Make a new `Int` and store
-        // `other` in it
+        // No capacity means `self` is zero. Just push the limb.
         if self.cap == 0 {
-            let mut new = Int::from_single_limb(other);
-            new.size = -1;
-            return new;
+            self.push(other);
+            self.size = -1;
+            return;
         }
         // This is zero, but has allocated space, so just store `other`
         if self.size == 0 {
@@ -934,7 +961,7 @@ impl Sub<Limb> for Int {
                 *self.ptr.get_mut() = other;
                 self.size = -1;
             }
-            return self;
+            return;
         }
         // `self` is non-zero, reuse the storage for the result.
         unsafe {
@@ -960,25 +987,33 @@ impl Sub<Limb> for Int {
         }
 
         debug_assert!(self.well_formed());
+    }
+}
+
+impl Sub<Limb> for Int {
+    type Output = Int;
+
+    #[inline]
+    fn sub(mut self, other: Limb) -> Int {
+        self += other;
         self
     }
 }
 
-impl<'a> Sub<&'a Int> for Int {
-    type Output = Int;
-
-    fn sub(mut self, other: &'a Int) -> Int {
+impl<'a> SubAssign<&'a Int> for Int {
+    fn sub_assign(&mut self, other: &'a Int) {
         debug_assert!(self.well_formed());
         debug_assert!(other.well_formed());
 
-        // LHS is zero, return the negation of the RHS
+        // LHS is zero, set self to the negation of the RHS
         if self.sign() == 0 {
             self.clone_from(other);
-            return -self;
+            self.size *= -1;
+            return;
         }
-        // RHS is zero, return the LHS
+        // RHS is zero, do nothing
         if other.sign() == 0 {
-            return self;
+            return;
         }
 
         if self.sign() == other.sign() {
@@ -989,7 +1024,7 @@ impl<'a> Sub<&'a Int> for Int {
                     Ordering::Equal => {
                         // x - x, just return zero
                         self.size = 0;
-                        return self;
+                        return;
                     }
                     Ordering::Less => {
                         self.ensure_capacity(other.abs_size() as u32);
@@ -1013,12 +1048,12 @@ impl<'a> Sub<&'a Int> for Int {
             }
 
             self.normalize();
-            return self;
         } else { // Different signs
             if self.sign() == -1 {
                 // self is negative, use addition and negation
-                let res = (-self) + other;
-                return -res;
+                self.size *= -1;
+                *self += other;
+                self.size *= -1;
             } else {
                 unsafe {
                     // Other is negative, handle as addition
@@ -1039,16 +1074,26 @@ impl<'a> Sub<&'a Int> for Int {
                     if carry != 0 {
                         self.push(carry);
                     }
-                    return self;
                 }
             }
         }
     }
 }
 
+impl<'a> Sub<&'a Int> for Int {
+    type Output = Int;
+
+    #[inline]
+    fn sub(mut self, other: &'a Int) -> Int {
+        self -= other;
+        self
+    }
+}
+
 impl<'a> Sub<Int> for &'a Int {
     type Output = Int;
 
+    #[inline]
     fn sub(self, mut other: Int) -> Int {
         if self.sign() == 0 {
             return -other;
@@ -1065,6 +1110,7 @@ impl<'a> Sub<Int> for &'a Int {
 impl Sub<Int> for Int {
     type Output = Int;
 
+    #[inline]
     fn sub(self, other: Int) -> Int {
         if self.sign() == 0 {
             return -other;
@@ -1077,9 +1123,18 @@ impl Sub<Int> for Int {
     }
 }
 
+impl SubAssign<Int> for Int {
+    #[inline]
+    fn sub_assign(&mut self, other: Int) {
+        let this = std::mem::replace(self, Int::zero());
+        *self = this - other;
+    }
+}
+
 impl<'a, 'b> Sub<&'a Int> for &'b Int {
     type Output = Int;
 
+    #[inline]
     fn sub(self, other: &'a Int) -> Int {
         if self.sign() == 0 {
             return -other;
@@ -1092,18 +1147,16 @@ impl<'a, 'b> Sub<&'a Int> for &'b Int {
     }
 }
 
-impl Mul<Limb> for Int {
-    type Output = Int;
-
-    fn mul(mut self, other: Limb) -> Int {
+impl MulAssign<Limb> for Int {
+    fn mul_assign(&mut self, other: Limb) {
         debug_assert!(self.well_formed());
         if other == 0 || self.sign() == 0 {
             self.size = 0;
-            return self;
+            return;
         }
 
         if other == 1 {
-            return self;
+            return;
         }
 
         unsafe {
@@ -1116,8 +1169,16 @@ impl Mul<Limb> for Int {
                 self.push(carry);
             }
         }
+    }
+}
 
-        return self;
+impl Mul<Limb> for Int {
+    type Output = Int;
+
+    #[inline]
+    fn mul(mut self, other: Limb) -> Int {
+        self *= other;
+        self
     }
 }
 
@@ -1178,6 +1239,7 @@ impl<'a, 'b> Mul<&'a Int> for &'b Int {
 impl<'a> Mul<&'a Int> for Int {
     type Output = Int;
 
+    #[inline]
     fn mul(mut self, other: &'a Int) -> Int {
         // `other` is zero
         if other.sign() == 0 {
@@ -1239,16 +1301,32 @@ impl Mul<Int> for Int {
     }
 }
 
-impl Div<Limb> for Int {
-    type Output = Int;
+impl<'a> MulAssign<&'a Int> for Int {
+    #[inline]
+    fn mul_assign(&mut self, other: &'a Int) {
+        // Temporarily extract self as a value, then overwrite it with the result
+        // of the multiplication
+        let this = std::mem::replace(self, Int::zero());
+        *self = this * other;
+    }
+}
 
-    fn div(mut self, other: Limb) -> Int {
+impl MulAssign<Int> for Int {
+    #[inline]
+    fn mul_assign(&mut self, other: Int) {
+        let this = std::mem::replace(self, Int::zero());
+        *self = this * other;
+    }
+}
+
+impl DivAssign<Limb> for Int {
+    fn div_assign(&mut self, other: Limb) {
         debug_assert!(self.well_formed());
         if other == 0 {
             ll::divide_by_zero();
         }
         if other == 1 || self.sign() == 0 {
-            return self;
+            return;
         }
 
         unsafe {
@@ -1261,8 +1339,16 @@ impl Div<Limb> for Int {
             // Adjust the size if necessary
             self.normalize();
         }
+    }
+}
 
-        return self;
+impl Div<Limb> for Int {
+    type Output = Int;
+
+    #[inline]
+    fn div(mut self, other: Limb) -> Int {
+        self /= other;
+        self
     }
 }
 
@@ -1290,6 +1376,7 @@ impl<'a, 'b> Div<&'a Int> for &'b Int {
 impl<'a> Div<&'a Int> for Int {
     type Output = Int;
 
+    #[inline]
     fn div(self, other: &'a Int) -> Int {
         (&self) / other
     }
@@ -1298,6 +1385,7 @@ impl<'a> Div<&'a Int> for Int {
 impl<'a> Div<Int> for &'a Int {
     type Output = Int;
 
+    #[inline]
     fn div(self, other: Int) -> Int {
         self / (&other)
     }
@@ -1306,8 +1394,25 @@ impl<'a> Div<Int> for &'a Int {
 impl Div<Int> for Int {
     type Output = Int;
 
+    #[inline]
     fn div(self, other: Int) -> Int {
         (&self) / (&other)
+    }
+}
+
+impl<'a> DivAssign<&'a Int> for Int {
+    #[inline]
+    fn div_assign(&mut self, other: &'a Int) {
+        let this = std::mem::replace(self, Int::zero());
+        *self = this / other;
+    }
+}
+
+impl DivAssign<Int> for Int {
+    #[inline]
+    fn div_assign(&mut self, other: Int) {
+        let this = std::mem::replace(self, Int::zero());
+        *self = this / other;
     }
 }
 
@@ -1870,6 +1975,17 @@ macro_rules! impl_arith_prim (
             }
         }
 
+        impl AddAssign<$t> for Int {
+            #[inline]
+            fn add_assign(&mut self, other: $t) {
+                if other < 0 {
+                    *self -= Limb(other.abs() as BaseInt);
+                } else if other > 0 {
+                    *self += Limb(other as BaseInt);
+                }
+            }
+        }
+
         impl Sub<$t> for Int {
             type Output = Int;
 
@@ -1885,25 +2001,60 @@ macro_rules! impl_arith_prim (
             }
         }
 
+        impl SubAssign<$t> for Int {
+            #[inline]
+            fn sub_assign(&mut self, other: $t) {
+                if other < 0 {
+                    *self += Limb(other.abs() as BaseInt);
+                } else if other > 0 {
+                    *self -= Limb(other as BaseInt);
+                }
+            }
+        }
+
         impl Mul<$t> for Int {
             type Output = Int;
 
             #[inline]
             fn mul(mut self, other: $t) -> Int {
+                self *= other;
+                self
+            }
+        }
+
+        impl MulAssign<$t> for Int {
+            #[inline]
+            fn mul_assign(&mut self, other: $t) {
                 if other == 0 {
                     self.size = 0;
-                    return self;
+                } else if other == -1 {
+                    self.negate();
+                } else if other < 0 {
+                    self.negate();
+                    *self *= Limb(other.abs() as BaseInt);
+                } else {
+                    *self *= Limb(other as BaseInt);
+                }
+            }
+        }
+
+        impl DivAssign<$t> for Int {
+            #[inline]
+            fn div_assign(&mut self, other: $t) {
+                if other == 0 {
+                    ll::divide_by_zero();
                 }
                 if other == 1 || self.sign() == 0 {
-                    return self;
+                    return;
                 }
                 if other == -1 {
-                    return -self;
+                    self.negate();
+                } else if other < 0 {
+                    self.negate();
+                    *self /= Limb(other.abs() as BaseInt);
+                } else {
+                    *self /= Limb(other as BaseInt);
                 }
-                if other < 0 {
-                    return -self * Limb(other.abs() as BaseInt);
-                }
-                return self * Limb(other as BaseInt);
             }
         }
 
@@ -1911,20 +2062,9 @@ macro_rules! impl_arith_prim (
             type Output = Int;
 
             #[inline]
-            fn div(self, other: $t) -> Int {
-                if other == 0 {
-                    ll::divide_by_zero();
-                }
-                if other == 1 || self.sign() == 0 {
-                    return self;
-                }
-                if other == -1 {
-                    return -self;
-                }
-                if other < 0 {
-                    return -self / Limb(other.abs() as BaseInt);
-                }
-                return self / Limb(other as BaseInt);
+            fn div(mut self, other: $t) -> Int {
+                self /= other;
+                self
             }
         }
 
@@ -1961,6 +2101,15 @@ macro_rules! impl_arith_prim (
             }
         }
 
+        impl AddAssign<$t> for Int {
+            #[inline]
+            fn add_assign(&mut self, other: $t) {
+                if other != 0 {
+                    *self += Limb(other as BaseInt);
+                }
+            }
+        }
+
         impl Sub<$t> for Int {
             type Output = Int;
 
@@ -1970,6 +2119,15 @@ macro_rules! impl_arith_prim (
                     return self;
                 }
                 return self - Limb(other as BaseInt);
+            }
+        }
+
+        impl SubAssign<$t> for Int {
+            #[inline]
+            fn sub_assign(&mut self, other: $t) {
+                if other != 0 {
+                    *self -= Limb(other as BaseInt);
+                }
             }
         }
 
@@ -1989,6 +2147,17 @@ macro_rules! impl_arith_prim (
             }
         }
 
+        impl MulAssign<$t> for Int {
+            #[inline]
+            fn mul_assign(&mut self, other: $t) {
+                if other == 0 {
+                    self.size = 0;
+                } else if other > 1 && self.sign() != 0 {
+                    *self *= Limb(other as BaseInt);
+                }
+            }
+        }
+
         impl Div<$t> for Int {
             type Output = Int;
 
@@ -2001,6 +2170,17 @@ macro_rules! impl_arith_prim (
                     return self;
                 }
                 return self / Limb(other as BaseInt);
+            }
+        }
+
+        impl DivAssign<$t> for Int {
+            #[inline]
+            fn div_assign(&mut self, other: $t) {
+                if other == 0 {
+                    ll::divide_by_zero();
+                } else if other > 1 && self.sign() != 0 {
+                    *self /= Limb(other as BaseInt);
+                }
             }
         }
 
@@ -2519,7 +2699,7 @@ impl_from_for_prim!(unsigned u8, u16, u32, u64, usize);
 impl std::num::Zero for Int {
     fn zero() -> Int {
         Int {
-            ptr: unsafe { Unique::new(std::rt::heap::EMPTY as *mut Limb) },
+            ptr: unsafe { Unique::new(alloc::heap::EMPTY as *mut Limb) },
             size: 0,
             cap: 0
         }
@@ -2647,7 +2827,7 @@ impl<R: Rng> RandomInt for R {
 
     fn gen_int_range(&mut self, lbound: &Int, ubound: &Int) -> Int {
         assert!(*lbound < *ubound);
-        return lbound + self.gen_uint_below(&(ubound - lbound));
+        lbound + self.gen_uint_below(&(ubound - lbound))
     }
 }
 
@@ -2800,6 +2980,7 @@ mod test {
             ("100000000", "-1", "100000001"),
             ("-100", "-100", "0"),
             ("-100", "100", "-200"),
+            ("237", "236", "1"),
             ("-192834857324591531", "-431343873217510631841", "431151038360186040310")
         ];
 

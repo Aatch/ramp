@@ -18,7 +18,8 @@
 #![allow(dead_code)] // Work in progress
 
 #![feature(core_intrinsics, asm, heap_api, associated_consts)]
-#![feature(zero_one, step_trait, unique, alloc)]
+#![feature(zero_one, step_trait, unique, alloc, op_assign_traits)]
+#![feature(augmented_assignments)]
 
 #![cfg_attr(test, feature(test))]
 

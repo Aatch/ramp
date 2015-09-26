@@ -1,8 +1,9 @@
 // A ramp port of TeXitoi's Rust version on
 // http://benchmarksgame.alioth.debian.org/
 
+#![feature(augmented_assignments)]
+
 extern crate ramp;
-use std::mem;
 use ramp::Int;
 use ramp::ll::limb::Limb;
 
@@ -18,15 +19,6 @@ fn main() {
     if n % 10 != 0 {
         for _ in n % 10 .. 10 { print!(" "); }
         println!("\t:{}", n);
-    }
-}
-
-trait Take {
-    fn take(&mut self) -> Self;
-}
-impl Take for Int {
-    fn take(&mut self) -> Int {
-        mem::replace(self, Int::zero())
     }
 }
 
@@ -49,21 +41,25 @@ impl Context {
     }
     fn extract_digit(&mut self, nth: Limb) -> Limb {
         self.tmp1.clone_from(&self.num);
-        self.tmp1 = (self.tmp1.take() * nth + &self.acc) / &self.den;
+        self.tmp1 *= nth;
+        self.tmp1 += &self.acc;
+        self.tmp1 /= &self.den;
 
         return self.tmp1.to_single_limb();
     }
     fn eliminate_digit(&mut self, d: Limb) {
-        self.acc = (self.acc.take() - self.den.clone() * d) * Limb(10);
-        self.num = self.num.take() * Limb(10);
+        self.acc -= self.den.clone() * d;
+        self.acc *= 10;
+        self.num *= 10;
     }
     fn next_term(&mut self) {
         self.k = self.k + 1;
         let k2 = self.k * 2 + 1;
-        self.acc = (self.acc.take() + &self.num + &self.num) * k2;
+        self.acc += &self.num + &self.num;
+        self.acc *= k2;
 
-        self.den = self.den.take() * k2;
-        self.num = self.num.take() * self.k;
+        self.den *= k2;
+        self.num *= self.k;
     }
 }
 impl Iterator for Context {
