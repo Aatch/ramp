@@ -793,7 +793,10 @@ impl Int {
     pub fn gcd(&self, other: &Int) -> Int {
         let mut a = (*self).clone();
         let mut b = (*other).clone();
-        let r: *mut Limb = &mut Limb(1);
+        // let r: *mut Limb = &mut Limb(1);
+        let out_size = a.abs_size() + b.abs_size();
+        let mut r = Int::with_capacity(out_size as u32);
+        r.size = out_size;
 
         if a == Int::zero() {
             return b;
@@ -804,8 +807,10 @@ impl Int {
         }
 
         unsafe {
-            ll::gcd(r, a.ptr.get_mut(), a.abs_size(), b.ptr.get_mut(), b.abs_size());
-            Int::from_single_limb(*r)
+            ll::gcd(r.ptr.get_mut(), a.ptr.get_mut(), a.abs_size(), b.ptr.get_mut(), b.abs_size());
+            r.normalize();
+            // println!("r-normalized: {}", r);
+            r
         }
     }
 
@@ -4270,6 +4275,11 @@ mod test {
         check(-6, 3, 3);
         check(-4, -2, 2);
         check(1764, 868, 28);
+
+        let a: Int = Int::from(std::u64::MAX) + 5;
+        let b: Int = Int::from(std::u64::MAX);
+        let c: Int = Int::from(5);
+        assert_eq!(a.gcd(&b), c);
     }
 
     #[test]

@@ -1,3 +1,5 @@
+use std::cmp::Ordering;
+
 use ll;
 use mem;
 use ll::limb::Limb;
@@ -24,24 +26,19 @@ pub unsafe fn gcd(gp: *mut Limb, ap: *mut Limb, an: i32, bp: *mut Limb, bn: i32)
             ll::shr(bp, bp, bn, 1);
         }
 
-        let (_ , of) = (*ap).sub_overflow(*bp);
-        if of {
-            // (*bp - *ap) >> 1
-            ll::shr(t, &(*bp - *ap), an, 1);
+        let c = ll::cmp(ap, bp, an);
+        if c == Ordering::Greater || c == Ordering::Equal {
+            ll::sub(t, ap, an, bp, an);
+            ll::shr(ap, t, an , 1);
         } else {
-            // (*ap - *bp) >> 1
-            ll::shr(t, &(*ap - *bp), an, 1);
-        }
-
-        if *ap >= *bp {
-            *ap = *t;
-        } else {
-            *bp = *t;
+            ll::sub(t, bp, an, ap, an);
+            ll::shr(bp, t, an , 1);
         }
     }
 
-    *gp = *g * *bp;
-    return bn;
+    ll::mul(gp, bp, an, g, 1);
+
+    return an;
 }
 
 unsafe fn is_even(n: *const Limb) -> bool {
