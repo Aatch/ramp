@@ -12,6 +12,14 @@
 //    See the License for the specific language governing permissions and
 //    limitations under the License.
 
+/*!
+ * Base conversion utilities
+ *
+ * Provides functions for converting an integer to/from a given base. In both `to_base` and
+ * `from_base` the base-N output or input (respectively) is stored as raw bytes. That means that a
+ * base-10 input contains bytes each with a value from 0-9.
+ */
+
 use std::intrinsics::assume;
 
 use ll;
