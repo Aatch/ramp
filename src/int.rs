@@ -819,12 +819,6 @@ impl Int {
     pub fn lcm(&self, other: &Int) -> Int {
         (self * other).abs() / self.gcd(other)
     }
-
-    pub fn is_even(&self) -> bool {
-        unsafe {
-            ll::scan_0(&self.to_single_limb(), 1) == 0
-        }
-    }
 }
 
 impl Clone for Int {
@@ -4234,24 +4228,6 @@ mod test {
             let z = &x + &y;
             test::black_box(z);
         });
-    }
-
-    #[test]
-    fn test_is_even() {
-        fn check(a: isize, b: bool) {
-            let big_a: Int = Int::from(a);
-
-            assert_eq!(big_a.is_even(), b);
-        }
-
-        check(-2, true);
-        check(-1, false);
-        check(0, true);
-        check(1, false);
-        check(2, true);
-        check(5, false);
-        check(102, true);
-        check(103, false);
     }
 
     #[test]
