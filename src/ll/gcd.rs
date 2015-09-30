@@ -5,12 +5,14 @@ use mem;
 use ll::limb::Limb;
 
 pub unsafe fn gcd(gp: *mut Limb, ap: *mut Limb, an: i32, bp: *mut Limb, bn: i32) -> i32 {
+    assert!(an >= bn);
+
     let mut tmp = mem::TmpAllocator::new();
 
     // TODO maybe there is an easier way to set g = 1
     // maybe an realloc would be nicer
     let g = tmp.allocate(an as usize);
-    // ll::zero(g, an);
+    ll::zero(g, an);
     // TODO is this save?
     *g = Limb(1);
     // ll::add(g, g, an, &Limb(1), 1);
@@ -23,27 +25,31 @@ pub unsafe fn gcd(gp: *mut Limb, ap: *mut Limb, an: i32, bp: *mut Limb, bn: i32)
 
     let t = tmp.allocate(an as usize);
 
+    // TODO realloc?
+    let bpp = tmp.allocate(an as usize);
+    ll::copy_incr(bp, bpp, bn);
+
     while !ll::is_zero(ap, an) {
 
         while is_even(ap) && !ll::is_zero(ap, an) {
             ll::shr(ap, ap, an, 1);
         }
 
-        while is_even(bp) && !ll::is_zero(bp, bn) {
-            ll::shr(bp, bp, bn, 1);
+        while is_even(bpp) && !ll::is_zero(bpp, an) {
+            ll::shr(bpp, bpp, an, 1);
         }
 
-        let c = ll::cmp(ap, bp, an);
+        let c = ll::cmp(ap, bpp, an);
         if c == Ordering::Greater || c == Ordering::Equal {
-            ll::sub(t, ap, an, bp, an);
-            ll::shr(ap, t, an , 1);
+            ll::sub(t, ap, an, bpp, an);
+            ll::shr(ap, t, an, 1);
         } else {
-            ll::sub(t, bp, an, ap, an);
-            ll::shr(bp, t, an , 1);
+            ll::sub(t, bpp, an, ap, an);
+            ll::shr(bpp, t, an, 1);
         }
     }
 
-    ll::mul(gp, bp, an, g, an);
+    ll::mul(gp, bpp, an, g, an);
 
     return an;
 }

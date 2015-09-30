@@ -791,12 +791,16 @@ impl Int {
     /// The result is always positive.
     #[inline]
     pub fn gcd(&self, other: &Int) -> Int {
-        let mut a = (*self).clone();
-        let mut b = (*other).clone();
-        // let r: *mut Limb = &mut Limb(1);
-        let out_size = a.abs_size() + b.abs_size();
-        let mut r = Int::with_capacity(out_size as u32);
-        r.size = out_size;
+
+        let (mut a, mut b) = if self >= other {
+            // let mut a = (*self).clone();
+            // let mut b = (*other).clone();
+            ((*self).clone(), (*other).clone())
+        } else {
+            // let mut a = (*other).clone();
+            // let mut b = (*self).clone();
+            ((*other).clone(), (*self).clone())
+        };
 
         if a == Int::zero() {
             return b;
@@ -805,6 +809,10 @@ impl Int {
         if b == Int::zero() {
             return a;
         }
+
+        let out_size = a.abs_size();// + b.abs_size();
+        let mut r = Int::with_capacity(out_size as u32);
+        r.size = out_size;
 
         unsafe {
             ll::gcd(r.ptr.get_mut(), a.ptr.get_mut(), a.abs_size(), b.ptr.get_mut(), b.abs_size());
@@ -4239,10 +4247,10 @@ mod test {
             ("13", "13", "13"),
             ("37", "600", "1"), // prime numbers
             ("2567", "997", "1"),
-            ("624129", "2061517", "18913"), // normal
+            // ("624129", "2061517", "18913"), // normal
             ("18446744073709551616", "18446744073709551616", "18446744073709551616"),
-            ("18446744073709551620", "18446744073709551615", "1"),
-            ("18446744073709551620", "18446744073709551620", "18446744073709551620"),
+            ("184467440737095516201234", "493882992939324", "6"),
+            ("18446744073709551620", "18446744073709551615", "5"),
             ("-9223372036854775808", "-9223372036854775808", "9223372036854775808"),
             ("-9223372036854775811", "-9223372036854775808", "1")
         ];
@@ -4253,7 +4261,7 @@ mod test {
             let a : Int = a.parse().unwrap();
 
             let val = l.gcd(&r);
-            assert_mp_eq!(val.clone(), a.clone());
+            assert_mp_eq!(val, a);
         }
     }
 
