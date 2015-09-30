@@ -5,15 +5,22 @@ use mem;
 use ll::limb::Limb;
 
 pub unsafe fn gcd(gp: *mut Limb, ap: *mut Limb, an: i32, bp: *mut Limb, bn: i32) -> i32 {
-    let mut g = &mut Limb(1);
+    let mut tmp = mem::TmpAllocator::new();
+
+    // TODO maybe there is an easier way to set g = 1
+    // maybe an realloc would be nicer
+    let g = tmp.allocate(an as usize);
+    // ll::zero(g, an);
+    // TODO is this save?
+    *g = Limb(1);
+    // ll::add(g, g, an, &Limb(1), 1);
 
     while is_even(ap) && is_even(bp) && !ll::is_zero(ap, an) && !ll::is_zero(bp, bn) {
         ll::shr(ap, ap, an, 1);
         ll::shr(bp, bp, bn, 1);
-        *g = *g << 1;
+        ll::shl(g, g, an, 1);
     }
 
-    let mut tmp = mem::TmpAllocator::new();
     let t = tmp.allocate(an as usize);
 
     while !ll::is_zero(ap, an) {
@@ -36,13 +43,13 @@ pub unsafe fn gcd(gp: *mut Limb, ap: *mut Limb, an: i32, bp: *mut Limb, bn: i32)
         }
     }
 
-    ll::mul(gp, bp, an, g, 1);
+    ll::mul(gp, bp, an, g, an);
 
     return an;
 }
 
 unsafe fn is_even(n: *const Limb) -> bool {
-    *n % 2 == 0
+    *n & Limb(1) == 0
 }
 
 #[cfg(test)]
