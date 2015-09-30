@@ -4231,31 +4231,30 @@ mod test {
     }
 
     #[test]
-    fn test_gcd() {
-        fn check(a: isize, b: isize, c: isize) {
-            let big_a: Int = Int::from(a);
-            let big_b: Int = Int::from(b);
-            let big_c: Int = Int::from(c);
+    fn gcd() {
+        let cases = [
+            ("3", "0","3"), // special
+            ("0", "3", "3"),
+            ("0", "0", "0"),
+            ("13", "13", "13"),
+            ("37", "600", "1"), // prime numbers
+            ("2567", "997", "1"),
+            ("624129", "2061517", "18913"), // normal
+            ("18446744073709551616", "18446744073709551616", "18446744073709551616"),
+            ("18446744073709551620", "18446744073709551615", "1"),
+            ("18446744073709551620", "18446744073709551620", "18446744073709551620"),
+            ("-9223372036854775808", "-9223372036854775808", "9223372036854775808"),
+            ("-9223372036854775811", "-9223372036854775808", "1")
+        ];
 
-            assert_eq!(big_a.gcd(&big_b), big_c);
+        for &(l, r, a) in cases.iter() {
+            let l : Int = l.parse().unwrap();
+            let r : Int = r.parse().unwrap();
+            let a : Int = a.parse().unwrap();
+
+            let val = l.gcd(&r);
+            assert_mp_eq!(val.clone(), a.clone());
         }
-
-        check(10, 2, 2);
-        check(10, 3, 1);
-        check(3, 0, 3);
-        check(0, 3, 3);
-        check(0, 0, 0);
-        check(3, 3, 3);
-        check(56, 42, 14);
-        check(3, -3, 3);
-        check(-6, 3, 3);
-        check(-4, -2, 2);
-        check(1764, 868, 28);
-
-        let a: Int = Int::from(std::u64::MAX) + 5;
-        let b: Int = Int::from(std::u64::MAX);
-        let c: Int = Int::from(5);
-        assert_eq!(a.gcd(&b), c);
     }
 
     #[test]
