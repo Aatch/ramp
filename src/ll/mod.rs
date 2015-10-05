@@ -689,4 +689,44 @@ mod test {
             assert_eq!(r, [0, 0, 0, 0]);
         }
     }
+
+    #[test]
+    fn test_bitscan() {
+        let a;
+
+        let (ap, asz) = make_limbs!(const a, 256);
+
+        let pos = unsafe {
+            scan_1(ap, asz)
+        };
+
+        assert_eq!(pos, 8);
+
+        let a;
+        let (ap, asz) = make_limbs!(const a, 0, 256);
+
+        let pos = unsafe {
+            scan_1(ap, asz)
+        };
+
+        assert_eq!(pos, 72);
+
+        let a;
+        let (ap, asz) = make_limbs!(const a, !256);
+
+        let pos = unsafe {
+            scan_0(ap, asz)
+        };
+
+        assert_eq!(pos, 8);
+
+        let a;
+        let (ap, asz) = make_limbs!(const a, !0, !256);
+
+        let pos = unsafe {
+            scan_0(ap, asz)
+        };
+
+        assert_eq!(pos, 72);
+    }
 }

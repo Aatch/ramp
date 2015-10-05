@@ -218,7 +218,6 @@ pub unsafe fn scan_1(mut xp: *const Limb, mut xs: i32) -> u32 {
         xs -= 1;
         if xs == 0 { return cnt; }
     }
-    xp = xp.offset(1);
     cnt += (*xp).trailing_zeros() as u32;
 
     return cnt;
@@ -238,7 +237,7 @@ pub unsafe fn scan_0(mut xp: *const Limb, mut xs: i32) -> u32 {
         xs -= 1;
         if xs == 0 { return cnt; }
     }
-    let mut last = (*xp.offset(1)).0;
+    let mut last = (*xp).0;
     while last & 1 != 0 {
         cnt += 1;
         last >>= 1;
