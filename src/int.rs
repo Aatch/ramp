@@ -366,9 +366,8 @@ impl Int {
     /**
      * Raises self to the power of exp
      */
-    pub fn pow(&self, mut exp: usize) -> Int {
+    pub fn pow(&self, exp: usize) -> Int {
         debug_assert!(self.well_formed());
-        const CUTOFF : usize = 2 << 8;
         match exp {
             0 => Int::one(),
             1 => self.clone(),
@@ -381,66 +380,17 @@ impl Int {
                 if exp & 1 == 0 {
                     signum = 1
                 }
-                let mut base = self.clone().abs();
-                let mut ret = Int::one();
 
-                let mut shift = 0;
-                while base.to_single_limb() == 0 {
-                    base = base >> Limb::BITS;
-                    shift += Limb::BITS
+                let mut ret = Int::with_capacity(self.abs_size() as u32 * exp as u32);
+                ret.size = (self.abs_size() * exp as i32) * signum;
+
+                unsafe {
+                    ll::pow(ret.ptr.get_mut(), self.ptr.get(), self.abs_size(), exp as u32);
                 }
 
-                let trailer : usize = base.to_single_limb().trailing_zeros() as usize;
-                shift += trailer;
-                base = base >> trailer;
+                ret.normalize();
 
-                shift *= exp;
-
-                if exp < CUTOFF {
-                    // Simple binary
-                    while exp > 0 {
-                        if (exp & 1) == 1 {
-                            ret = ret * &base;
-                        }
-
-                        base = base.dsquare();
-
-                        exp /= 2;
-                    }
-                } else {
-                    // m-ary method from Gordon, D. M. (1998). "A
-                    // Survey of Fast Exponentiation Methods". Journal
-                    // of Algorithms 27: 129–146.
-
-                    let mut acc = Int::one();
-                    // Is there a less awful way to do this?
-                    let precomp = [{ acc = acc * &base; acc.clone() },
-                                   { acc = acc * &base; acc.clone() },
-                                   { acc = acc * &base; acc.clone() },
-                                   { acc = acc * &base; acc.clone() },
-                                   { acc = acc * &base; acc.clone() },
-                                   { acc = acc * &base; acc.clone() },
-                                   { acc = acc * &base; acc.clone() },
-                                   { acc = acc * &base; acc.clone() },
-                                   { acc = acc * &base; acc.clone() },
-                                   { acc = acc * &base; acc.clone() },
-                                   { acc = acc * &base; acc.clone() },
-                                   { acc = acc * &base; acc.clone() },
-                                   { acc = acc * &base; acc.clone() },
-                                   { acc = acc * &base; acc.clone() },
-                                   { acc = acc * &base; acc.clone() }];
-
-                    while exp > 0 {
-                        let idx = exp & 15;
-                        if idx != 0 {
-                            ret = ret * &precomp[idx - 1];
-                        }
-
-                        base = base.dsquare().dsquare().dsquare().dsquare();
-                        exp = exp >> 4
-                    }
-                }
-                (ret << shift) * signum
+                ret
             }
         }
     }

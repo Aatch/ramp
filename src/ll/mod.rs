@@ -84,6 +84,7 @@ mod addsub;
 mod mul;
 mod div;
 mod bit;
+mod pow;
 
 pub mod base;
 pub mod limb;
@@ -99,6 +100,7 @@ pub use self::bit::{
 pub use self::addsub::{add_n, sub_n, add, sub, add_1, sub_1, incr, decr};
 pub use self::mul::{addmul_1, submul_1, mul_1, mul};
 pub use self::div::{divrem_1, divrem_2, divrem};
+pub use self::pow::pow;
 
 #[inline(always)]
 pub unsafe fn overlap(xp: *const Limb, xs: i32, yp: *const Limb, ys: i32) -> bool {

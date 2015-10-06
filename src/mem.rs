@@ -88,6 +88,7 @@ impl TmpAllocator {
         self.allocate_bytes(n * mem::size_of::<T>()) as *mut T
     }
 
+    #[allow(dead_code)] // not used at this point
     /// Allocates space for n1+n2 instances of `T` and returns a pair of pointers.
     pub unsafe fn allocate_2<T>(&mut self, n1: usize, n2: usize) -> (*mut T, *mut T) {
         let x = self.allocate(n1 + n2);

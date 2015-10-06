@@ -17,6 +17,7 @@
 use ll::limb::Limb;
 use super::{copy_rest, same_or_separate};
 
+#[allow(dead_code)]
 unsafe fn add_n_generic(mut wp: *mut Limb, mut xp: *const Limb, mut yp: *const Limb,
                         mut n: i32) -> Limb {
 
@@ -78,6 +79,7 @@ pub unsafe fn add_n(wp: *mut Limb, xp: *const Limb, yp: *const Limb,
     add_n_generic(wp, xp, yp, n)
 }
 
+#[allow(dead_code)]
 unsafe fn sub_n_generic(mut wp: *mut Limb, mut xp: *const Limb, mut yp: *const Limb,
                         mut n: i32) -> Limb {
     let mut carry = Limb(0);

@@ -23,6 +23,7 @@ use mem;
 
 const TOOM22_THRESHOLD : i32 = 20;
 
+#[allow(dead_code)]
 unsafe fn mul_1_generic(mut wp: *mut Limb, mut xp: *const Limb, mut n: i32, vl: Limb) -> Limb {
     let mut cl = Limb(0);
     loop {
@@ -76,6 +77,7 @@ pub unsafe fn mul_1(wp: *mut Limb, xp: *const Limb, n: i32, vl: Limb) -> Limb {
     ramp_mul_1(wp, xp, n, vl)
 }
 
+#[allow(dead_code)]
 unsafe fn addmul_1_generic(mut wp: *mut Limb, mut xp: *const Limb, mut n: i32, vl: Limb) -> Limb {
     debug_assert!(n > 0);
     debug_assert!(same_or_separate(wp, n, xp, n));
@@ -126,6 +128,7 @@ pub unsafe fn addmul_1(wp: *mut Limb, xp: *const Limb, n: i32, vl: Limb) -> Limb
     ramp_addmul_1(wp, xp, n, vl)
 }
 
+#[allow(dead_code)]
 unsafe fn submul_1_generic(mut wp: *mut Limb, mut xp: *const Limb, mut n: i32, vl: Limb) -> Limb {
     debug_assert!(n > 0);
     debug_assert!(same_or_separate(wp, n, xp, n));
