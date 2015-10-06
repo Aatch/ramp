@@ -806,7 +806,7 @@ impl Int {
             return a;
         }
 
-        let out_size = a.abs_size() + b.abs_size();
+        let out_size = 2 * a.abs_size();
         let mut r = Int::with_capacity(out_size as u32);
 
         unsafe {
@@ -4532,17 +4532,51 @@ mod test {
         bench_div(b, 1000, 1000);
     }
 
-    #[bench]
-    fn bench_gcd_128bit_128bit(b: &mut Bencher) {
+    fn bench_gcd(b: &mut Bencher, xs: usize, ys: usize) {
         let mut rng = rand::thread_rng();
 
+        let x = rng.gen_int(xs * Limb::BITS);
+        let y = rng.gen_int(ys * Limb::BITS);
 
         b.iter(|| {
-            let x = rng.gen_uint(128);
-            let y = rng.gen_uint_below(&x);
-
-            x.gcd(&y);
+            let z = x.gcd(&y);
+            test::black_box(z);
         });
+    }
+
+    #[bench]
+    fn bench_gcd_1_1(b: &mut Bencher) {
+        bench_gcd(b, 1, 1);
+    }
+
+    #[bench]
+    fn bench_gcd_10_10(b: &mut Bencher) {
+        bench_gcd(b, 10, 10);
+    }
+
+    #[bench]
+    fn bench_gcd_20_2(b: &mut Bencher) {
+        bench_gcd(b, 20, 2);
+    }
+
+    #[bench]
+    fn bench_gcd_50_50(b: &mut Bencher) {
+        bench_gcd(b, 50, 50);
+    }
+
+    #[bench]
+    fn bench_gcd_50_5(b: &mut Bencher) {
+        bench_gcd(b, 50, 5);
+    }
+
+    #[bench]
+    fn bench_gcd_250_250(b: &mut Bencher) {
+        bench_gcd(b, 250, 250);
+    }
+
+    #[bench]
+    fn bench_gcd_1000_1000(b: &mut Bencher) {
+        bench_gcd(b, 1000, 1000);
     }
 
 }

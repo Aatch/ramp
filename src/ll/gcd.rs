@@ -4,83 +4,96 @@ use ll;
 use mem;
 use ll::limb::Limb;
 
-pub unsafe fn gcd(gp: *mut Limb, ap: *mut Limb, an: i32, bp: *mut Limb, bn: i32) -> i32 {
+pub unsafe fn gcd(gp: *mut Limb, mut ap: *mut Limb, mut an: i32, mut bp: *mut Limb, mut bn: i32) -> i32 {
     assert!(an >= bn);
 
     let mut tmp = mem::TmpAllocator::new();
 
-    // TODO maybe there is an easier way to set g = 1
-    // maybe an realloc would be nicer
-    let g = tmp.allocate(an as usize);
-    ll::zero(g, an);
-    // TODO is this save?
-    *g = Limb(1);
-    // ll::add(g, g, an, &Limb(1), 1);
+    let mut ac = ll::scan_1(ap, an);
+    let mut bc = ll::scan_1(bp, bn);
 
-    while is_even(ap) && is_even(bp) && !ll::is_zero(ap, an) && !ll::is_zero(bp, bn) {
-        ll::shr(ap, ap, an, 1);
-        ll::shr(bp, bp, bn, 1);
-        ll::shl(g, g, an, 1);
+    let gc = if ac < bc {
+        ac
+    } else {
+        bc
+    };
+
+    let mut offset = (gc / Limb::BITS as u32);
+    ap = ap.offset(offset as isize);
+    bp = bp.offset(offset as isize);
+
+    an -= offset as i32;
+    bn -= offset as i32;
+
+    let apbp_mod = gc % Limb::BITS as u32;
+    if apbp_mod > 0 {
+        ll::shr(ap, ap, an, apbp_mod);
+        ll::shr(bp, bp, bn, apbp_mod);
     }
+
+    ll::copy_incr(bp, gp, bn);
+    bp = gp;
 
     let t = tmp.allocate(an as usize);
-
-    // TODO realloc?
-    let bpp = tmp.allocate(an as usize);
-    ll::copy_incr(bp, bpp, bn);
-
     while !ll::is_zero(ap, an) {
 
-        while is_even(ap) && !ll::is_zero(ap, an) {
-            ll::shr(ap, ap, an, 1);
+        ac = ll::scan_1(ap, an);
+        offset = (ac / Limb::BITS as u32);
+        if an - offset as i32 > 0 {
+            ap = ap.offset(offset as isize);
+            an -= offset as i32;
+        }
+        let ap_mod = ac % Limb::BITS as u32;
+        if ap_mod > 0 {
+            ll::shr(ap, ap, an, ap_mod);
         }
 
-        while is_even(bpp) && !ll::is_zero(bpp, an) {
-            ll::shr(bpp, bpp, an, 1);
+        bc = ll::scan_1(bp, bn);
+        offset = (bc / Limb::BITS as u32);
+        if bn - offset as i32 > 0 {
+            bp = bp.offset(offset as isize);
+            bn -= offset as i32;
+        }
+        let bp_mod = bc % Limb::BITS as u32;
+        if bp_mod > 0 {
+            ll::shr(bp, bp, bn, bp_mod);
         }
 
-        let c = ll::cmp(ap, bpp, an);
-        if c == Ordering::Greater || c == Ordering::Equal {
-            ll::sub(t, ap, an, bpp, an);
+        let c = if an >= bn {
+            ll::cmp(ap, bp, an)
+        } else {
+            ll::cmp(ap, bp, bn)
+        };
+
+        if an >= bn && (c == Ordering::Equal || c == Ordering::Greater) {
+            ll::sub(t, ap, an, bp, bn);
             ll::shr(ap, t, an, 1);
         } else {
-            ll::sub(t, bpp, an, ap, an);
-            ll::shr(bpp, t, an, 1);
+            ll::sub(t, bp, an, ap, an);
+            ll::shr(bp, t, an, 1);
         }
     }
 
-    ll::mul(gp, bpp, an, g, an);
+    // println!("{}, {}, {}", bn, *bp, *(bp.offset(1)));
+    // println!("{}", gc);
 
-    return an;
+    let gn = ((gc / Limb::BITS as u32) + 1) as i32;
+    // ll::zero(gp, gn)
+    // ll::copy_incr(bp, gp.offset(gn), bn);
+
+    // println!("{}", *gp);
+
+    for _ in 0..(gc / (Limb::BITS - 1) as u32) {
+        ll::shl(gp, gp, gn, (Limb::BITS - 1) as u32);
+    }
+    let gc_mod = gc % (Limb::BITS - 1) as u32;
+    if gc_mod > 0 {
+        ll::shl(gp, gp, gn, gc_mod);
+    }
+
+    return gn;
 }
 
 unsafe fn is_even(n: *const Limb) -> bool {
     *n & Limb(1) == 0
-}
-
-#[cfg(test)]
-mod test {
-    use ll::limb::Limb;
-
-    #[test]
-    fn test_is_even() {
-        fn check(a: u64, b: bool) {
-            let limb_a = Limb(a);
-
-            unsafe {
-                assert_eq!(super::is_even(&limb_a), b);
-            }
-        }
-
-        check(441, false);
-        check(217, false);
-        // check(-2, true);
-        // check(-1, false);
-        check(0, true);
-        check(1, false);
-        check(2, true);
-        check(5, false);
-        check(102, true);
-        check(103, false);
-    }
 }
