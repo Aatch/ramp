@@ -17,7 +17,9 @@ use ll::limb::Limb;
 use mem;
 
 /**
- * Takes `{ap, an}` to the power of `exp` and stores the result in `{wp, an*exp}`.
+ * Takes `{ap, an}` to the power of `exp` and stores the result to `wp`. `wp` is
+ * assumed to have enough space to store the result (which can be calculated using
+ * `num_pow_limbs`
  *
  * `{wp, an*exp}` must be disjoint from `{ap, an}`.
  * `{ap, an}` must not be zero.
@@ -26,23 +28,23 @@ use mem;
 pub unsafe fn pow(mut wp: *mut Limb, mut ap: *const Limb, mut an: i32, mut exp: u32) {
     debug_assert!(exp > 2);
     debug_assert!(!ll::is_zero(ap, an));
-    debug_assert!(!ll::overlap(wp, an*exp as i32, ap, an));
+
+    let mut wn = num_pow_limbs(ap, an, exp);
+    debug_assert!(!ll::overlap(wp, wn, ap, an));
 
     let mut tmp = mem::TmpAllocator::new();
 
-    ll::zero(wp, an * (exp as i32));
+    ll::zero(wp, wn);
 
     while *ap == 0 {
         ap = ap.offset(1);
         wp = wp.offset(1);
+        wn -= 1;
         an -= 1;
     }
     let trailing = (*ap).trailing_zeros() as u32;
 
-    // Calculate the size we need to store the base and the scratch space
-    // The number of limbs is going to be the number of limbs in the (shifted) ap
-    // multiplied by the exponent (due to x*x having up to twice as many digits as x)
-    let sz = (an * (exp as i32)) as usize;
+    let sz = wn as usize;
     let (bp, scratch) = tmp.allocate_2(sz, sz);
     let mut bn = an;
 
@@ -91,7 +93,34 @@ pub unsafe fn pow(mut wp: *mut Limb, mut ap: *const Limb, mut an: i32, mut exp: 
     }
 
     if shift > 0 {
-        let v = ll::shl(wp, wp, wn+1, shift);
-        debug_assert!(v == 0);
+        let v = ll::shl(wp, wp, wn, shift);
+        if v > 0 {
+            *wp.offset(wn as isize) = v;
+        }
     }
+}
+
+/// Calculates the number of limbs required to store the result of taking
+/// `{xp, xn}` to the power of `exp`
+pub unsafe fn num_pow_limbs(xp: *const Limb, xn: i32, exp: u32) -> i32 {
+    // This is a better approximation of log_b(x^e) than simply using the
+    // the number of digits, n.
+    // Instead it uses the most significant digit, a, to calculate
+    // e*log_b(a*b^(n-1)), which is e*(log_b(a) + n - 1)
+    let n = xn - 1;
+    let high_limb = *xp.offset(n as isize);
+
+    // Calculate log_2(a), this is because floor(log_b(a)) will always be
+    // 0
+    let lg2 = Limb::BITS as u32 - high_limb.leading_zeros() as u32;
+
+    // Get e*log_2(a)
+    let lg2e = exp as i32 * lg2 as i32;
+
+    // Now convert it to log_b using the formula
+    // log_a(x) = log_b(x) / log_b(a)
+    let elog_b = lg2e / Limb::BITS as i32;
+
+    // Add a final 1 to account for the error in the estimate
+    elog_b + (exp as i32 * n) + 1
 }

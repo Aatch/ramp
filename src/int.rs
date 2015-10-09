@@ -381,11 +381,14 @@ impl Int {
                     signum = 1
                 }
 
-                let mut ret = Int::with_capacity(self.abs_size() as u32 * exp as u32);
-                ret.size = (self.abs_size() * exp as i32) * signum;
+                let ret_sz = unsafe {
+                    ll::pow::num_pow_limbs(self.ptr.get(), self.abs_size(), exp as u32)
+                };
+                let mut ret = Int::with_capacity(ret_sz as u32);
+                ret.size = ret_sz * signum;
 
                 unsafe {
-                    ll::pow(ret.ptr.get_mut(), self.ptr.get(), self.abs_size(), exp as u32);
+                    ll::pow::pow(ret.ptr.get_mut(), self.ptr.get(), self.abs_size(), exp as u32);
                 }
 
                 ret.normalize();

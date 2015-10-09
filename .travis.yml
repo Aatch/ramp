@@ -21,7 +21,7 @@ script:
       travis-cargo doc -- --features "$FEATURES"
 
 after_success:
-    - if [ -z "$FEATURES" ]; then travis-cargo doc-upload; fi
+    - if [ -z "$FEATURES" -a "$BITS" = "32" ]; then travis-cargo doc-upload; fi
 
 env:
   matrix:
