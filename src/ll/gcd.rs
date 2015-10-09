@@ -12,7 +12,7 @@ pub unsafe fn gcd(gp: *mut Limb, mut ap: *mut Limb, mut an: i32, mut bp: *mut Li
         bp = bp.offset(1);
         an -= 1;
         bn -= 1;
-        gc += Limb::BITS as u32;
+        gc += 1;
     }
 
     let a_trailing = (*ap).trailing_zeros() as u32;
@@ -27,7 +27,6 @@ pub unsafe fn gcd(gp: *mut Limb, mut ap: *mut Limb, mut an: i32, mut bp: *mut Li
     if trailing > 0 {
         ll::shr(ap, ap, an, trailing);
         ll::shr(bp, bp, bn, trailing);
-        gc += trailing;
     }
 
     ll::copy_incr(bp, gp, bn);
@@ -56,25 +55,26 @@ pub unsafe fn gcd(gp: *mut Limb, mut ap: *mut Limb, mut an: i32, mut bp: *mut Li
         }
 
         let c = ll::cmp(ap, bp, an);
-        if an >= bn && (c == Ordering::Equal || c == Ordering::Greater) {
+
+        // FIXME find better way to compute |ap - bp| / 2
+        if c == Ordering::Equal || c == Ordering::Greater {
             ll::sub(ap, ap, an, bp, bn);
             ll::shr(ap, ap, an, 1);
         } else {
-            // TODO: an for bp?
             ll::sub(gp, bp, an, ap, an);
             ll::shr(gp, gp, an, 1);
             bp = gp;
         }
     }
 
-    let gn = ((gc / Limb::BITS as u32) + 1) as i32;
-
-    for _ in 0..(gc / (Limb::BITS - 1) as u32) {
+    // FIXME what's the best way for the left shift, using offset
+    let gn = (gc + 1) as i32;
+    for _ in 0..gc {
         ll::shl(gp, gp, gn, (Limb::BITS - 1) as u32);
+        ll::shl(gp, gp, gn, 1);
     }
-    let gc_mod = gc % (Limb::BITS - 1) as u32;
-    if gc_mod > 0 {
-        ll::shl(gp, gp, gn, gc_mod);
+    if trailing > 0 {
+        ll::shl(gp, gp, gn, trailing);
     }
 
     gn
