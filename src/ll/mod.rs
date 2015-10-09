@@ -84,8 +84,8 @@ mod addsub;
 mod mul;
 mod div;
 mod bit;
-mod pow;
 
+pub mod pow;
 pub mod base;
 pub mod limb;
 use self::limb::Limb;
@@ -100,7 +100,6 @@ pub use self::bit::{
 pub use self::addsub::{add_n, sub_n, add, sub, add_1, sub_1, incr, decr};
 pub use self::mul::{addmul_1, submul_1, mul_1, mul};
 pub use self::div::{divrem_1, divrem_2, divrem};
-pub use self::pow::pow;
 
 #[inline(always)]
 pub unsafe fn overlap(xp: *const Limb, xs: i32, yp: *const Limb, ys: i32) -> bool {
@@ -711,7 +710,7 @@ mod test {
             scan_1(ap, asz)
         };
 
-        assert_eq!(pos, 72);
+        assert_eq!(pos, Limb::BITS as u32 + 8);
 
         let a;
         let (ap, asz) = make_limbs!(const a, !256);
@@ -729,6 +728,6 @@ mod test {
             scan_0(ap, asz)
         };
 
-        assert_eq!(pos, 72);
+        assert_eq!(pos, Limb::BITS as u32 + 8);
     }
 }
