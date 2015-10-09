@@ -28,9 +28,6 @@ env:
     - TARGET=i686-unknown-linux-gnu
       BITS=32
       FEATURES=''
-    - TARGET=i686-unknown-linux-gnu
-      BITS=32
-      FEATURES='asm'
     - TARGET=x86_64-unknown-linux-gnu
       BITS=64
       FEATURES=''
