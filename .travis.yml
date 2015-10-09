@@ -1,9 +1,18 @@
-language: rust
+sudo: required
 
-rust:
-  - nightly
-before_script:
-  - pip install 'travis-cargo<0.2' --user && export PATH=$HOME/.local/bin:$PATH
+install: |
+    mkdir -p ~/rust && \
+    echo -e "\033[33;1mDownloading Rust\033[0m" && \
+    curl -sL https://static.rust-lang.org/dist/rust-nightly-$TARGET.tar.gz | tar --strip-components=1 -C ~/rust -xzf -
+
+before_script: |
+    if [ $BITS -eq 32 ]; then \
+      sudo apt-get update && \
+      sudo apt-get install libc6-dev:i386 libstdc++6:i386 zlib1g-dev:i386 libssl-dev:i386 pkg-config:i386 gcc-multilib; \
+    fi && \
+    sudo ~/rust/install.sh
+    pip install 'travis-cargo<0.2' --user && export PATH=$HOME/.local/bin:$PATH
+
 script:
   - |
       travis-cargo build -- --features "$FEATURES" &&
@@ -12,12 +21,22 @@ script:
       travis-cargo doc -- --features "$FEATURES"
 
 after_success:
-  - if [ -z "$FEATURES" ]; then travis-cargo doc-upload; fi
+    - if [ -z "$FEATURES" ]; then travis-cargo doc-upload; fi
 
 env:
   matrix:
-    - FEATURES=''
-    - FEATURES='asm'
+    - TARGET=i686-unknown-linux-gnu
+      BITS=32
+      FEATURES=''
+    - TARGET=i686-unknown-linux-gnu
+      BITS=32
+      FEATURES='asm'
+    - TARGET=x86_64-unknown-linux-gnu
+      BITS=64
+      FEATURES=''
+    - TARGET=x86_64-unknown-linux-gnu
+      BITS=64
+      FEATURES='asm'
   global:
-  - TRAVIS_CARGO_NIGHTLY_FEATURE=unstable
-  - secure: dc4TpJx2YONax6C5967cUmTKH/54pwUtDQu/9+KdjxA75AE1KjibZcg1W5bJhfYaWMPCTT2cwTfvUZP8k2tC0erWQUJv9iWy6MsrDTx88WeHmUlHls4OF64pa0kfSN4+Np4+96WMfFH2nlVGFazXzNeP2Dzwhyh54jW+qEfpICT5PSZm4cuLbhIzMviNu1fwFzQHDlsGnrhhc/rP9riYHIVYF9rCMMAugufKoDYdp4wllowhvVt+2OZlY2i7G0cPr3OZq5DvdQ07JWpGGKBMqSK5dLGTirfBSgTOv28CaCDwKUkTz1JCU3205NjbAnvGFkiym4opjRJpyLBIeRjxGULkodbBsUdg6F5JZTsmyaBaxszzk/l4TFaZ6TaKb2hU1G4EYa1lsPe5NEwOHY2YgGf+eCy/0kA4QpumUktY7844Vn409wJvZ5lmoiWhm6ZZpbu27KnZEBZGdWjfYIUdB3rm07BZcS8CcjYREzO+7rRPNwk3wg6DFFxRCugKMADLBBtndBxqenO12FuFiOkD5kyoufqSioO0quU6kAe5BtU+7+n7+mkzvhq7BowKXadKozNFVyo1rmGnO54z9TLgrwybRmx7pRXKJiYuOxL8T7UUPQUvQE2AYSF9462SdgDmpH+Um7Mojc9jb/qlEqBzHxze4X8Gz+25AcWvbgTVsQU=
+    - TRAVIS_CARGO_NIGHTLY_FEATURE=unstable
+    - secure: dc4TpJx2YONax6C5967cUmTKH/54pwUtDQu/9+KdjxA75AE1KjibZcg1W5bJhfYaWMPCTT2cwTfvUZP8k2tC0erWQUJv9iWy6MsrDTx88WeHmUlHls4OF64pa0kfSN4+Np4+96WMfFH2nlVGFazXzNeP2Dzwhyh54jW+qEfpICT5PSZm4cuLbhIzMviNu1fwFzQHDlsGnrhhc/rP9riYHIVYF9rCMMAugufKoDYdp4wllowhvVt+2OZlY2i7G0cPr3OZq5DvdQ07JWpGGKBMqSK5dLGTirfBSgTOv28CaCDwKUkTz1JCU3205NjbAnvGFkiym4opjRJpyLBIeRjxGULkodbBsUdg6F5JZTsmyaBaxszzk/l4TFaZ6TaKb2hU1G4EYa1lsPe5NEwOHY2YgGf+eCy/0kA4QpumUktY7844Vn409wJvZ5lmoiWhm6ZZpbu27KnZEBZGdWjfYIUdB3rm07BZcS8CcjYREzO+7rRPNwk3wg6DFFxRCugKMADLBBtndBxqenO12FuFiOkD5kyoufqSioO0quU6kAe5BtU+7+n7+mkzvhq7BowKXadKozNFVyo1rmGnO54z9TLgrwybRmx7pRXKJiYuOxL8T7UUPQUvQE2AYSF9462SdgDmpH+Um7Mojc9jb/qlEqBzHxze4X8Gz+25AcWvbgTVsQU=
