@@ -2610,19 +2610,17 @@ macro_rules! impl_from_for_prim (
                 if sign == 0 {
                     return 0;
                 }
-                let mask = !0 >> 1;
                 if ::std::mem::size_of::<BaseInt>() < ::std::mem::size_of::<$t>() {
                     // Handle conversion where BaseInt = u32 and $t = i64
                     if i.abs_size() >= 2 { // Fallthrough if there's only one limb
                         let lower = i.to_single_limb().0 as $t;
-                        // Clear the highest bit of the high limb
-                        let higher = (unsafe { (*i.ptr.offset(1)).0 } & mask) as $t;
+                        let higher = unsafe { (*i.ptr.offset(1)).0 } as $t;
 
                         // Combine the two
-                        let n : $t = lower & (higher << Limb::BITS);
+                        let n : $t = lower | (higher << Limb::BITS);
 
                         // Apply the sign
-                        return n * sign;
+                        return n.wrapping_mul(sign);
                     }
                 }
                 let n = i.to_single_limb().0;
@@ -2648,7 +2646,7 @@ macro_rules! impl_from_for_prim (
                         let higher = unsafe { (*i.ptr.offset(1)).0 } as $t;
 
                         // Combine the two
-                        let n : $t = lower & (higher << Limb::BITS);
+                        let n : $t = lower | (higher << Limb::BITS);
 
                         return n;
                     }
