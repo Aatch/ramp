@@ -806,7 +806,7 @@ impl Int {
             return a;
         }
 
-        let out_size = 2 * a.abs_size();
+        let out_size = a.abs_size();
         let mut r = Int::with_capacity(out_size as u32);
 
         unsafe {
@@ -4570,13 +4570,23 @@ mod test {
     }
 
     #[bench]
-    fn bench_gcd_250_250(b: &mut Bencher) {
-        bench_gcd(b, 250, 250);
+    fn bench_gcd_250_150(b: &mut Bencher) {
+        bench_gcd(b, 250, 150);
     }
 
     #[bench]
-    fn bench_gcd_1000_1000(b: &mut Bencher) {
-        bench_gcd(b, 1000, 1000);
+    fn bench_gcd_1000_10(b: &mut Bencher) {
+        bench_gcd(b, 1000, 10);
+    }
+
+    #[bench]
+    fn bench_gcd_1000_100(b: &mut Bencher) {
+        bench_gcd(b, 1000, 100);
+    }
+
+    #[bench]
+    fn bench_gcd_1000_500(b: &mut Bencher) {
+        bench_gcd(b, 1000, 500);
     }
 
 }
