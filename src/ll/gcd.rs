@@ -6,26 +6,28 @@ use ll::limb::Limb;
 pub unsafe fn gcd(gp: *mut Limb, mut ap: *mut Limb, mut an: i32, mut bp: *mut Limb, mut bn: i32) -> i32 {
     assert!(an >= bn);
 
-    let mut ac = ll::scan_1(ap, an);
-    let mut bc = ll::scan_1(bp, bn);
+    let mut gc = 0;
+    while *ap == 0 && !ll::is_zero(ap, an) && *bp == 0 && !ll::is_zero(bp, bn){
+        ap = ap.offset(1);
+        bp = bp.offset(1);
+        an -= 1;
+        bn -= 1;
+        gc += Limb::BITS as u32;
+    }
 
-    let gc = if ac < bc {
-        ac
+    let a_trailing = (*ap).trailing_zeros() as u32;
+    let b_trailing = (*bp).trailing_zeros() as u32;
+
+    let trailing = if a_trailing < b_trailing {
+        a_trailing
     } else {
-        bc
+        b_trailing
     };
 
-    let mut offset = gc / Limb::BITS as u32;
-    ap = ap.offset(offset as isize);
-    bp = bp.offset(offset as isize);
-
-    an -= offset as i32;
-    bn -= offset as i32;
-
-    let apbp_mod = gc % Limb::BITS as u32;
-    if apbp_mod > 0 {
-        ll::shr(ap, ap, an, apbp_mod);
-        ll::shr(bp, bp, bn, apbp_mod);
+    if trailing > 0 {
+        ll::shr(ap, ap, an, trailing);
+        ll::shr(bp, bp, bn, trailing);
+        gc += trailing;
     }
 
     ll::copy_incr(bp, gp, bn);
@@ -33,40 +35,35 @@ pub unsafe fn gcd(gp: *mut Limb, mut ap: *mut Limb, mut an: i32, mut bp: *mut Li
 
     while !ll::is_zero(ap, an) {
 
-        ac = ll::scan_1(ap, an);
-        offset = ac / Limb::BITS as u32;
-        if an - offset as i32 > 0 {
-            ap = ap.offset(offset as isize);
-            an -= offset as i32;
-        }
-        let ap_mod = ac % Limb::BITS as u32;
-        if ap_mod > 0 {
-            ll::shr(ap, ap, an, ap_mod);
+        while *ap == 0 && !ll::is_zero(ap, an) {
+            ap = ap.offset(1);
+            an -= 1;
         }
 
-        bc = ll::scan_1(bp, bn);
-        offset = bc / Limb::BITS as u32;
-        if bn - offset as i32 > 0 {
-            bp = bp.offset(offset as isize);
-            bn -= offset as i32;
-        }
-        let bp_mod = bc % Limb::BITS as u32;
-        if bp_mod > 0 {
-            ll::shr(bp, bp, bn, bp_mod);
+        let at = (*ap).trailing_zeros() as u32;
+        if at > 0 {
+            ll::shr(ap, ap, an, at);
         }
 
-        let c = if an >= bn {
-            ll::cmp(ap, bp, an)
-        } else {
-            ll::cmp(ap, bp, bn)
-        };
+        while *bp == 0 && !ll::is_zero(bp, bn) {
+            bp = bp.offset(1);
+            bn -= 1;
+        }
 
+        let bt = (*bp).trailing_zeros() as u32;
+        if bt > 0 {
+            ll::shr(bp, bp, bn, bt);
+        }
+
+        let c = ll::cmp(ap, bp, an);
         if an >= bn && (c == Ordering::Equal || c == Ordering::Greater) {
             ll::sub(ap, ap, an, bp, bn);
             ll::shr(ap, ap, an, 1);
         } else {
-            ll::sub(bp, bp, an, ap, an);
-            ll::shr(bp, bp, an, 1);
+            // TODO: an for bp?
+            ll::sub(gp, bp, an, ap, an);
+            ll::shr(gp, gp, an, 1);
+            bp = gp;
         }
     }
 
@@ -80,5 +77,5 @@ pub unsafe fn gcd(gp: *mut Limb, mut ap: *mut Limb, mut an: i32, mut bp: *mut Li
         ll::shl(gp, gp, gn, gc_mod);
     }
 
-    return gn;
+    gn
 }
