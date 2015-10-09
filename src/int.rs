@@ -2463,6 +2463,11 @@ macro_rules! impl_from_prim (
             fn from(val: $t) -> Int {
                 if val == 0 {
                     return Int::zero();
+                } if val == <$t>::min_value() {
+                    let shift = val.trailing_zeros() as usize;
+                    let mut i = Int::one();
+                    i = i << shift;
+                    return -i;
                 }
                 // Handle i64/u64 on 32-bit platforms.
                 if std::mem::size_of::<$t>() > std::mem::size_of::<BaseInt>() {
@@ -2621,7 +2626,9 @@ macro_rules! impl_from_for_prim (
                     }
                 }
                 let n = i.to_single_limb().0;
-                return (n as $t) * sign;
+                // Using wrapping_mul to account for when the binary
+                // representation of n == $t::MIN
+                return (n as $t).wrapping_mul(sign);
             }
         })*
     );
@@ -3039,6 +3046,18 @@ mod test {
             let val = &l | &r;
             assert_mp_eq!(val, a);
         }
+    }
+
+    #[test]
+    fn int_from() {
+        let i = Int::from(::std::i64::MIN);
+        assert_eq!(i64::from(&i), ::std::i64::MIN);
+
+        let i = Int::from(::std::i32::MIN);
+        assert_eq!(i32::from(&i), ::std::i32::MIN);
+
+        let i = Int::from(::std::usize::MAX);
+        assert_eq!(usize::from(&i), ::std::usize::MAX);
     }
 
     const RAND_ITER : usize = 1000;
