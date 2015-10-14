@@ -68,7 +68,7 @@ pub unsafe fn gcd(gp: *mut Limb, mut ap: *mut Limb, mut an: i32, mut bp: *mut Li
     }
 
     // FIXME what's the best way for the left shift, using offset
-    let gn = (gc + 1) as i32;
+    let gn = bn + gc;
     for _ in 0..gc {
         ll::shl(gp, gp, gn, (Limb::BITS - 1) as u32);
         ll::shl(gp, gp, gn, 1);
