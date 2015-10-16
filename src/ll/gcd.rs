@@ -3,13 +3,14 @@ use std::cmp::Ordering;
 use ll;
 use ll::limb::Limb;
 
-pub unsafe fn gcd(gp: *mut Limb, mut ap: *mut Limb, mut an: i32, mut bp: *mut Limb, mut bn: i32) -> i32 {
+pub unsafe fn gcd(mut gp: *mut Limb, mut ap: *mut Limb, mut an: i32, mut bp: *mut Limb, mut bn: i32) -> i32 {
     assert!(an >= bn);
 
     let mut gc = 0;
     while *ap == 0 && !ll::is_zero(ap, an) && *bp == 0 && !ll::is_zero(bp, bn){
         ap = ap.offset(1);
         bp = bp.offset(1);
+        gp = gp.offset(1);
         an -= 1;
         bn -= 1;
         gc += 1;
@@ -56,26 +57,23 @@ pub unsafe fn gcd(gp: *mut Limb, mut ap: *mut Limb, mut an: i32, mut bp: *mut Li
 
         let c = ll::cmp(ap, bp, an);
 
-        // FIXME find better way to compute |ap - bp| / 2
         if c == Ordering::Equal || c == Ordering::Greater {
             ll::sub(ap, ap, an, bp, bn);
             ll::shr(ap, ap, an, 1);
         } else {
-            ll::sub(gp, bp, an, ap, an);
-            ll::shr(gp, gp, an, 1);
+            ll::sub(gp, bp, bn, ap, bn);
+            ll::shr(gp, gp, bn, 1);
             bp = gp;
         }
     }
 
-    // FIXME what's the best way for the left shift, using offset
-    let gn = bn + gc;
-    for _ in 0..gc {
-        ll::shl(gp, gp, gn, (Limb::BITS - 1) as u32);
-        ll::shl(gp, gp, gn, 1);
-    }
     if trailing > 0 {
-        ll::shl(gp, gp, gn, trailing);
+        let v = ll::shl(gp, gp, bn, trailing);
+        if v > 0 {
+            *gp.offset(bn as isize) = v;
+            gc += 1;
+        }
     }
 
-    gn
+    gc + bn
 }
