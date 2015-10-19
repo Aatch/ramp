@@ -791,6 +791,8 @@ impl Int {
     /// The result is always positive.
     #[inline]
     pub fn gcd(&self, other: &Int) -> Int {
+        debug_assert!(self.well_formed());
+        debug_assert!(other.well_formed());
 
         let (mut a, mut b) = if self.abs_size() >= other.abs_size() {
             ((*self).clone(), (*other).clone())
@@ -4249,7 +4251,9 @@ mod test {
             ("-9223372036854775808", "-9223372036854775808", "9223372036854775808"),
             ("-9223372036854775811", "-9223372036854775808", "1"),
             ("-23465475685232342344366756745345", "-23423545489322535345", "5"),
-            ("-23423545489322535345", "-23465475685232342344366756745345", "5")
+            ("-23423545489322535345", "-23465475685232342344366756745345", "5"),
+            ("-170141183460469231731687303715884105728", "-170141183460469231731687303715884105729", "1"),
+            ("-170141183460469231731687303715884105731", "-170141183460469231731687303715884105728", "1")
         ];
 
         for &(l, r, a) in cases.iter() {
@@ -4575,18 +4579,18 @@ mod test {
     }
 
     #[bench]
-    fn bench_gcd_1000_10(b: &mut Bencher) {
-        bench_gcd(b, 1000, 10);
+    fn bench_gcd_100_100(b: &mut Bencher) {
+        bench_gcd(b, 100, 100);
     }
 
     #[bench]
-    fn bench_gcd_1000_100(b: &mut Bencher) {
-        bench_gcd(b, 1000, 100);
+    fn bench_gcd_100_10(b: &mut Bencher) {
+        bench_gcd(b, 100, 10);
     }
 
     #[bench]
-    fn bench_gcd_1000_500(b: &mut Bencher) {
-        bench_gcd(b, 1000, 500);
+    fn bench_gcd_100_50(b: &mut Bencher) {
+        bench_gcd(b, 100, 50);
     }
 
 }
