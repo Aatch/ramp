@@ -416,9 +416,15 @@ impl Int {
                 unreachable!()
             }
         } else {
-            // There are slight faster ways of squaring very large numbers, but
-            // but this is good enough for now.
-            self * self
+            let sz = self.abs_size() * 2;
+            let mut ret = Int::with_capacity(sz as u32);
+            ret.size = sz;
+            unsafe {
+                ll::sqr(ret.ptr.get_mut(), self.ptr.get(), self.abs_size());
+            }
+            ret.normalize();
+
+            ret
         }
     }
 
@@ -439,9 +445,7 @@ impl Int {
                 unreachable!()
             }
         } else {
-            // There are slight faster ways of squaring very large numbers, but
-            // but this is good enough for now.
-            &self * &self
+            self.square()
         }
     }
 
@@ -497,7 +501,7 @@ impl Int {
      * Adjust the size field so the most significant limb is non-zero
      */
     fn normalize(&mut self) {
-        if self.size == 0 { true; }
+        if self.size == 0 { return }
         let sign = self.sign();
         unsafe {
             while self.size != 0 &&
@@ -3075,6 +3079,20 @@ mod test {
     }
 
     #[test]
+    fn sqr_rand() {
+        let mut rng = rand::thread_rng();
+        for _ in (0..RAND_ITER) {
+            let x = rng.gen_int(640);
+
+            let xs = x.square();
+            let xm = &x * &x;
+
+            assert_mp_eq!(xm, xs);
+        }
+    }
+
+
+    #[test]
     fn shl_rand() {
         let mut rng = rand::thread_rng();
         for _ in (0..RAND_ITER) {
@@ -3321,6 +3339,42 @@ mod test {
     #[bench]
     fn bench_mul_50_1500(b: &mut Bencher) {
         bench_mul(b, 50, 1500);
+    }
+
+    fn bench_sqr(b: &mut Bencher, xs: usize) {
+        let mut rng = rand::thread_rng();
+
+        let x = rng.gen_int(xs * Limb::BITS);
+
+        b.iter(|| {
+            let z = x.square();
+            test::black_box(z);
+        });
+    }
+
+    #[bench]
+    fn bench_sqr_1(b: &mut Bencher) {
+        bench_sqr(b, 1);
+    }
+
+    #[bench]
+    fn bench_sqr_10(b: &mut Bencher) {
+        bench_sqr(b, 10);
+    }
+
+    #[bench]
+    fn bench_sqr_50(b: &mut Bencher) {
+        bench_sqr(b, 50);
+    }
+
+    #[bench]
+    fn bench_sqr_250(b: &mut Bencher) {
+        bench_sqr(b, 250);
+    }
+
+    #[bench]
+    fn bench_sqr_1000(b: &mut Bencher) {
+        bench_sqr(b, 1000);
     }
 
     #[bench]

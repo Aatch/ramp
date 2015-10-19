@@ -437,3 +437,74 @@ unsafe fn mul_unbalanced(mut wp: *mut Limb,
                   xs);
     ll::incr(wp.offset(ys as isize), cy);
 }
+
+/**
+ * Squares the number in `{xp, xs}` storing the result in `{wp, xs*2}`.
+ * This is slightly more efficient than regular multiplication with both
+ * inputs the same.
+ *
+ * `{wp, xs*2}` must not overlap with `{xp, xs}`
+ */
+pub unsafe fn sqr(wp: *mut Limb, xp: *const Limb, xs: i32) {
+    debug_assert!(xs > 0);
+    debug_assert!(!overlap(wp, 2*xs, xp, xs));
+
+    if xs <= TOOM22_THRESHOLD {
+        mul_basecase(wp, xp, xs, xp, xs);
+    } else {
+        let mut tmp = mem::TmpAllocator::new();
+        let scratch = tmp.allocate((xs * 2) as usize);
+
+        sqr_toom2(wp, xp, xs, scratch);
+    }
+}
+
+#[inline(always)]
+unsafe fn sqr_rec(wp: *mut Limb, xp: *const Limb, xs: i32, scratch: *mut Limb) {
+    if xs < TOOM22_THRESHOLD {
+        mul_basecase(wp, xp, xs, xp, xs);
+    } else {
+        sqr_toom2(wp, xp, xs, scratch);
+    }
+}
+
+unsafe fn sqr_toom2(wp: *mut Limb, xp: *const Limb, xs: i32, scratch: *mut Limb) {
+    // This is very similar to regular mul_toom22, however it is slightly more efficient
+    // as it can take advantage of the coefficents being the same.
+    //
+    // Splitting x into x1, x0 to get x = x1*(B^n) + x0 means we get
+    //
+    //    x*x = (B^2n)*z2 + 2*(B^n)*z1 + z0
+    //
+    // Where:
+    //   z0 = x0*x0
+    //   z1 = x0*x1
+    //   z2 = x1*x1
+
+    let xh = xs >> 1;
+    let xl = xs - xh;
+
+    let x0 = xp;
+    let x1 = xp.offset(xl as isize);
+
+    let z0 = wp;
+    let z1 = scratch;
+    let z2 = wp.offset((xl * 2) as isize);
+    let scratch_out = scratch.offset((xl * 2) as isize);
+
+    // Calculate z1
+    mul_rec(z1, x0, xl, x1, xh, scratch_out);
+    // Calculate z0
+    sqr_rec(z0, x0, xl, scratch_out);
+    // Calculate z2
+    sqr_rec(z2, x1, xh, scratch_out);
+
+    // Calculate 2*z1
+    let mut cy = ll::add_n(z1, z1, z1, xs);
+
+    // wp now contains the result of (B^2n)*z2 + z0
+
+    cy = cy + ll::add_n(wp.offset(xl as isize), wp.offset(xl as isize), z1, xs);
+
+    ll::incr(wp.offset((xl + xs) as isize), cy);
+}

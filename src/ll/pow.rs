@@ -85,7 +85,7 @@ pub unsafe fn pow(mut wp: *mut Limb, mut ap: *const Limb, mut an: i32, mut exp: 
             break;
         }
 
-        ll::mul(scratch, bp, bn, bp, bn);
+        ll::sqr(scratch, bp, bn);
         bn = ll::normalize(scratch, bn + bn);
 
         ll::copy_incr(scratch, bp, bn);
