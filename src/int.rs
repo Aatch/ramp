@@ -959,7 +959,7 @@ impl Sub<Limb> for Int {
 
     #[inline]
     fn sub(mut self, other: Limb) -> Int {
-        self += other;
+        self -= other;
         self
     }
 }
@@ -2814,8 +2814,8 @@ mod test {
     macro_rules! assert_mp_eq (
         ($l:expr, $r:expr) => (
             {
-                let l = $l;
-                let r = $r;
+                let l : Int = $l;
+                let r : Int = $r;
                 if l != r {
                     println!("assertion failed: {} == {}", stringify!($l), stringify!($r));
                     panic!("{:} != {:}", l, r);
@@ -3048,6 +3048,53 @@ mod test {
             let val = &l | &r;
             assert_mp_eq!(val, a);
         }
+    }
+
+    #[test]
+    fn arith_prim() {
+        // Test that the Int/prim overloads are working as expected
+
+        let x : Int = "100".parse().unwrap();
+
+        // Int op prim
+        assert_mp_eq!(&x + 1usize, "101".parse().unwrap());
+        assert_mp_eq!(&x - 1usize, "99".parse().unwrap());
+
+        assert_mp_eq!(&x + 1i32, "101".parse().unwrap());
+        assert_mp_eq!(&x - 1i32, "99".parse().unwrap());
+
+        assert_mp_eq!(&x + (-1i32), "99".parse().unwrap());
+        assert_mp_eq!(&x - (-1i32), "101".parse().unwrap());
+
+        assert_mp_eq!(&x * 2usize, "200".parse().unwrap());
+
+        assert_mp_eq!(&x * 2i32, "200".parse().unwrap());
+        assert_mp_eq!(&x * (-2i32), "-200".parse().unwrap());
+
+        assert_mp_eq!(&x / 2usize, "50".parse().unwrap());
+        assert_mp_eq!(&x / 2i32, "50".parse().unwrap());
+        assert_mp_eq!(&x / (-2i32), "-50".parse().unwrap());
+
+        let x : Int = "5".parse().unwrap();
+
+        // prim op Int
+        assert_mp_eq!(1usize + &x, "6".parse().unwrap());
+        assert_mp_eq!(1usize - &x, "-4".parse().unwrap());
+
+        assert_mp_eq!(1i32 + &x, "6".parse().unwrap());
+        assert_mp_eq!(1i32 - &x, "-4".parse().unwrap());
+
+        assert_mp_eq!((-1i32) + &x, "4".parse().unwrap());
+        assert_mp_eq!((-1i32) - &x, "-6".parse().unwrap());
+
+        assert_mp_eq!(2usize * &x, "10".parse().unwrap());
+
+        assert_mp_eq!(2i32 * &x, "10".parse().unwrap());
+        assert_mp_eq!((-2i32) * &x, "-10".parse().unwrap());
+
+        assert_mp_eq!(20usize / &x, "4".parse().unwrap());
+        assert_mp_eq!(20i32 / &x, "4".parse().unwrap());
+        assert_mp_eq!((-20i32) / &x, "-4".parse().unwrap());
     }
 
     #[test]
