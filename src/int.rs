@@ -25,7 +25,8 @@ use std::num::Zero;
 use std::ops::{
     Add, Sub, Mul, Div, Rem, Neg,
     AddAssign, SubAssign, MulAssign, DivAssign, RemAssign,
-    Shl, Shr, BitAnd, BitOr
+    Shl, Shr, BitAnd, BitOr,
+    ShlAssign, ShrAssign, BitAndAssign, BitOrAssign,
 };
 use std::ptr::Unique;
 use std::str::FromStr;
@@ -1593,6 +1594,14 @@ impl<'a> Shl<usize> for &'a Int {
     }
 }
 
+impl ShlAssign<usize> for Int {
+    #[inline]
+    fn shl_assign(&mut self, other: usize) {
+        let this = std::mem::replace(self, Int::zero());
+        *self = this << other;
+    }
+}
+
 impl Shr<usize> for Int {
     type Output = Int;
 
@@ -1636,6 +1645,14 @@ impl Shr<usize> for Int {
         }
 
         return self;
+    }
+}
+
+impl ShrAssign<usize> for Int {
+    #[inline]
+    fn shr_assign(&mut self, other: usize) {
+        let this = std::mem::replace(self, Int::zero());
+        *self = this >> other;
     }
 }
 
@@ -1839,6 +1856,20 @@ impl BitAnd<Int> for Int {
         self.bitand(&other)
     }
 }
+impl BitAndAssign<Int> for Int {
+    #[inline]
+    fn bitand_assign(&mut self, other: Int) {
+        let this = std::mem::replace(self, Int::zero());
+        *self = this & other;
+    }
+}
+impl<'a> BitAndAssign<&'a Int> for Int {
+    #[inline]
+    fn bitand_assign(&mut self, other: &'a Int) {
+        let this = std::mem::replace(self, Int::zero());
+        *self = this & other;
+    }
+}
 
 impl<'a> BitOr<&'a Int> for Int {
     type Output = Int;
@@ -1975,6 +2006,22 @@ impl BitOr<Int> for Int {
         self.bitor(&other)
     }
 }
+
+impl BitOrAssign<Int> for Int {
+    #[inline]
+    fn bitor_assign(&mut self, other: Int) {
+        let this = std::mem::replace(self, Int::zero());
+        *self = this | other;
+    }
+}
+impl<'a> BitOrAssign<&'a Int> for Int {
+    #[inline]
+    fn bitor_assign(&mut self, other: &'a Int) {
+        let this = std::mem::replace(self, Int::zero());
+        *self = this | other;
+    }
+}
+
 
 macro_rules! impl_arith_prim (
     (signed $t:ty) => (
