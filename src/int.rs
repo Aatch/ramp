@@ -1648,6 +1648,15 @@ impl Shr<usize> for Int {
     }
 }
 
+impl<'a> Shr<usize> for &'a Int {
+    type Output = Int;
+
+    #[inline]
+    fn shr(self, other: usize) -> Int {
+        self.clone() >> other
+    }
+}
+
 impl ShrAssign<usize> for Int {
     #[inline]
     fn shr_assign(&mut self, other: usize) {
