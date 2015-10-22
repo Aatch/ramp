@@ -24,7 +24,7 @@ use std::io;
 use std::num::Zero;
 use std::ops::{
     Add, Sub, Mul, Div, Rem, Neg,
-    AddAssign, SubAssign, MulAssign, DivAssign,
+    AddAssign, SubAssign, MulAssign, DivAssign, RemAssign,
     Shl, Shr, BitAnd, BitOr
 };
 use std::ptr::Unique;
@@ -1408,6 +1408,14 @@ impl DivAssign<Int> for Int {
     }
 }
 
+impl RemAssign<Limb> for Int {
+    #[inline]
+    fn rem_assign(&mut self, other: Limb) {
+        let this = std::mem::replace(self, Int::zero());
+        *self = this % other;
+    }
+}
+
 impl Rem<Limb> for Int {
     type Output = Int;
 
@@ -1496,6 +1504,20 @@ impl Rem<Int> for Int {
     }
 }
 
+impl RemAssign<Int> for Int {
+    #[inline]
+    fn rem_assign(&mut self, other: Int) {
+        let this = std::mem::replace(self, Int::zero());
+        *self = this % other;
+    }
+}
+impl<'a> RemAssign<&'a Int> for Int {
+    #[inline]
+    fn rem_assign(&mut self, other: &'a Int) {
+        let this = std::mem::replace(self, Int::zero());
+        *self = this % other;
+    }
+}
 
 impl Neg for Int {
     type Output = Int;
@@ -2066,6 +2088,14 @@ macro_rules! impl_arith_prim (
             }
         }
 
+        impl RemAssign<$t> for Int {
+            #[inline]
+            fn rem_assign(&mut self, other: $t) {
+                let this = std::mem::replace(self, Int::zero());
+                *self = this % other;
+            }
+        }
+
         impl Rem<$t> for Int {
             type Output = Int;
 
@@ -2199,6 +2229,14 @@ macro_rules! impl_arith_prim (
                 return self / Limb(other as BaseInt);
             }
         }
+        impl RemAssign<$t> for Int {
+            #[inline]
+            fn rem_assign(&mut self, other: $t) {
+                let this = std::mem::replace(self, Int::zero());
+                *self = this % other;
+            }
+        }
+
         impl_arith_prim!(common $t);
     );
     (common $t:ty) => (
