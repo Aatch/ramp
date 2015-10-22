@@ -350,9 +350,8 @@ test_binop! {
     div: /, /=, false, all;
     // FIXME(#24): rem gives incorrect results
     // rem: %, %=, false, all;
-    // FIXME(#26): memory corruption
-    // bitand: &, &=, true, any;
-    // bitor: &, &=, true, any;
+    bitand: &, &=, true, any;
+    bitor: |, |=, true, any;
     // FIXME(#25): bitxor is missing
     // bitxor: &, &=, true, any;
 }
