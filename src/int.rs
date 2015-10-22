@@ -2080,7 +2080,7 @@ macro_rules! impl_arith_prim (
                     return self;
                 }
 
-                return self / Limb(other as BaseInt);
+                return self % Limb(other.abs() as BaseInt);
             }
         }
 
@@ -2196,7 +2196,7 @@ macro_rules! impl_arith_prim (
                     return self;
                 }
 
-                return self / Limb(other as BaseInt);
+                return self % Limb(other as BaseInt);
             }
         }
         impl_arith_prim!(common $t);
