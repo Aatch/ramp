@@ -456,6 +456,34 @@ impl Int {
         self.size *= -1;
     }
 
+    /**
+     * Returns whether or not this number is even.
+     *
+     * Returns 0 if `self == 0`
+     */
+    #[inline]
+    pub fn is_even(&self) -> bool {
+        debug_assert!(self.well_formed());
+        (self.to_single_limb().0 & 1) == 0
+    }
+
+    /**
+     * Returns the number of trailing zero bits in this number
+     *
+     * Returns 0 if `self == 0`
+     */
+    #[inline]
+    pub fn trailing_zeros(&self) -> u32 {
+        debug_assert!(self.well_formed());
+        if self.sign() == 0 {
+            0
+        } else {
+            unsafe {
+                ll::scan_1(self.ptr.get(), self.abs_size())
+            }
+        }
+    }
+
     fn ensure_capacity(&mut self, cap: u32) {
         if cap > self.cap {
             unsafe {
@@ -3048,6 +3076,43 @@ mod test {
             let val = &l | &r;
             assert_mp_eq!(val, a);
         }
+    }
+
+    #[test]
+    fn is_even() {
+        let cases = [
+            ("0", true),
+            ("1", false),
+            ("47398217493274092174042109472", true),
+            ("47398217493274092174042109471", false),
+        ];
+
+        for &(v, even) in cases.iter() {
+            let val : Int = v.parse().unwrap();
+
+            assert_eq!(val.is_even(), even);
+
+            let val = -val;
+            assert_eq!(val.is_even(), even);
+        }
+
+    }
+
+    #[test]
+    fn trailing_zeros() {
+        let cases = [
+            ("0", 0),
+            ("1", 0),
+            ("16", 4),
+            ("3036937844145311324764506857395738547330878864826266812416", 100)
+        ];
+
+        for &(v, count) in cases.iter() {
+            let val : Int = v.parse().unwrap();
+
+            assert_eq!(val.trailing_zeros(), count);
+        }
+
     }
 
     #[test]
