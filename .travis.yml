@@ -13,6 +13,12 @@ before_script: |
     sudo ~/rust/install.sh
     pip install 'travis-cargo<0.2' --user && export PATH=$HOME/.local/bin:$PATH
 
+addons:
+  apt:
+    packages:
+      - libgmp-dev
+      - libgmp10:i386
+
 script:
   - |
       travis-cargo build -- --features "$FEATURES" &&
