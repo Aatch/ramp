@@ -1435,10 +1435,13 @@ impl Rem<Limb> for Int {
             let sign = self.sign();
             self.size = sign;
 
+            self.normalize();
+
             if self.cap > 8 {
                 // Shrink self, since it's at least 8 times bigger than necessary
                 self.shrink_to_fit();
             }
+
         }
 
         return self;
@@ -1469,6 +1472,7 @@ impl<'a, 'b> Rem<&'a Int> for &'b Int {
 impl<'a> Rem<&'a Int> for Int {
     type Output = Int;
 
+    #[inline]
     fn rem(self, other: &'a Int) -> Int {
         (&self) % other
     }
@@ -1477,6 +1481,7 @@ impl<'a> Rem<&'a Int> for Int {
 impl<'a> Rem<Int> for &'a Int {
     type Output = Int;
 
+    #[inline]
     fn rem(self, other: Int) -> Int {
         self % (&other)
     }
@@ -1485,6 +1490,7 @@ impl<'a> Rem<Int> for &'a Int {
 impl Rem<Int> for Int {
     type Output = Int;
 
+    #[inline]
     fn rem(self, other: Int) -> Int {
         (&self) % (&other)
     }
@@ -3041,6 +3047,26 @@ mod test {
     }
 
     #[test]
+    fn rem() {
+        let cases = [
+            ("2", "1", "0"),
+            ("1", "2", "1"),
+            ("100", "2", "0"),
+            ("100", "3", "1"),
+            ("234129835798275032157029375235", "4382109473241242142341234", "2490861941946976021925083")
+        ];
+
+        for &(l, r, a) in cases.iter() {
+            let l : Int = l.parse().unwrap();
+            let r : Int = r.parse().unwrap();
+            let a : Int = a.parse().unwrap();
+
+            let val = &l % &r;
+            assert_mp_eq!(val, a);
+        }
+    }
+
+    #[test]
     fn bitand() {
         let cases = [
             ("0", "543253451643657932075830214751263521", "0"),
@@ -3139,6 +3165,10 @@ mod test {
         assert_mp_eq!(&x / 2usize, "50".parse().unwrap());
         assert_mp_eq!(&x / 2i32, "50".parse().unwrap());
         assert_mp_eq!(&x / (-2i32), "-50".parse().unwrap());
+
+        assert_mp_eq!(&x % 2usize, "0".parse().unwrap());
+        assert_mp_eq!(&x % 2i32, "0".parse().unwrap());
+        assert_mp_eq!(&x % (-2i32), "0".parse().unwrap());
 
         let x : Int = "5".parse().unwrap();
 
