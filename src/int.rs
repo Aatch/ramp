@@ -566,6 +566,21 @@ impl Int {
 
         return high_limb != 0;
     }
+
+    /**
+     * convert self into two's complement format (i.e. *self =
+     * (!*self) + 1)
+     */
+    fn negate_twos_complement(&mut self) {
+        unsafe {
+            let self_ptr = self.ptr.get_mut() as *mut _;
+            let carry = ll::twos_complement(self_ptr, self_ptr, self.abs_size());
+            if carry != 0 {
+                self.push(carry)
+            }
+        }
+        self.size = -self.size;
+    }
 }
 
 impl Clone for Int {
