@@ -25,8 +25,8 @@ use std::num::Zero;
 use std::ops::{
     Add, Sub, Mul, Div, Rem, Neg,
     AddAssign, SubAssign, MulAssign, DivAssign, RemAssign,
-    Shl, Shr, BitAnd, BitOr,
-    ShlAssign, ShrAssign, BitAndAssign, BitOrAssign,
+    Shl, Shr, BitAnd, BitOr, BitXor,
+    ShlAssign, ShrAssign, BitAndAssign, BitOrAssign, BitXorAssign,
 };
 use std::ptr::Unique;
 use std::str::FromStr;
@@ -1686,7 +1686,7 @@ impl ShrAssign<usize> for Int {
     }
 }
 
-enum BitOp { And, Or }
+enum BitOp { And, Or, Xor }
 
 fn bitop_ref(this: &mut Int, other: &Int, op: BitOp) -> Result<(), ()> {
     let this_sign = this.sign();
@@ -1710,6 +1710,15 @@ fn bitop_ref(this: &mut Int, other: &Int, op: BitOp) -> Result<(), ()> {
                 this.ensure_capacity(max_size as u32);
                 let this_ptr = this.ptr.get_mut() as *mut _;
                 ll::or_n(this_ptr, this_ptr, other_ptr, min_size);
+                if this.abs_size() < max_size {
+                    ll::copy_rest(other_ptr, this_ptr, max_size, min_size);
+                }
+                this.size = max_size;
+            }
+            BitOp::Xor => {
+                this.ensure_capacity(max_size as u32);
+                let this_ptr = this.ptr.get_mut() as *mut _;
+                ll::xor_n(this_ptr, this_ptr, other_ptr, min_size);
                 if this.abs_size() < max_size {
                     ll::copy_rest(other_ptr, this_ptr, max_size, min_size);
                 }
@@ -1761,6 +1770,15 @@ fn bitop_neg(mut a: Int, mut b: Int, op: BitOp) -> Int {
 
                 (a_sign < 0 || b_sign < 0,
                  b_sign > 0)
+            }
+            BitOp::Xor => {
+                ll::xor_n(a_ptr, a_ptr, b_ptr, min_size);
+                if b_sign < 0 {
+                    let ptr = a_ptr.offset(min_size as isize);
+                    ll::not(ptr, ptr, max_size - min_size);
+                }
+                ((a_sign < 0) ^ (b_sign < 0),
+                 true)
             }
         };
 
@@ -1892,6 +1910,63 @@ impl<'a> BitOrAssign<&'a Int> for Int {
     }
 }
 
+impl<'a> BitXor<&'a Int> for Int {
+    type Output = Int;
+
+    fn bitxor(mut self, other: &'a Int) -> Int {
+        if let Ok(_) = bitop_ref(&mut self, other, BitOp::Xor) {
+            self
+        } else {
+            bitop_neg(self, other.clone(), BitOp::Xor)
+        }
+    }
+}
+
+impl<'a> BitXor<Int> for &'a Int {
+    type Output = Int;
+
+    #[inline]
+    fn bitxor(self, other: Int) -> Int {
+        other.bitxor(self)
+    }
+}
+
+impl<'a, 'b> BitXor<&'a Int> for &'b Int {
+    type Output = Int;
+
+    #[inline]
+    fn bitxor(self, other: &'a Int) -> Int {
+        self.clone().bitxor(other)
+    }
+}
+
+impl BitXor<Int> for Int {
+    type Output = Int;
+
+    #[inline]
+    fn bitxor(mut self, other: Int) -> Int {
+        if let Ok(_) = bitop_ref(&mut self, &other, BitOp::Xor) {
+            self
+        } else {
+            bitop_neg(self, other, BitOp::Xor)
+        }
+    }
+}
+
+impl BitXorAssign<Int> for Int {
+    #[inline]
+    fn bitxor_assign(&mut self, other: Int) {
+        let this = std::mem::replace(self, Int::zero());
+        *self = this ^ other;
+    }
+}
+impl<'a> BitXorAssign<&'a Int> for Int {
+    #[inline]
+    fn bitxor_assign(&mut self, other: &'a Int) {
+        let this = std::mem::replace(self, Int::zero());
+        *self = this ^ other;
+    }
+}
 
 macro_rules! impl_arith_prim (
     (signed $t:ty) => (

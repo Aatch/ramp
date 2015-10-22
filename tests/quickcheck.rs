@@ -352,8 +352,7 @@ test_binop! {
     // rem: %, %=, false, all;
     bitand: &, &=, true, any;
     bitor: |, |=, true, any;
-    // FIXME(#25): bitxor is missing
-    // bitxor: &, &=, true, any;
+    bitxor: ^, ^=, true, any;
 }
 
 mod neg {
