@@ -24,7 +24,7 @@ script:
       travis-cargo build -- --features "$FEATURES" &&
       travis-cargo test -- --features "$FEATURES" &&
       # need optimisations or else a full quickcheck takes too long
-      travis-cargo test --release -- --features "$FEATURES full-quickcheck" &&
+      travis-cargo test -- --release --features "$FEATURES full-quickcheck" &&
       travis-cargo bench -- --features "$FEATURES" &&
       travis-cargo doc -- --features "$FEATURES"
 
