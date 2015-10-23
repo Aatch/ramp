@@ -52,8 +52,35 @@ impl Arbitrary for BigIntStr {
         }
         write!(&mut string, "{:x}", first).unwrap();
 
+        let mut sticky = None;
         for _ in 0..(size - 1) {
-            let digit = g.gen::<u8>() % 16;
+            // Each nibble only has a "small" chance (4/20 == 20%) of
+            // going into sticky mode, but a much higher chance of
+            // staying in it ((16*19)/(16*20) == 95%). This means we
+            // get long sequences of 0x0 or 0xF nibbles but still have
+            // some evenly distributed ones scattered around.
+            //
+            // This is trying to imitate gmp's`mpz_rrandomb`, which,
+            // apparently, seem to uncover more edge cases than truly
+            // uniform bits.
+            let limit = if sticky.is_none() {
+                16 + 4
+            } else {
+                16 * 20
+            };
+            let raw_digit = g.gen_range(0, limit);
+
+            let digit = if raw_digit < 16 {
+                sticky = None;
+                raw_digit
+            } else if let Some(d) = sticky {
+                d
+            } else {
+                let d = if raw_digit % 2 == 0 { 0xF } else { 0x0 };
+                sticky = Some(d);
+                d
+            };
+
             write!(&mut string, "{:x}", digit).unwrap();
         }
         BigIntStr(string)
