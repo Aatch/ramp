@@ -2876,7 +2876,7 @@ impl<R: Rng> RandomInt for R {
 
         let mut i = Int::with_capacity(limbs + 1);
 
-        for _ in (0 .. limbs) {
+        for _ in 0..limbs {
             let limb = Limb(self.gen());
             i.push(limb);
         }
@@ -3311,7 +3311,7 @@ mod test {
     #[test]
     fn div_rand() {
         let mut rng = rand::thread_rng();
-        for _ in (0..RAND_ITER) {
+        for _ in 0..RAND_ITER {
             let x = rng.gen_int(640);
             let y = rng.gen_int(320);
 
@@ -3325,7 +3325,7 @@ mod test {
     #[test]
     fn sqr_rand() {
         let mut rng = rand::thread_rng();
-        for _ in (0..RAND_ITER) {
+        for _ in 0..RAND_ITER {
             let x = rng.gen_int(640);
 
             let xs = x.square();
@@ -3339,7 +3339,7 @@ mod test {
     #[test]
     fn shl_rand() {
         let mut rng = rand::thread_rng();
-        for _ in (0..RAND_ITER) {
+        for _ in 0..RAND_ITER {
             let x = rng.gen_int(640);
 
             let shift_1 = &x << 1;
@@ -3357,7 +3357,7 @@ mod test {
     #[test]
     fn shl_rand_large() {
         let mut rng = rand::thread_rng();
-        for _ in (0..RAND_ITER) {
+        for _ in 0..RAND_ITER {
             let pow : usize = rng.gen_range(64, 8196);
             let mul_by = Int::from(2).pow(pow);
 
@@ -3373,7 +3373,7 @@ mod test {
     #[test]
     fn shr_rand() {
         let mut rng = rand::thread_rng();
-        for _ in (0..RAND_ITER) {
+        for _ in 0..RAND_ITER {
             let pow : usize = rng.gen_range(64, 8196);
             let x = rng.gen_int(640);
 
@@ -3387,7 +3387,7 @@ mod test {
     #[test]
     fn bitand_rand() {
         let mut rng = rand::thread_rng();
-        for _ in (0..RAND_ITER) {
+        for _ in 0..RAND_ITER {
             let x = rng.gen_int(640);
             let y = rng.gen_int(640);
 
@@ -3398,7 +3398,7 @@ mod test {
     #[test]
     fn hash_rand() {
         let mut rng = rand::thread_rng();
-        for _ in (0..RAND_ITER) {
+        for _ in 0..RAND_ITER {
             let x1 = rng.gen_int(640);
             let x2 = x1.clone();
 
