@@ -227,6 +227,15 @@ impl Sub<BaseInt> for Limb {
     }
 }
 
+impl Sub<bool> for Limb {
+    type Output=Limb;
+
+    #[inline(always)]
+    fn sub(self, other: bool) -> Limb {
+        Limb(self.0.wrapping_sub(other as BaseInt))
+    }
+}
+
 impl Sub<Limb> for BaseInt {
     type Output=Limb;
 
