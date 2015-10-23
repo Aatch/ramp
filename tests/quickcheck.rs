@@ -163,6 +163,14 @@ fn negate(a: BigIntStr) -> TestResult {
     eq!(ar, -ag)
 }
 
+#[quickcheck]
+fn count_ones(a: BigIntStr) {
+    let (ar, ag) = a.parse();
+
+    assert_eq!(ar.count_ones(),
+               ag.popcount());
+}
+
 // operators
 
 macro_rules! expr {

@@ -32,6 +32,7 @@ use std::ptr::Unique;
 use std::str::FromStr;
 use rand::Rng;
 
+use hamming;
 use alloc;
 
 use ll;
@@ -505,6 +506,25 @@ impl Int {
             unsafe {
                 ll::scan_1(self.ptr.get(), self.abs_size())
             }
+        }
+    }
+
+    /**
+     * Returns the number of ones (the population count) in this number
+     *
+     * If this number is negative, it has infinitely many ones (in
+     * two's complement), so this returns usize::MAX.
+     */
+    pub fn count_ones(&self) -> usize {
+        debug_assert!(self.well_formed());
+        if self.sign() < 0 {
+            std::usize::MAX
+        } else {
+            let bytes = unsafe {
+                std::slice::from_raw_parts(self.ptr.get() as *const _ as *const u8,
+                                           self.abs_size() as usize * std::mem::size_of::<Limb>())
+            };
+            hamming::weight(bytes) as usize
         }
     }
 
