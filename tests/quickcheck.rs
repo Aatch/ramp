@@ -371,8 +371,7 @@ test_binop! {
     sub: -, -=, true, all;
     mul: *, *=, true, all;
     div: /, /=, false, all;
-    // FIXME(#24): rem gives incorrect results
-    // rem: %, %=, false, all;
+    rem: %, %=, false, all;
     bitand: &, &=, true, any;
     bitor: |, |=, true, any;
     bitxor: ^, ^=, true, any;
