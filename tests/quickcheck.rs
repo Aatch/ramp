@@ -164,6 +164,21 @@ fn negate(a: BigIntStr) -> TestResult {
 }
 
 #[quickcheck]
+fn is_even(a: BigIntStr) {
+    let (ar, ag) = a.parse();
+
+    assert_eq!(ar.is_even(), !ag.tstbit(0));
+}
+
+#[quickcheck]
+fn trailing_zeros(a: BigIntStr) {
+    let (ar, ag) = a.parse();
+
+    let bit = (0..).position(|idx| ag.tstbit(idx)).unwrap();
+    assert_eq!(ar.trailing_zeros() as usize, bit);
+}
+
+#[quickcheck]
 fn count_ones(a: BigIntStr) {
     let (ar, ag) = a.parse();
 
