@@ -24,8 +24,9 @@ use std::io;
 use std::num::Zero;
 use std::ops::{
     Add, Sub, Mul, Div, Rem, Neg,
-    AddAssign, SubAssign, MulAssign, DivAssign,
-    Shl, Shr, BitAnd, BitOr
+    AddAssign, SubAssign, MulAssign, DivAssign, RemAssign,
+    Shl, Shr, BitAnd, BitOr,
+    ShlAssign, ShrAssign, BitAndAssign, BitOrAssign,
 };
 use std::ptr::Unique;
 use std::str::FromStr;
@@ -1414,6 +1415,14 @@ impl DivAssign<Int> for Int {
     }
 }
 
+impl RemAssign<Limb> for Int {
+    #[inline]
+    fn rem_assign(&mut self, other: Limb) {
+        let this = std::mem::replace(self, Int::zero());
+        *self = this % other;
+    }
+}
+
 impl Rem<Limb> for Int {
     type Output = Int;
 
@@ -1502,6 +1511,20 @@ impl Rem<Int> for Int {
     }
 }
 
+impl RemAssign<Int> for Int {
+    #[inline]
+    fn rem_assign(&mut self, other: Int) {
+        let this = std::mem::replace(self, Int::zero());
+        *self = this % other;
+    }
+}
+impl<'a> RemAssign<&'a Int> for Int {
+    #[inline]
+    fn rem_assign(&mut self, other: &'a Int) {
+        let this = std::mem::replace(self, Int::zero());
+        *self = this % other;
+    }
+}
 
 impl Neg for Int {
     type Output = Int;
@@ -1577,6 +1600,14 @@ impl<'a> Shl<usize> for &'a Int {
     }
 }
 
+impl ShlAssign<usize> for Int {
+    #[inline]
+    fn shl_assign(&mut self, other: usize) {
+        let this = std::mem::replace(self, Int::zero());
+        *self = this << other;
+    }
+}
+
 impl Shr<usize> for Int {
     type Output = Int;
 
@@ -1620,6 +1651,23 @@ impl Shr<usize> for Int {
         }
 
         return self;
+    }
+}
+
+impl<'a> Shr<usize> for &'a Int {
+    type Output = Int;
+
+    #[inline]
+    fn shr(self, other: usize) -> Int {
+        self.clone() >> other
+    }
+}
+
+impl ShrAssign<usize> for Int {
+    #[inline]
+    fn shr_assign(&mut self, other: usize) {
+        let this = std::mem::replace(self, Int::zero());
+        *self = this >> other;
     }
 }
 
@@ -1823,6 +1871,20 @@ impl BitAnd<Int> for Int {
         self.bitand(&other)
     }
 }
+impl BitAndAssign<Int> for Int {
+    #[inline]
+    fn bitand_assign(&mut self, other: Int) {
+        let this = std::mem::replace(self, Int::zero());
+        *self = this & other;
+    }
+}
+impl<'a> BitAndAssign<&'a Int> for Int {
+    #[inline]
+    fn bitand_assign(&mut self, other: &'a Int) {
+        let this = std::mem::replace(self, Int::zero());
+        *self = this & other;
+    }
+}
 
 impl<'a> BitOr<&'a Int> for Int {
     type Output = Int;
@@ -1960,6 +2022,22 @@ impl BitOr<Int> for Int {
     }
 }
 
+impl BitOrAssign<Int> for Int {
+    #[inline]
+    fn bitor_assign(&mut self, other: Int) {
+        let this = std::mem::replace(self, Int::zero());
+        *self = this | other;
+    }
+}
+impl<'a> BitOrAssign<&'a Int> for Int {
+    #[inline]
+    fn bitor_assign(&mut self, other: &'a Int) {
+        let this = std::mem::replace(self, Int::zero());
+        *self = this | other;
+    }
+}
+
+
 macro_rules! impl_arith_prim (
     (signed $t:ty) => (
         // Limbs are unsigned, so make sure we account for the sign
@@ -2069,6 +2147,14 @@ macro_rules! impl_arith_prim (
             fn div(mut self, other: $t) -> Int {
                 self /= other;
                 self
+            }
+        }
+
+        impl RemAssign<$t> for Int {
+            #[inline]
+            fn rem_assign(&mut self, other: $t) {
+                let this = std::mem::replace(self, Int::zero());
+                *self = this % other;
             }
         }
 
@@ -2205,6 +2291,14 @@ macro_rules! impl_arith_prim (
                 return self % Limb(other as BaseInt);
             }
         }
+        impl RemAssign<$t> for Int {
+            #[inline]
+            fn rem_assign(&mut self, other: $t) {
+                let this = std::mem::replace(self, Int::zero());
+                *self = this % other;
+            }
+        }
+
         impl_arith_prim!(common $t);
     );
     (common $t:ty) => (
@@ -2936,8 +3030,10 @@ mod test {
     #[test]
     fn pow() {
         let bases = ["0", "1", "190000000000000", "192834857324591531",
+                     "340282366920938463463374607431768211456", // 2**128
                      "100000000", "-1", "-100", "-200", "-192834857324591531",
-                     "-431343873217510631841"];
+                     "-431343873217510631841",
+                     "-340282366920938463463374607431768211456"];
 
         for b in bases.iter() {
             let b : Int = b.parse().unwrap();
