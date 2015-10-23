@@ -36,11 +36,12 @@ pub unsafe fn pow(mut wp: *mut Limb, mut ap: *const Limb, mut an: i32, mut exp: 
 
     ll::zero(wp, wn);
 
+    // (m * 2**K)**exp == m**exp * 2**(K*exp)
     while *ap == 0 {
         ap = ap.offset(1);
-        wp = wp.offset(1);
-        wn -= 1;
         an -= 1;
+        wp = wp.offset(exp as isize);
+        wn -= exp as i32;
     }
     let trailing = (*ap).trailing_zeros() as u32;
 

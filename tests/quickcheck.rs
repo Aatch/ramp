@@ -134,8 +134,6 @@ fn divmod(a: BigIntStr, b: BigIntStr) -> TestResult {
         rr, rg)
 }
 
-// FIXME(#30): .pow is wrong sometimes
-/*
 #[quickcheck]
 fn pow(a: BigIntStr, b: u32) -> TestResult {
     if b > 100 {
@@ -145,7 +143,6 @@ fn pow(a: BigIntStr, b: u32) -> TestResult {
 
     eq!(ar.pow(b as usize), ag.pow(b))
 }
-*/
 
 #[quickcheck]
 fn square(a: BigIntStr) -> TestResult {
