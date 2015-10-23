@@ -35,7 +35,8 @@ use alloc;
 
 use ll;
 use ll::limb::{BaseInt, Limb};
-use mem;
+
+use alloc::raw_vec::RawVec;
 
 /**
  * An arbitrary-precision signed integer.
@@ -138,18 +139,45 @@ impl Int {
         i
     }
 
-    fn with_capacity(cap: u32) -> Int {
-        if cap == 0 {
-            return Int::zero();
-        }
+    /**
+     * Views the internal memory as a `RawVec`, which can be
+     * manipulated to change `self`'s allocation.
+     */
+    fn with_raw_vec<F: FnOnce(&mut RawVec<Limb>)>(&mut self, f: F) {
         unsafe {
-            let ptr = mem::allocate(cap as usize);
-            Int {
-                ptr: Unique::new(ptr),
-                size: 0,
-                cap: cap
+            let old_cap = self.cap as usize;
+            let mut vec = RawVec::from_raw_parts(self.ptr.get_mut(), old_cap);
+            // if `f` panics, let `vec` do the cleaning up, not self.
+            self.cap = 0;
+
+            f(&mut vec);
+
+            // update `self` for any changes that happened
+            self.ptr = Unique::new(vec.ptr());
+            let new_cap = vec.cap();
+            assert!(new_cap <= std::u32::MAX as usize);
+            self.cap = new_cap as u32;
+            // ownership has transferred back into `self`, so make
+            // sure that allocation isn't freed by `vec`.
+            std::mem::forget(vec);
+
+            if old_cap < new_cap {
+                // the allocation got larger, new Limbs should be
+                // zero.
+                let self_ptr = self.ptr.get_mut() as *mut _;
+                std::ptr::write_bytes(self_ptr.offset(old_cap as isize) as *mut u8,
+                                      0,
+                                      (new_cap - old_cap) * std::mem::size_of::<Limb>());
             }
         }
+    }
+
+    fn with_capacity(cap: u32) -> Int {
+        let mut ret = Int::zero();
+        if cap != 0 {
+            ret.with_raw_vec(|v| v.reserve_exact(0, cap as usize))
+        }
+        ret
     }
 
     /**
@@ -219,14 +247,9 @@ impl Int {
 
         if size == 0 { size = 1; } // Keep space for at least one limb around
 
-        unsafe {
-            let old_ptr = self.ptr.get_mut() as *mut Limb as *mut u8;
-            let old_cap = (self.cap as usize) * std::mem::size_of::<Limb>();
-            let new_cap = size * std::mem::size_of::<Limb>();
-
-            let new_ptr = mem::reallocate(old_ptr, old_cap, new_cap);
-            self.ptr = Unique::new(new_ptr as *mut Limb);
-        }
+        self.with_raw_vec(|v| {
+            v.shrink_to_fit(size);
+        })
     }
 
     /**
@@ -486,26 +509,10 @@ impl Int {
 
     fn ensure_capacity(&mut self, cap: u32) {
         if cap > self.cap {
-            unsafe {
-
-                let new_ptr = if self.cap > 0 {
-                    let old_ptr = self.ptr.get_mut() as *mut Limb as *mut u8;
-                    let old_cap = (self.cap as usize) * std::mem::size_of::<Limb>();
-                    let new_cap = (cap as usize) * std::mem::size_of::<Limb>();
-                    mem::reallocate(old_ptr, old_cap, new_cap) as *mut Limb
-                } else {
-                    mem::allocate(cap as usize)
-                };
-
-                let mut i = self.cap;
-                while i < cap {
-                    *new_ptr.offset(i as isize) = Limb(0);
-                    i += 1;
-                }
-
-                self.ptr = Unique::new(new_ptr);
-                self.cap = cap;
-            }
+            let old_cap = self.cap as usize;
+            self.with_raw_vec(|v| {
+                v.reserve_exact(old_cap, cap as usize - old_cap)
+            })
         }
     }
 
@@ -603,9 +610,8 @@ impl Drop for Int {
     fn drop(&mut self) {
         if self.cap > 0 {
             unsafe {
-                let ptr = self.ptr.get_mut() as *mut Limb as *mut u8;
-                let size = (self.cap as usize) * std::mem::size_of::<Limb>();
-                mem::deallocate(ptr, size);
+                drop(RawVec::from_raw_parts(self.ptr.get_mut(),
+                                            self.cap as usize));
             }
             self.cap = 0;
             self.size = 0;

@@ -31,24 +31,7 @@ pub unsafe fn allocate_bytes(size: usize) -> *mut u8 {
     ret
 }
 
-pub unsafe fn allocate<T>(n: usize) -> *mut T {
-    allocate_bytes(n * mem::size_of::<T>()) as *mut T
-}
-
-pub unsafe fn reallocate(old: *mut u8, old_size: usize, new_size: usize) -> *mut u8 {
-    let ret = heap::reallocate(old, old_size, new_size, mem::align_of::<usize>());
-    if ret.is_null() {
-        let _ = writeln!(io::stderr(), "Failed to reallocate memory (old size={}, new size={})",
-                         old_size, new_size);
-        abort();
-    }
-    if old_size < new_size {
-        ptr::write_bytes(ret.offset(old_size as isize), 0, new_size - old_size);
-    }
-    ret
-}
-
-pub unsafe fn deallocate(ptr: *mut u8, size: usize) {
+pub unsafe fn deallocate_bytes(ptr: *mut u8, size: usize) {
     heap::deallocate(ptr, size, mem::align_of::<usize>());
 }
 
@@ -105,7 +88,7 @@ impl Drop for TmpAllocator {
             while !mark.is_null() {
                 next = (*mark).next;
                 let size = (*mark).size;
-                deallocate(mark as *mut u8, size);
+                deallocate_bytes(mark as *mut u8, size);
                 mark = next;
             }
         }
