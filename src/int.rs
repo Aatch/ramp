@@ -528,6 +528,53 @@ impl Int {
         }
     }
 
+    /**
+     * Returns the number of bits required to represent (the absolute
+     * value of) this number, that is, `floor(log2(abs(self))) + 1`.
+     *
+     * Returns 1 if `self == 0`.
+     */
+    #[inline]
+    pub fn bit_length(&self) -> u32 {
+        if *self == 0 {
+            1
+        } else {
+            unsafe {
+                ll::base::num_base_digits(self.ptr.get(), self.abs_size(), 2) as u32
+            }
+        }
+    }
+
+    /**
+     * Returns the value of the `bit`th bit in this number, as if it
+     * were represented in two's complement.
+     */
+    #[inline]
+    pub fn bit(&self, bit: u32) -> bool {
+        let word = (bit / Limb::BITS as u32) as isize;
+        let subbit = bit % Limb::BITS as u32;
+        if word < self.abs_size() as isize {
+            let b = unsafe {
+                let w: Limb = *(self.ptr.get() as *const _).offset(word);
+                w.0 & (1 << subbit) != 0
+            };
+            if self.sign() >= 0 {
+                b
+            } else {
+                let first_one = self.trailing_zeros();
+                // the number is negative, so, in two's complement,
+                // bits up to and including the first one are the same
+                // as their sign-magnitude values (... ^ false), while
+                // bits beyond that are complemented (... ^ true)
+                b ^ (bit > first_one)
+            }
+        } else {
+            // we're beyond the in-memory limbs, so the bits are
+            // either all zeros (positive) or all ones (negative)
+            self.sign() < 0
+        }
+    }
+
     fn ensure_capacity(&mut self, cap: u32) {
         if cap > self.cap {
             let old_cap = self.cap as usize;
