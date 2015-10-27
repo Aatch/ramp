@@ -186,6 +186,20 @@ fn count_ones(a: BigIntStr) {
                ag.popcount());
 }
 
+#[quickcheck]
+fn bit_length(a: BigIntStr) {
+    let (ar, ag) = a.parse();
+
+    assert_eq!(ar.bit_length(), ag.bit_length() as u32)
+}
+
+#[quickcheck]
+fn bit(a: BigIntStr, bit: u16) {
+    let (ar, ag) = a.parse();
+
+    assert_eq!(ar.bit(bit as u32), ag.tstbit(bit as usize));
+}
+
 // operators
 
 macro_rules! expr {
