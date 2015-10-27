@@ -25,6 +25,7 @@
 
 extern crate alloc;
 extern crate rand;
+extern crate hamming;
 
 pub mod ll;
 mod mem;

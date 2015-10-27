@@ -12,7 +12,7 @@
 //    See the License for the specific language governing permissions and
 //    limitations under the License.
 
-use ll::limb::Limb;
+use ll::limb::{Limb, BaseInt};
 use ll::{same_or_decr, same_or_incr};
 
 /**
@@ -202,6 +202,27 @@ pub unsafe fn not(mut wp: *mut Limb, mut xp: *const Limb, n: i32) {
         xp = xp.offset(1);
         i += 1;
     }
+}
+
+/**
+ * Computes the two's complement of the `xs` least significant words
+ * of `xp`. The result is stored the result in `wp`, and a carry is
+ * returned, if there is one.
+ */
+pub unsafe fn twos_complement(mut wp: *mut Limb, mut xp: *mut Limb, xs: i32) -> Limb {
+    let mut i = 0;
+    let mut carry = Limb(1);
+
+    while i < xs {
+        let flipped = !*xp;
+        *wp = flipped + carry;
+        xp = xp.offset(1);
+        wp = wp.offset(1);
+        i += 1;
+        carry = carry & Limb((flipped == !0) as BaseInt);
+    }
+
+    carry
 }
 
 /**

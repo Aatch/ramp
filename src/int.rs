@@ -25,13 +25,14 @@ use std::num::Zero;
 use std::ops::{
     Add, Sub, Mul, Div, Rem, Neg,
     AddAssign, SubAssign, MulAssign, DivAssign, RemAssign,
-    Shl, Shr, BitAnd, BitOr,
-    ShlAssign, ShrAssign, BitAndAssign, BitOrAssign,
+    Shl, Shr, BitAnd, BitOr, BitXor,
+    ShlAssign, ShrAssign, BitAndAssign, BitOrAssign, BitXorAssign,
 };
 use std::ptr::Unique;
 use std::str::FromStr;
 use rand::Rng;
 
+use hamming;
 use alloc;
 
 use ll;
@@ -508,6 +509,25 @@ impl Int {
         }
     }
 
+    /**
+     * Returns the number of ones (the population count) in this number
+     *
+     * If this number is negative, it has infinitely many ones (in
+     * two's complement), so this returns usize::MAX.
+     */
+    pub fn count_ones(&self) -> usize {
+        debug_assert!(self.well_formed());
+        if self.sign() < 0 {
+            std::usize::MAX
+        } else {
+            let bytes = unsafe {
+                std::slice::from_raw_parts(self.ptr.get() as *const _ as *const u8,
+                                           self.abs_size() as usize * std::mem::size_of::<Limb>())
+            };
+            hamming::weight(bytes) as usize
+        }
+    }
+
     fn ensure_capacity(&mut self, cap: u32) {
         if cap > self.cap {
             let old_cap = self.cap as usize;
@@ -565,6 +585,21 @@ impl Int {
         };
 
         return high_limb != 0;
+    }
+
+    /**
+     * convert self into two's complement format (i.e. *self =
+     * (!*self) + 1)
+     */
+    fn negate_twos_complement(&mut self) {
+        unsafe {
+            let self_ptr = self.ptr.get_mut() as *mut _;
+            let carry = ll::twos_complement(self_ptr, self_ptr, self.abs_size());
+            if carry != 0 {
+                self.push(carry)
+            }
+        }
+        self.size = -self.size;
     }
 }
 
@@ -1671,176 +1706,123 @@ impl ShrAssign<usize> for Int {
     }
 }
 
-struct ComplementSplit {
-    ptr: *const Limb,
-    split_idx: i32,
-    len: i32
-}
+enum BitOp { And, Or, Xor }
 
-impl ComplementSplit {
-    fn low_len(&self) -> i32 { self.split_idx }
+fn bitop_ref(this: &mut Int, other: &Int, op: BitOp) -> Result<(), ()> {
+    let this_sign = this.sign();
+    let other_sign = other.sign();
 
-    fn has_high_limbs(&self) -> bool {
-        self.split_idx + 1 < self.len
+    if this_sign < 0 || other_sign < 0 {
+        return Err(())
     }
-    fn high_ptr(&self) -> *const Limb {
-        debug_assert!(self.has_high_limbs());
-        unsafe {
-            self.ptr.offset((self.split_idx + 1) as isize)
+
+    unsafe {
+        let other_ptr = other.ptr.get();
+        let min_size = std::cmp::min(this.abs_size(), other.abs_size());
+        let max_size = std::cmp::max(this.abs_size(), other.abs_size());
+        match op {
+            BitOp::And => {
+                let this_ptr = this.ptr.get_mut();
+                ll::and_n(this_ptr, this_ptr, other_ptr, min_size);
+                this.size = min_size;
+            }
+            BitOp::Or => {
+                this.ensure_capacity(max_size as u32);
+                let this_ptr = this.ptr.get_mut() as *mut _;
+                ll::or_n(this_ptr, this_ptr, other_ptr, min_size);
+                if this.abs_size() < max_size {
+                    ll::copy_rest(other_ptr, this_ptr, max_size, min_size);
+                }
+                this.size = max_size;
+            }
+            BitOp::Xor => {
+                this.ensure_capacity(max_size as u32);
+                let this_ptr = this.ptr.get_mut() as *mut _;
+                ll::xor_n(this_ptr, this_ptr, other_ptr, min_size);
+                if this.abs_size() < max_size {
+                    ll::copy_rest(other_ptr, this_ptr, max_size, min_size);
+                }
+                this.size = max_size;
+            }
         }
     }
-    fn high_len(&self) -> i32 { self.len - (self.split_idx + 1) }
-
-    unsafe fn split_limb(&self) -> Limb {
-        *self.ptr.offset(self.split_idx as isize)
-    }
+    this.normalize();
+    Ok(())
 }
 
-/*
- * Helper function for the bitwise operations below.
- *
- * The bitwise operations act as if the numbers are stored as two's complement integers, rather
- * than the signed magnitude representation that is actually used. Since converting to and from a
- * two's complement representation would be horribly inefficient, we split the number into three
- * segments: A number of high limbs, a single limb, the remaining zero limbs. The first segment is
- * the limbs that would be inverted in a two's complement form, the single limb is the limb
- * containing the first `1` bit. By definition, the remaining limbs must all be zero.
- *
- * This works due to the fact that `-n == !n + 1`. Consider the following bitstring, with 4-bit
- * limbs:
- *
- *     0011 0011 1101 1000 1100 0000 0000
- *
- * The two's complement of this number (with an additional "sign" bit) is:
- *
- *   1 1100 1100 0010 0111 0100 0000 0000
- *
- * As you can see, all the trailing zeros are preserved and the remaining bits are all inverted
- * with the exception of the first `1` bit. Since we prefer to work with whole limbs and not
- * individual bits we can simply take the two's complement of the limb containing that bit
- * directly.
- */
-unsafe fn complement_split(np: *const Limb, len: i32) -> ComplementSplit {
-    debug_assert!(len > 0);
+// one of the inputs is negative. The answer is as if `Int` was stored
+// in two's complement (in infinite precision), which means converting
+// to that format, doing the operation, and then converting back out
+// of it, if necessary.
+fn bitop_neg(mut a: Int, mut b: Int, op: BitOp) -> Int {
+    debug_assert!(a.sign() < 0 || b.sign() < 0);
+    let mut a_sign = a.sign();
+    let mut b_sign = b.sign();
 
-    let bit_idx = ll::scan_1(np, len);
-    let split_idx = (bit_idx / (Limb::BITS as u32)) as i32;
-
-    ComplementSplit {
-        ptr: np,
-        split_idx: split_idx,
-        len: len
+    if a_sign < 0 {
+        a.negate_twos_complement();
     }
+    if b_sign < 0 {
+        b.negate_twos_complement();
+    }
+    if a.abs_size() < b.abs_size() {
+        // self should be the longer one
+        std::mem::swap(&mut a, &mut b);
+        std::mem::swap(&mut a_sign, &mut b_sign);
+    }
+
+    unsafe {
+        let a_ptr = a.ptr.get_mut() as *mut _;
+        let b_ptr = b.ptr.get();
+        let min_size = b.abs_size();
+        let max_size = a.abs_size();
+
+        let (neg_result, use_max_size) = match op {
+            BitOp::And => {
+                ll::and_n(a_ptr, a_ptr, b_ptr, min_size);
+
+                (a_sign < 0 && b_sign < 0,
+                 b_sign < 0)
+            }
+            BitOp::Or => {
+                ll::or_n(a_ptr, a_ptr, b_ptr, min_size);
+                // (no need to copy trailing, a is longer than b)
+
+                (a_sign < 0 || b_sign < 0,
+                 b_sign > 0)
+            }
+            BitOp::Xor => {
+                ll::xor_n(a_ptr, a_ptr, b_ptr, min_size);
+                if b_sign < 0 {
+                    let ptr = a_ptr.offset(min_size as isize);
+                    ll::not(ptr, ptr, max_size - min_size);
+                }
+                ((a_sign < 0) ^ (b_sign < 0),
+                 true)
+            }
+        };
+
+        a.size = if use_max_size {
+            max_size
+        } else {
+            min_size
+        };
+        if neg_result {
+            a.negate_twos_complement();
+        }
+    }
+    a.normalize();
+    return a;
 }
 
 impl<'a> BitAnd<&'a Int> for Int {
     type Output = Int;
 
     fn bitand(mut self, other: &'a Int) -> Int {
-        unsafe {
-            let other_sign = other.sign();
-            let self_sign = self.sign();
-
-            // x & 0 == 0
-            if other_sign == 0 || self_sign == 0 {
-                self.size = 0;
-                return self;
-            }
-
-            // Special case -1 as the two's complement is all 1s
-            if *other == -1 {
-                return self;
-            }
-
-            if self == -1 {
-                self.clone_from(other);
-                return self;
-            }
-
-            let self_ptr = self.ptr.get_mut() as *mut Limb;
-            let other_ptr = other.ptr.get() as *const Limb;
-
-            // Nice easy case both are positive
-            if other_sign > 0 && self_sign > 0 {
-                let size = std::cmp::min(self.abs_size(), other.abs_size());
-                ll::and_n(self_ptr, self_ptr, other_ptr, size);
-                self.size = size;
-
-                self.normalize();
-                return self;
-            }
-
-            // Both are negative
-            if other_sign == self_sign {
-                let size = std::cmp::max(self.abs_size(), other.abs_size());
-                self.ensure_capacity(size as u32);
-                // Copy the high limbs from other to self, if self is smaller than other
-                if size > self.abs_size() {
-                    ll::copy_rest(other_ptr, self_ptr, size, self.abs_size());
-                }
-                self.size = -size;
-
-                let min_size = std::cmp::min(self.abs_size(), other.abs_size());
-
-                let self_split = complement_split(self_ptr, min_size);
-                let other_split = complement_split(other_ptr, min_size);
-
-                let mut zero_limbs = std::cmp::max(self_split.low_len(), other_split.low_len());
-                if zero_limbs > 0 {
-                    ll::zero(self_ptr, zero_limbs);
-                }
-
-                // If the limb we split it is different for self and other, it'd be
-                // zeroed out by the above step
-                if self_split.low_len() == other_split.low_len() {
-                    let split_ptr = self_ptr.offset(self_split.low_len() as isize);
-                    *split_ptr = -(*split_ptr) & -(*other_ptr.offset(self_split.low_len() as isize));
-                    zero_limbs += 1;
-                }
-
-                if zero_limbs < min_size {
-                    let high_limbs = min_size - zero_limbs;
-                    // Use de Morgan's Rule: !x & !y == !(x | y)
-                    let self_ptr = self_ptr.offset(zero_limbs as isize);
-                    let other_ptr = other_ptr.offset(zero_limbs as isize);
-
-                    ll::nor_n(self_ptr, self_ptr, other_ptr, high_limbs);
-                }
-
-                self.normalize();
-                return self;
-            }
-
-            // If we got here one is positive, the other is negative
-
-            let (xp, yp, n) = if other_sign < 0 {
-                (self_ptr as *const Limb, other_ptr, self.abs_size())
-            } else {
-                if other.abs_size() > self.abs_size() {
-                    self.ensure_capacity(other.abs_size() as u32);
-                    // Copy the high limbs from other to self
-                    ll::copy_rest(other_ptr, self_ptr, other.abs_size(), self.abs_size());
-                }
-                (other_ptr, self_ptr as *const Limb, other.abs_size())
-            };
-
-            // x > 0, y < 0
-            let self_ptr = self.ptr.get_mut() as *mut Limb;
-            let y_split = complement_split(yp, n);
-
-            let split = y_split.split_idx as isize;
-            ll::zero(self_ptr, y_split.low_len());
-
-            *self_ptr.offset(split) = *xp.offset(split) & -y_split.split_limb();
-
-            if y_split.has_high_limbs() {
-                ll::and_not_n(self_ptr.offset(split + 1), xp.offset(split + 1), y_split.high_ptr(),
-                              y_split.high_len());
-            }
-
-            self.size = n;
-            self.normalize();
-            return self;
+        if let Ok(_) = bitop_ref(&mut self, other, BitOp::And) {
+            self
+        } else {
+            bitop_neg(self, other.clone(), BitOp::And)
         }
     }
 }
@@ -1866,11 +1848,15 @@ impl<'a, 'b> BitAnd<&'a Int> for &'b Int {
 impl BitAnd<Int> for Int {
     type Output = Int;
 
-    #[inline]
-    fn bitand(self, other: Int) -> Int {
-        self.bitand(&other)
+    fn bitand(mut self, other: Int) -> Int {
+        if let Ok(_) = bitop_ref(&mut self, &other, BitOp::And) {
+            self
+        } else {
+            bitop_neg(self, other, BitOp::And)
+        }
     }
 }
+
 impl BitAndAssign<Int> for Int {
     #[inline]
     fn bitand_assign(&mut self, other: Int) {
@@ -1890,107 +1876,10 @@ impl<'a> BitOr<&'a Int> for Int {
     type Output = Int;
 
     fn bitor(mut self, other: &'a Int) -> Int {
-        unsafe {
-            if *other == 0 {
-                return self;
-            }
-            if self == 0 {
-                self.clone_from(other);
-                return self;
-            }
-
-            if *other == -1 || self == -1 {
-                self.size = -1;
-                *self.ptr.get_mut() = Limb(1);
-                return self;
-            }
-
-            let self_sign = self.sign();
-            let other_sign = other.sign();
-
-            let self_ptr = self.ptr.get_mut() as *mut Limb;
-            let other_ptr = other.ptr.get() as *const Limb;
-
-            if self_sign > 0 && other_sign > 0 {
-                let size = std::cmp::max(self.abs_size(), other.abs_size());
-                self.ensure_capacity(size as u32);
-                if size > self.abs_size() {
-                    ll::copy_rest(other_ptr, self_ptr, size, self.abs_size());
-                }
-
-                let min_size = std::cmp::min(self.abs_size(), other.abs_size());
-                ll::or_n(self_ptr, self_ptr, other_ptr, min_size);
-
-                self.size = size;
-                return self;
-            }
-
-            if self_sign == other_sign {
-                let min_size = std::cmp::min(self.abs_size(), other.abs_size());
-
-                let self_split = complement_split(self_ptr, min_size);
-                let other_split = complement_split(other_ptr, min_size);
-
-                if self_split.low_len() > other_split.low_len() {
-                    let mut p = self_ptr.offset(other_split.low_len() as isize);
-
-                    *p = -other_split.split_limb();
-                    p = p.offset(1);
-                    let mut o = other_ptr.offset((other_split.low_len() + 1) as isize);
-                    let mut n = (self_split.low_len() - other_split.low_len()) - 1;
-
-                    while n > 0 {
-                        *p = !(*o);
-                        p = p.offset(1);
-                        o = o.offset(1);
-                        n -= 1;
-                    }
-                }
-
-                let low_limbs = std::cmp::max(self_split.low_len(), other_split.low_len()) + 1;
-                if low_limbs < min_size {
-                    let high_limbs = min_size - low_limbs;
-                    let o = other_ptr.offset(low_limbs as isize);
-                    let s = self_ptr.offset(low_limbs as isize);
-                    // de Morgan's Rule: !x | !y == !(x & y)
-                    ll::nand_n(s, s, o, high_limbs);
-                }
-
-                self.size = -min_size;
-                self.normalize();
-
-                return self;
-            }
-
-
-            // If we got here one is positive, the other is negative
-
-            let n = std::cmp::max(other.abs_size(), self.abs_size());
-            self.ensure_capacity(n as u32);
-            let (xp, yp) = if other_sign < 0 {
-                (self_ptr as *const Limb, other_ptr)
-            } else {
-                (other_ptr, self_ptr as *const Limb)
-            };
-
-            // x > 0, y < 0
-            let y_split = complement_split(yp, n);
-            let split = y_split.low_len() as isize;
-
-            if xp != self_ptr {
-                ll::copy_incr(xp, self_ptr, y_split.low_len());
-            }
-
-            *self_ptr.offset(split) = *xp.offset(split) | -y_split.split_limb();
-
-            if y_split.has_high_limbs() {
-                ll::or_not_n(self_ptr.offset(split + 1), xp.offset(split + 1), y_split.high_ptr(),
-                             y_split.high_len());
-            }
-
-            self.size = -n;
-            self.normalize();
-            return self;
+        if let Ok(_) = bitop_ref(&mut self, other, BitOp::Or) {
+            self
+        } else {
+            bitop_neg(self, other.clone(), BitOp::Or)
         }
     }
 }
@@ -2017,8 +1906,12 @@ impl BitOr<Int> for Int {
     type Output = Int;
 
     #[inline]
-    fn bitor(self, other: Int) -> Int {
-        self.bitor(&other)
+    fn bitor(mut self, other: Int) -> Int {
+        if let Ok(_) = bitop_ref(&mut self, &other, BitOp::Or) {
+            self
+        } else {
+            bitop_neg(self, other, BitOp::Or)
+        }
     }
 }
 
@@ -2037,6 +1930,63 @@ impl<'a> BitOrAssign<&'a Int> for Int {
     }
 }
 
+impl<'a> BitXor<&'a Int> for Int {
+    type Output = Int;
+
+    fn bitxor(mut self, other: &'a Int) -> Int {
+        if let Ok(_) = bitop_ref(&mut self, other, BitOp::Xor) {
+            self
+        } else {
+            bitop_neg(self, other.clone(), BitOp::Xor)
+        }
+    }
+}
+
+impl<'a> BitXor<Int> for &'a Int {
+    type Output = Int;
+
+    #[inline]
+    fn bitxor(self, other: Int) -> Int {
+        other.bitxor(self)
+    }
+}
+
+impl<'a, 'b> BitXor<&'a Int> for &'b Int {
+    type Output = Int;
+
+    #[inline]
+    fn bitxor(self, other: &'a Int) -> Int {
+        self.clone().bitxor(other)
+    }
+}
+
+impl BitXor<Int> for Int {
+    type Output = Int;
+
+    #[inline]
+    fn bitxor(mut self, other: Int) -> Int {
+        if let Ok(_) = bitop_ref(&mut self, &other, BitOp::Xor) {
+            self
+        } else {
+            bitop_neg(self, other, BitOp::Xor)
+        }
+    }
+}
+
+impl BitXorAssign<Int> for Int {
+    #[inline]
+    fn bitxor_assign(&mut self, other: Int) {
+        let this = std::mem::replace(self, Int::zero());
+        *self = this ^ other;
+    }
+}
+impl<'a> BitXorAssign<&'a Int> for Int {
+    #[inline]
+    fn bitxor_assign(&mut self, other: &'a Int) {
+        let this = std::mem::replace(self, Int::zero());
+        *self = this ^ other;
+    }
+}
 
 macro_rules! impl_arith_prim (
     (signed $t:ty) => (

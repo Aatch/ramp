@@ -95,7 +95,8 @@ pub use self::bit::{
     and_n, and_not_n, nand_n,
     or_n, or_not_n, nor_n, xor_n,
     not,
-    scan_1, scan_0
+    scan_1, scan_0,
+    twos_complement
 };
 pub use self::addsub::{add_n, sub_n, add, sub, add_1, sub_1, incr, decr};
 pub use self::mul::{addmul_1, submul_1, mul_1, mul, sqr};

@@ -163,6 +163,29 @@ fn negate(a: BigIntStr) -> TestResult {
     eq!(ar, -ag)
 }
 
+#[quickcheck]
+fn is_even(a: BigIntStr) {
+    let (ar, ag) = a.parse();
+
+    assert_eq!(ar.is_even(), !ag.tstbit(0));
+}
+
+#[quickcheck]
+fn trailing_zeros(a: BigIntStr) {
+    let (ar, ag) = a.parse();
+
+    let bit = (0..).position(|idx| ag.tstbit(idx)).unwrap();
+    assert_eq!(ar.trailing_zeros() as usize, bit);
+}
+
+#[quickcheck]
+fn count_ones(a: BigIntStr) {
+    let (ar, ag) = a.parse();
+
+    assert_eq!(ar.count_ones(),
+               ag.popcount());
+}
+
 // operators
 
 macro_rules! expr {
@@ -350,11 +373,9 @@ test_binop! {
     div: /, /=, false, all;
     // FIXME(#24): rem gives incorrect results
     // rem: %, %=, false, all;
-    // FIXME(#26): memory corruption
-    // bitand: &, &=, true, any;
-    // bitor: &, &=, true, any;
-    // FIXME(#25): bitxor is missing
-    // bitxor: &, &=, true, any;
+    bitand: &, &=, true, any;
+    bitor: |, |=, true, any;
+    bitxor: ^, ^=, true, any;
 }
 
 mod neg {
