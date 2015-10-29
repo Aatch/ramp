@@ -1901,39 +1901,57 @@ fn bitop_limb(a: &mut Int, b: Limb, signed: bool, op: BitOp) {
     }
     // b is already in two's complement if it is negative
 
-    unsafe {
-        let a_ptr = a.ptr.get_mut() as *mut _;
-        let min_size = if b == 0 { 0 } else { 1 };
-        let max_size = a.abs_size();
-
-        let (neg_result, use_max_size) = match op {
-            BitOp::And => {
-                *a_ptr = *a_ptr & b;
-                (a_sign < 0 && b_sign < 0,
-                 b_sign < 0)
-            }
-            BitOp::Or => {
-                *a_ptr = *a_ptr | b;
-                (a_sign < 0 || b_sign < 0,
-                 b_sign >= 0)
-            }
-            BitOp::Xor => {
-                *a_ptr = *a_ptr ^ b;
+    if a_sign == 0 {
+        match op {
+            // 0 ^ x == 0 | x == x
+            BitOp::Or | BitOp::Xor => {
                 if b_sign < 0 {
-                    let ptr = a_ptr.offset(min_size as isize);
-                    ll::not(ptr, ptr, max_size - min_size);
+                    a.push(-b);
+                    a.negate();
+                } else {
+                    a.push(b)
                 }
-                ((a_sign < 0) ^ (b_sign < 0),
-                 true)
             }
-        };
-        a.size = if use_max_size {
-            max_size
-        } else {
-            min_size
-        };
-        if neg_result {
-            a.negate_twos_complement();
+            // 0 & x == 0
+            BitOp::And => {}
+        }
+    } else {
+        unsafe {
+            let a_ptr = a.ptr.get_mut() as *mut _;
+            let min_size = if b == 0 { 0 } else { 1 };
+            let max_size = a.abs_size();
+            // we've got to have space to write data to this pointer
+            debug_assert!(max_size >= 1);
+
+            let (neg_result, use_max_size) = match op {
+                BitOp::And => {
+                    *a_ptr = *a_ptr & b;
+                    (a_sign < 0 && b_sign < 0,
+                     b_sign < 0)
+                }
+                BitOp::Or => {
+                    *a_ptr = *a_ptr | b;
+                    (a_sign < 0 || b_sign < 0,
+                     b_sign >= 0)
+                }
+                BitOp::Xor => {
+                    *a_ptr = *a_ptr ^ b;
+                    if b_sign < 0 {
+                        let ptr = a_ptr.offset(min_size as isize);
+                        ll::not(ptr, ptr, max_size - min_size);
+                    }
+                    ((a_sign < 0) ^ (b_sign < 0),
+                     true)
+                }
+            };
+            a.size = if use_max_size {
+                max_size
+            } else {
+                min_size
+            };
+            if neg_result {
+                a.negate_twos_complement();
+            }
         }
     }
     a.normalize();
@@ -3219,8 +3237,8 @@ mod test {
     macro_rules! assert_mp_eq (
         ($l:expr, $r:expr) => (
             {
-                let l : Int = $l;
-                let r : Int = $r;
+                let l : &Int = &$l;
+                let r : &Int = &$r;
                 if l != r {
                     println!("assertion failed: {} == {}", stringify!($l), stringify!($r));
                     panic!("{:} != {:}", l, r);
@@ -3442,38 +3460,114 @@ mod test {
     #[test]
     fn bitand() {
         let cases = [
+            ("0", "1", "0"),
+            ("17", "65", "1"),
+            ("-17", "65", "65"),
+            ("17", "-65", "17"),
+            ("-17", "-65", "-81"),
             ("0", "543253451643657932075830214751263521", "0"),
             ("-1", "543253451643657932075830214751263521", "543253451643657932075830214751263521"),
             ("47398217493274092174042109472", "9843271092740214732017421", "152974816756326460458496"),
-            ("87641324986400000000000", "31470973247490321000000000000000", "2398658832415825854464")
+            ("87641324986400000000000", "31470973247490321000000000000000", "2398658832415825854464"),
+            ("-87641324986400000000000", "31470973247490321000000000000000", "31470973245091662167584174145536"),
+            ("87641324986400000000000", "-31470973247490321000000000000000", "85242666153984174129152"),
+            ("-87641324986400000000000", "-31470973247490321000000000000000", "-31470973332732987153984174129152"),
         ];
 
-        for &(l, r, a) in cases.iter() {
-            let l : Int = l.parse().unwrap();
-            let r : Int = r.parse().unwrap();
+        for &(l_, r_, a) in cases.iter() {
+            let l : Int = l_.parse().unwrap();
+            let r : Int = r_.parse().unwrap();
             let a : Int = a.parse().unwrap();
 
             let val = &l & &r;
             assert_mp_eq!(val, a);
+
+            if l.bit_length() <= 31 {
+                let l: i32 = l_.parse().unwrap();
+                let val = l & &r;
+                assert_mp_eq!(val, a);
+            }
+            if r.bit_length() <= 31 {
+                let r: i32 = r_.parse().unwrap();
+                let val = &l & r;
+                assert_mp_eq!(val, a);
+            }
         }
     }
 
     #[test]
     fn bitor() {
         let cases = [
+            ("0", "1", "1"),
+            ("17", "65", "81"),
+            ("-17", "65", "-17"),
+            ("17", "-65", "-65"),
+            ("-17", "-65", "-1"),
             ("0", "543253451643657932075830214751263521", "543253451643657932075830214751263521"),
             ("-1", "543253451643657932075830214751263521", "-1"),
             ("47398217493274092174042109472", "9843271092740214732017421","47407907789550076062313668397"),
             ("87641324986400000000000", "31470973247490321000000000000000", "31470973332732987153984174145536"),
+            ("-87641324986400000000000", "31470973247490321000000000000000", "-85242666153984174145536"),
+            ("87641324986400000000000", "-31470973247490321000000000000000", "-31470973245091662167584174129152"),
+            ("-87641324986400000000000", "-31470973247490321000000000000000", "-2398658832415825870848"),
         ];
 
-        for &(l, r, a) in cases.iter() {
-            let l : Int = l.parse().unwrap();
-            let r : Int = r.parse().unwrap();
+        for &(l_, r_, a) in cases.iter() {
+            let l : Int = l_.parse().unwrap();
+            let r : Int = r_.parse().unwrap();
             let a : Int = a.parse().unwrap();
 
             let val = &l | &r;
             assert_mp_eq!(val, a);
+
+            if l.bit_length() <= 31 {
+                let l: i32 = l_.parse().unwrap();
+                let val = l | &r;
+                assert_mp_eq!(val, a);
+            }
+            if r.bit_length() <= 31 {
+                let r: i32 = r_.parse().unwrap();
+                let val = &l | r;
+                assert_mp_eq!(val, a);
+            }
+        }
+    }
+
+    #[test]
+    fn bitxor() {
+        let cases = [
+            ("0", "1", "1"),
+            ("17", "65", "80"),
+            ("-17", "65", "-82"),
+            ("17", "-65", "-82"),
+            ("-17", "-65", "80"),
+            ("0", "543253451643657932075830214751263521", "543253451643657932075830214751263521"),
+            ("-1", "543253451643657932075830214751263521", "-543253451643657932075830214751263522"),
+            ("47398217493274092174042109472", "9843271092740214732017421","47407754814733319735853209901"),
+            ("87641324986400000000000", "31470973247490321000000000000000", "31470973330334328321568348291072"),
+            ("-87641324986400000000000", "31470973247490321000000000000000", "-31470973330334328321568348291072"),
+            ("87641324986400000000000", "-31470973247490321000000000000000", "-31470973330334328321568348258304"),
+            ("-87641324986400000000000", "-31470973247490321000000000000000", "31470973330334328321568348258304"),
+        ];
+
+        for &(l_, r_, a) in cases.iter() {
+            let l : Int = l_.parse().unwrap();
+            let r : Int = r_.parse().unwrap();
+            let a : Int = a.parse().unwrap();
+
+            let val = &l ^ &r;
+            assert_mp_eq!(val, a);
+
+            if l.bit_length() <= 31 {
+                let l: i32 = l_.parse().unwrap();
+                let val = l ^ &r;
+                assert_mp_eq!(val, a);
+            }
+            if r.bit_length() <= 31 {
+                let r: i32 = r_.parse().unwrap();
+                let val = &l ^ r;
+                assert_mp_eq!(val, a);
+            }
         }
     }
 
