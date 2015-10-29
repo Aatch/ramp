@@ -827,6 +827,7 @@ impl AddAssign<Limb> for Int {
             unsafe {
                 *self.ptr.get_mut() = other;
                 self.size = 1;
+                return
             }
         }
         // `self` is non-zero, reuse the storage for the result.
