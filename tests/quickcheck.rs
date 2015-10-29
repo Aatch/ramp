@@ -233,7 +233,7 @@ macro_rules! expr {
     ($e: expr) => { $e }
 }
 macro_rules! test_binop {
-    ($($name: ident: $op: tt, $assign: tt, $allow_zero: expr, $primitives: ident;)*) => {
+    ($($name: ident: $op: tt, $assign: tt, $allow_zero: expr;)*) => {
         $(mod $name {
             #![allow(unused_imports)]
             use ::BigIntStr;
@@ -270,29 +270,26 @@ macro_rules! test_binop {
                 eq!(&ar $op &br, ag $op bg)
             }
 
-            #[cfg($primitives())]
             #[quickcheck]
             fn int_limb(a: BigIntStr, b: BaseInt) -> TestResult {
                 if !$allow_zero && b == 0 {
                     return TestResult::discard()
                 }
                 let (ar, ag) = a.parse();
-                let bg = b as u64;
+                let bg = Mpz::from(b as u64);
 
                 eq!(ar $op Limb(b), ag $op bg)
             }
-            #[cfg($primitives())]
             #[quickcheck]
             fn int_baseint(a: BigIntStr, b: BaseInt) -> TestResult {
                 if !$allow_zero && b == 0 {
                     return TestResult::discard()
                 }
                 let (ar, ag) = a.parse();
-                let bg = b as u64;
+                let bg = Mpz::from(b as u64);
 
                 eq!(ar $op b, ag $op bg)
             }
-            #[cfg($primitives())]
             #[quickcheck]
             fn int_i32(a: BigIntStr, b: i32) -> TestResult {
                 if !$allow_zero && b == 0 {
@@ -303,19 +300,17 @@ macro_rules! test_binop {
 
                 eq!(ar $op b, ag $op bg)
             }
-            #[cfg($primitives())]
             #[quickcheck]
             fn int_usize(a: BigIntStr, b: usize) -> TestResult {
                 if !$allow_zero && b == 0 {
                     return TestResult::discard()
                 }
                 let (ar, ag) = a.parse();
-                let bg = b as u64;
+                let bg = Mpz::from(b as u64);
 
                 eq!(ar $op b, ag $op bg)
             }
 
-            #[cfg($primitives())]
             #[quickcheck]
             fn baseint_int(a: BaseInt, b: BigIntStr) -> TestResult {
                 let ag = Mpz::from(a);
@@ -323,7 +318,6 @@ macro_rules! test_binop {
 
                 eq!(a $op br, ag $op bg)
             }
-            #[cfg($primitives())]
             #[quickcheck]
             fn i32_int(a: i32, b: BigIntStr) -> TestResult {
                 let ag = Mpz::from(a);
@@ -331,7 +325,6 @@ macro_rules! test_binop {
 
                 eq!(a $op br, ag $op bg)
             }
-            #[cfg($primitives())]
             #[quickcheck]
             fn usize_int(a: usize, b: BigIntStr) -> TestResult {
                 let ag = Mpz::from(a as u64);
@@ -355,31 +348,28 @@ macro_rules! test_binop {
                 eq!(ar, ag $op bg)
             }
 
-            #[cfg($primitives())]
             #[quickcheck]
             fn assign_limb(a: BigIntStr, b: BaseInt) -> TestResult {
                 if !$allow_zero && b == 0 {
                     return TestResult::discard()
                 }
                 let (mut ar, ag) = a.parse();
-                let bg = b as u64;
+                let bg = Mpz::from(b as u64);
 
                 expr!(ar $assign Limb(b));
                 eq!(ar, ag $op bg)
             }
-            #[cfg($primitives())]
             #[quickcheck]
             fn assign_baseint(a: BigIntStr, b: BaseInt) -> TestResult {
                 if !$allow_zero && b == 0 {
                     return TestResult::discard()
                 }
                 let (mut ar, ag) = a.parse();
-                let bg = b as u64;
+                let bg = Mpz::from(b as u64);
 
                 expr!(ar $assign b);
                 eq!(ar, ag $op bg)
             }
-            #[cfg($primitives())]
             #[quickcheck]
             fn assign_i32(a: BigIntStr, b: i32) -> TestResult {
                 if !$allow_zero && b == 0 {
@@ -391,14 +381,13 @@ macro_rules! test_binop {
                 expr!(ar $assign b);
                 eq!(ar, ag $op bg)
             }
-            #[cfg($primitives())]
             #[quickcheck]
             fn assign_usize(a: BigIntStr, b: usize) -> TestResult {
                 if !$allow_zero && b == 0 {
                     return TestResult::discard()
                 }
                 let (mut ar, ag) = a.parse();
-                let bg = b as u64;
+                let bg = Mpz::from(b as u64);
 
                 expr!(ar $assign b);
                 eq!(ar, ag $op bg)
@@ -408,14 +397,14 @@ macro_rules! test_binop {
 }
 
 test_binop! {
-    add: +, +=, true, all;
-    sub: -, -=, true, all;
-    mul: *, *=, true, all;
-    div: /, /=, false, all;
-    rem: %, %=, false, all;
-    bitand: &, &=, true, any;
-    bitor: |, |=, true, any;
-    bitxor: ^, ^=, true, any;
+    add: +, +=, true;
+    sub: -, -=, true;
+    mul: *, *=, true;
+    div: /, /=, false;
+    rem: %, %=, false;
+    bitand: &, &=, true;
+    bitor: |, |=, true;
+    bitxor: ^, ^=, true;
 }
 
 mod neg {
