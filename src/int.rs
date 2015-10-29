@@ -1753,11 +1753,35 @@ impl ShrAssign<usize> for Int {
     }
 }
 
+#[derive(Copy, Clone)]
 enum BitOp { And, Or, Xor }
 
 fn bitop_ref(this: &mut Int, other: &Int, op: BitOp) -> Result<(), ()> {
     let this_sign = this.sign();
     let other_sign = other.sign();
+
+    // if other is small, we can fall back to something that'll be
+    // more efficient (especially if other is negative)
+    if other.abs_size() <= 1 {
+        // the magnitude of the limb
+        let mut limb = other.to_single_limb();
+        if other_sign < 0 {
+            if limb.high_bit_set() {
+                // the limb is too large to be put into two's
+                // complement form (NB. that if other is positive, we
+                // don't need to worry about two's complement, since
+                // bitop_limb can handle unsigned Limbs)
+                return Err(())
+            } else {
+                limb = -limb;
+            }
+        }
+
+        // as mentioned above, we only have to say that `limb` is
+        // signed when it is actually negative
+        bitop_limb(this, limb, other_sign < 0, op);
+        return Ok(());
+    }
 
     if this_sign < 0 || other_sign < 0 {
         return Err(())
@@ -1836,7 +1860,7 @@ fn bitop_neg(mut a: Int, mut b: Int, op: BitOp) -> Int {
                 // (no need to copy trailing, a is longer than b)
 
                 (a_sign < 0 || b_sign < 0,
-                 b_sign > 0)
+                 b_sign >= 0)
             }
             BitOp::Xor => {
                 ll::xor_n(a_ptr, a_ptr, b_ptr, min_size);
@@ -1860,6 +1884,74 @@ fn bitop_neg(mut a: Int, mut b: Int, op: BitOp) -> Int {
     }
     a.normalize();
     return a;
+}
+
+// do a bit operation on `a` and `b`.
+//
+// If `signed` only indicates whether to interpret `b` as two's
+// complement or not (i.e. if it is true, then `1` is still `1`, and
+// `-1` is `!0`)
+fn bitop_limb(a: &mut Int, b: Limb, signed: bool, op: BitOp) {
+    let a_sign = a.sign();
+    let b_negative = signed && b.high_bit_set();
+    let b_sign = if b_negative { -1 } else if b == 0 { 0 } else { 1 };
+
+    if a_sign < 0 {
+        a.negate_twos_complement();
+    }
+    // b is already in two's complement if it is negative
+
+    unsafe {
+        let a_ptr = a.ptr.get_mut() as *mut _;
+        let min_size = if b == 0 { 0 } else { 1 };
+        let max_size = a.abs_size();
+
+        let (neg_result, use_max_size) = match op {
+            BitOp::And => {
+                *a_ptr = *a_ptr & b;
+                (a_sign < 0 && b_sign < 0,
+                 b_sign < 0)
+            }
+            BitOp::Or => {
+                *a_ptr = *a_ptr | b;
+                (a_sign < 0 || b_sign < 0,
+                 b_sign >= 0)
+            }
+            BitOp::Xor => {
+                *a_ptr = *a_ptr ^ b;
+                if b_sign < 0 {
+                    let ptr = a_ptr.offset(min_size as isize);
+                    ll::not(ptr, ptr, max_size - min_size);
+                }
+                ((a_sign < 0) ^ (b_sign < 0),
+                 true)
+            }
+        };
+        a.size = if use_max_size {
+            max_size
+        } else {
+            min_size
+        };
+        if neg_result {
+            a.negate_twos_complement();
+        }
+    }
+    a.normalize();
+}
+
+impl<'a> BitAnd<Limb> for Int {
+    type Output = Int;
+
+    fn bitand(mut self, other: Limb) -> Int {
+        self &= other;
+        self
+    }
+}
+
+impl BitAndAssign<Limb> for Int {
+    fn bitand_assign(&mut self, other: Limb) {
+        bitop_limb(self, other, false, BitOp::And)
+    }
 }
 
 impl<'a> BitAnd<&'a Int> for Int {
@@ -1919,6 +2011,21 @@ impl<'a> BitAndAssign<&'a Int> for Int {
     }
 }
 
+impl BitOr<Limb> for Int {
+    type Output = Int;
+
+    fn bitor(mut self, other: Limb) -> Int {
+        self |= other;
+        self
+    }
+}
+
+impl BitOrAssign<Limb> for Int {
+    fn bitor_assign(&mut self, other: Limb) {
+        bitop_limb(self, other, false, BitOp::Or)
+    }
+}
+
 impl<'a> BitOr<&'a Int> for Int {
     type Output = Int;
 
@@ -1974,6 +2081,21 @@ impl<'a> BitOrAssign<&'a Int> for Int {
     fn bitor_assign(&mut self, other: &'a Int) {
         let this = std::mem::replace(self, Int::zero());
         *self = this | other;
+    }
+}
+
+impl<'a> BitXor<Limb> for Int {
+    type Output = Int;
+
+    fn bitxor(mut self, other: Limb) -> Int {
+        self ^= other;
+        self
+    }
+}
+
+impl BitXorAssign<Limb> for Int {
+    fn bitxor_assign(&mut self, other: Limb) {
+        bitop_limb(self, other, false, BitOp::Xor)
     }
 }
 
@@ -2173,6 +2295,27 @@ macro_rules! impl_arith_prim (
             }
         }
 
+        impl BitAndAssign<$t> for Int {
+            #[inline]
+            fn bitand_assign(&mut self, other: $t) {
+                bitop_limb(self, Limb(other as BaseInt), true, BitOp::And)
+            }
+        }
+
+        impl BitOrAssign<$t> for Int {
+            #[inline]
+            fn bitor_assign(&mut self, other: $t) {
+                bitop_limb(self, Limb(other as BaseInt), true, BitOp::Or)
+            }
+        }
+
+        impl BitXorAssign<$t> for Int {
+            #[inline]
+            fn bitxor_assign(&mut self, other: $t) {
+                bitop_limb(self, Limb(other as BaseInt), true, BitOp::Xor)
+            }
+        }
+
         impl_arith_prim!(common $t);
     );
     (unsigned $t:ty) => (
@@ -2293,6 +2436,27 @@ macro_rules! impl_arith_prim (
             fn rem_assign(&mut self, other: $t) {
                 let this = std::mem::replace(self, Int::zero());
                 *self = this % other;
+            }
+        }
+
+        impl BitAndAssign<$t> for Int {
+            #[inline]
+            fn bitand_assign(&mut self, other: $t) {
+                bitop_limb(self, Limb(other as BaseInt), false, BitOp::And)
+            }
+        }
+
+        impl BitOrAssign<$t> for Int {
+            #[inline]
+            fn bitor_assign(&mut self, other: $t) {
+                bitop_limb(self, Limb(other as BaseInt), false, BitOp::Or)
+            }
+        }
+
+        impl BitXorAssign<$t> for Int {
+            #[inline]
+            fn bitxor_assign(&mut self, other: $t) {
+                bitop_limb(self, Limb(other as BaseInt), false, BitOp::Xor)
             }
         }
 
@@ -2475,6 +2639,116 @@ macro_rules! impl_arith_prim (
             }
         }
 
+        impl BitAnd<$t> for Int {
+            type Output = Int;
+
+            #[inline]
+            fn bitand(mut self, other: $t) -> Int {
+                self &= other;
+                self
+            }
+        }
+
+        impl<'a> BitAnd<$t> for &'a Int {
+            type Output = Int;
+
+            #[inline]
+            fn bitand(self, other: $t) -> Int {
+                self.clone() & other
+            }
+        }
+
+        impl BitAnd<Int> for $t {
+            type Output = Int;
+
+            #[inline]
+            fn bitand(self, other: Int) -> Int {
+                other & self
+            }
+        }
+
+        impl<'a> BitAnd<&'a Int> for $t {
+            type Output = Int;
+
+            #[inline]
+            fn bitand(self, other: &'a Int) -> Int {
+                other & self
+            }
+        }
+
+        impl BitOr<$t> for Int {
+            type Output = Int;
+
+            #[inline]
+            fn bitor(mut self, other: $t) -> Int {
+                self |= other;
+                self
+            }
+        }
+
+        impl<'a> BitOr<$t> for &'a Int {
+            type Output = Int;
+
+            #[inline]
+            fn bitor(self, other: $t) -> Int {
+                self.clone() | other
+            }
+        }
+
+        impl BitOr<Int> for $t {
+            type Output = Int;
+
+            #[inline]
+            fn bitor(self, other: Int) -> Int {
+                other | self
+            }
+        }
+
+        impl<'a> BitOr<&'a Int> for $t {
+            type Output = Int;
+
+            #[inline]
+            fn bitor(self, other: &'a Int) -> Int {
+                other | self
+            }
+        }
+
+        impl BitXor<$t> for Int {
+            type Output = Int;
+
+            #[inline]
+            fn bitxor(mut self, other: $t) -> Int {
+                self ^= other;
+                self
+            }
+        }
+
+        impl<'a> BitXor<$t> for &'a Int {
+            type Output = Int;
+
+            #[inline]
+            fn bitxor(self, other: $t) -> Int {
+                self.clone() ^ other
+            }
+        }
+
+        impl BitXor<Int> for $t {
+            type Output = Int;
+
+            #[inline]
+            fn bitxor(self, other: Int) -> Int {
+                other ^ self
+            }
+        }
+
+        impl<'a> BitXor<&'a Int> for $t {
+            type Output = Int;
+
+            #[inline]
+            fn bitxor(self, other: &'a Int) -> Int {
+                other ^ self
+            }
+        }
     )
 );
 

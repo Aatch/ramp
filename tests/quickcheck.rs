@@ -277,7 +277,7 @@ macro_rules! test_binop {
                     return TestResult::discard()
                 }
                 let (ar, ag) = a.parse();
-                let bg = b as u64;
+                let bg = Mpz::from(b as u64);
 
                 eq!(ar $op Limb(b), ag $op bg)
             }
@@ -288,7 +288,7 @@ macro_rules! test_binop {
                     return TestResult::discard()
                 }
                 let (ar, ag) = a.parse();
-                let bg = b as u64;
+                let bg = Mpz::from(b as u64);
 
                 eq!(ar $op b, ag $op bg)
             }
@@ -310,7 +310,7 @@ macro_rules! test_binop {
                     return TestResult::discard()
                 }
                 let (ar, ag) = a.parse();
-                let bg = b as u64;
+                let bg = Mpz::from(b as u64);
 
                 eq!(ar $op b, ag $op bg)
             }
@@ -362,7 +362,7 @@ macro_rules! test_binop {
                     return TestResult::discard()
                 }
                 let (mut ar, ag) = a.parse();
-                let bg = b as u64;
+                let bg = Mpz::from(b as u64);
 
                 expr!(ar $assign Limb(b));
                 eq!(ar, ag $op bg)
@@ -374,7 +374,7 @@ macro_rules! test_binop {
                     return TestResult::discard()
                 }
                 let (mut ar, ag) = a.parse();
-                let bg = b as u64;
+                let bg = Mpz::from(b as u64);
 
                 expr!(ar $assign b);
                 eq!(ar, ag $op bg)
@@ -398,7 +398,7 @@ macro_rules! test_binop {
                     return TestResult::discard()
                 }
                 let (mut ar, ag) = a.parse();
-                let bg = b as u64;
+                let bg = Mpz::from(b as u64);
 
                 expr!(ar $assign b);
                 eq!(ar, ag $op bg)
@@ -413,9 +413,9 @@ test_binop! {
     mul: *, *=, true, all;
     div: /, /=, false, all;
     rem: %, %=, false, all;
-    bitand: &, &=, true, any;
-    bitor: |, |=, true, any;
-    bitxor: ^, ^=, true, any;
+    bitand: &, &=, true, all;
+    bitor: |, |=, true, all;
+    bitxor: ^, ^=, true, all;
 }
 
 mod neg {
