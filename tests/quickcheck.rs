@@ -33,6 +33,14 @@ impl BigIntStr {
 
 impl Arbitrary for BigIntStr {
     fn arbitrary<G: Gen>(g: &mut G) -> BigIntStr {
+        if g.gen::<f64>() < 0.005 {
+            // 0.5% chance of generating zero means 63% chance of a
+            // zero appearing at least once when running a function
+            // taking two BigIntStrs 100 times, and 39% chance for a
+            // function taking one.
+            return BigIntStr("0".to_owned());
+        }
+
         let raw_size = g.size();
 
         let size = std::cmp::max(g.gen_range(raw_size / RANGE_MULT, raw_size * RANGE_MULT),
@@ -152,6 +160,7 @@ fn abs_cmp(a: BigIntStr, b: BigIntStr) {
 fn divmod(a: BigIntStr, b: BigIntStr) -> TestResult {
     let (ar, ag) = a.parse();
     let (br, bg) = b.parse();
+    if br == 0 { return TestResult::discard() }
 
     let (qr, rr) = ar.divmod(&br);
     let qg = &ag / &bg;
@@ -201,7 +210,11 @@ fn is_even(a: BigIntStr) {
 fn trailing_zeros(a: BigIntStr) {
     let (ar, ag) = a.parse();
 
-    let bit = (0..).position(|idx| ag.tstbit(idx)).unwrap();
+    let bit = if ar == 0 {
+        0
+    } else {
+        (0..).position(|idx| ag.tstbit(idx)).unwrap()
+    };
     assert_eq!(ar.trailing_zeros() as usize, bit);
 }
 
@@ -245,6 +258,8 @@ macro_rules! test_binop {
             fn int_int(a: BigIntStr, b: BigIntStr) -> TestResult {
                 let (ar, ag) = a.parse();
                 let (br, bg) = b.parse();
+                if !$allow_zero && br == 0 { return TestResult::discard() }
+
                 eq!(ar $op br, ag $op bg)
             }
 
@@ -252,6 +267,7 @@ macro_rules! test_binop {
             fn intref_int(a: BigIntStr, b: BigIntStr) -> TestResult {
                 let (ar, ag) = a.parse();
                 let (br, bg) = b.parse();
+                if !$allow_zero && br == 0 { return TestResult::discard() }
 
                 eq!(&ar $op br, ag $op bg)
             }
@@ -259,6 +275,7 @@ macro_rules! test_binop {
             fn int_intref(a: BigIntStr, b: BigIntStr) -> TestResult {
                 let (ar, ag) = a.parse();
                 let (br, bg) = b.parse();
+                if !$allow_zero && br == 0 { return TestResult::discard() }
 
                 eq!(ar $op &br, ag $op bg)
             }
@@ -266,6 +283,7 @@ macro_rules! test_binop {
             fn intref_intref(a: BigIntStr, b: BigIntStr) -> TestResult {
                 let (ar, ag) = a.parse();
                 let (br, bg) = b.parse();
+                if !$allow_zero && br == 0 { return TestResult::discard() }
 
                 eq!(&ar $op &br, ag $op bg)
             }
@@ -315,6 +333,7 @@ macro_rules! test_binop {
             fn baseint_int(a: BaseInt, b: BigIntStr) -> TestResult {
                 let ag = Mpz::from(a);
                 let (br, bg) = b.parse();
+                if !$allow_zero && br == 0 { return TestResult::discard() }
 
                 eq!(a $op br, ag $op bg)
             }
@@ -322,6 +341,7 @@ macro_rules! test_binop {
             fn i32_int(a: i32, b: BigIntStr) -> TestResult {
                 let ag = Mpz::from(a);
                 let (br, bg) = b.parse();
+                if !$allow_zero && br == 0 { return TestResult::discard() }
 
                 eq!(a $op br, ag $op bg)
             }
@@ -329,6 +349,7 @@ macro_rules! test_binop {
             fn usize_int(a: usize, b: BigIntStr) -> TestResult {
                 let ag = Mpz::from(a as u64);
                 let (br, bg) = b.parse();
+                if !$allow_zero && br == 0 { return TestResult::discard() }
 
                 eq!(a $op br, ag $op bg)
             }
@@ -337,6 +358,8 @@ macro_rules! test_binop {
             fn assign_int(a: BigIntStr, b: BigIntStr) -> TestResult {
                 let (mut ar, ag) = a.parse();
                 let (br, bg) = b.parse();
+                if !$allow_zero && br == 0 { return TestResult::discard() }
+
                 expr!(ar $assign br);
                 eq!(ar, ag $op bg)
             }
@@ -344,6 +367,8 @@ macro_rules! test_binop {
             fn assign_intref(a: BigIntStr, b: BigIntStr) -> TestResult {
                 let (mut ar, ag) = a.parse();
                 let (br, bg) = b.parse();
+                if !$allow_zero && br == 0 { return TestResult::discard() }
+
                 expr!(ar $assign &br);
                 eq!(ar, ag $op bg)
             }
