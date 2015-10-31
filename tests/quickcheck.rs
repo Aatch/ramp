@@ -240,6 +240,20 @@ fn bit(a: BigIntStr, bit: u16) {
     assert_eq!(ar.bit(bit as u32), ag.tstbit(bit as usize));
 }
 
+#[quickcheck]
+fn set_bit(a: BigIntStr, bit: u16, b: bool) {
+    let (mut ar, mut ag) = a.parse();
+
+    ar.set_bit(bit as u32, b);
+    if b {
+        ag.setbit(bit as usize);
+    } else {
+        ag.clrbit(bit as usize);
+    }
+    eq!(ar, ag);
+    assert_eq!(ar.bit(bit as u32), b);
+}
+
 // operators
 
 macro_rules! expr {
