@@ -999,9 +999,19 @@ impl Add<Int> for Int {
 
 impl AddAssign<Int> for Int {
     #[inline]
-    fn add_assign(&mut self, other: Int) {
-        let this = std::mem::replace(self, Int::zero());
-        *self = this + other;
+    fn add_assign(&mut self, mut other: Int) {
+        // Use the allocation of the larger of the two inputs.
+        // Doing the obvious and simply swapping self and other
+        // when other.size > self.size results in poor codegen.
+        if other.abs_size() > self.abs_size() {
+            // Instead we doing the addition in-place, then overwrite
+            // self with other. This results in better codegen and better
+            // memory allocation behaviour.
+            other += &*self;
+            *self = other;
+        } else {
+            *self += &other;
+        }
     }
 }
 
@@ -1208,8 +1218,14 @@ impl Sub<Int> for Int {
 impl SubAssign<Int> for Int {
     #[inline]
     fn sub_assign(&mut self, other: Int) {
-        let this = std::mem::replace(self, Int::zero());
-        *self = this - other;
+        if other.sign() == 0 {
+            return;
+        }
+        if self.sign() == 0 {
+            *self = -other;
+            return;
+        }
+        *self -= &other;
     }
 }
 
@@ -1386,18 +1402,30 @@ impl Mul<Int> for Int {
 impl<'a> MulAssign<&'a Int> for Int {
     #[inline]
     fn mul_assign(&mut self, other: &'a Int) {
-        // Temporarily extract self as a value, then overwrite it with the result
-        // of the multiplication
-        let this = std::mem::replace(self, Int::zero());
-        *self = this * other;
+        if self.sign() == 0 {
+            return;
+        }
+        if other.sign() == 0 {
+            self.size = 0;
+            return;
+        }
+        let res = &*self * other;
+        *self = res;
     }
 }
 
 impl MulAssign<Int> for Int {
     #[inline]
     fn mul_assign(&mut self, other: Int) {
-        let this = std::mem::replace(self, Int::zero());
-        *self = this * other;
+        if self.sign() == 0 {
+            return;
+        }
+        if other.sign() == 0 {
+            self.size = 0;
+            return;
+        }
+        let res = &*self * other;
+        *self = res;
     }
 }
 
@@ -1485,31 +1513,31 @@ impl Div<Int> for Int {
 impl<'a> DivAssign<&'a Int> for Int {
     #[inline]
     fn div_assign(&mut self, other: &'a Int) {
-        let this = std::mem::replace(self, Int::zero());
-        *self = this / other;
+        let res = &*self / other;
+        *self = res;
     }
 }
 
 impl DivAssign<Int> for Int {
     #[inline]
     fn div_assign(&mut self, other: Int) {
-        let this = std::mem::replace(self, Int::zero());
-        *self = this / other;
-    }
-}
-
-impl RemAssign<Limb> for Int {
-    #[inline]
-    fn rem_assign(&mut self, other: Limb) {
-        let this = std::mem::replace(self, Int::zero());
-        *self = this % other;
+        let res = &*self / other;
+        *self = res;
     }
 }
 
 impl Rem<Limb> for Int {
     type Output = Int;
 
+    #[inline]
     fn rem(mut self, other: Limb) -> Int {
+        self %= other;
+        self
+    }
+}
+
+impl RemAssign<Limb> for Int {
+    fn rem_assign(&mut self, other: Limb) {
         debug_assert!(self.well_formed());
         if other == 0 {
             ll::divide_by_zero();
@@ -1517,7 +1545,7 @@ impl Rem<Limb> for Int {
         // x % 1 == 0, 0 % n == 0
         if other == 1 || self.sign() == 0 {
             self.size = 0;
-            return self;
+            return;
         }
 
         unsafe {
@@ -1541,8 +1569,6 @@ impl Rem<Limb> for Int {
             }
 
         }
-
-        return self;
     }
 }
 
@@ -1597,15 +1623,15 @@ impl Rem<Int> for Int {
 impl RemAssign<Int> for Int {
     #[inline]
     fn rem_assign(&mut self, other: Int) {
-        let this = std::mem::replace(self, Int::zero());
-        *self = this % other;
+        let res = &*self % other;
+        *self = res;
     }
 }
 impl<'a> RemAssign<&'a Int> for Int {
     #[inline]
     fn rem_assign(&mut self, other: &'a Int) {
-        let this = std::mem::replace(self, Int::zero());
-        *self = this % other;
+        let res = &*self % other;
+        *self = res;
     }
 }
 
@@ -1629,13 +1655,11 @@ impl<'a> Neg for &'a Int {
     }
 }
 
-impl Shl<usize> for Int {
-    type Output = Int;
-
+impl ShlAssign<usize> for Int {
     #[inline]
-    fn shl(mut self, mut cnt: usize) -> Int {
+    fn shl_assign(&mut self, mut cnt: usize) {
         debug_assert!(self.well_formed());
-        if self.sign() == 0 { return self; }
+        if self.sign() == 0 { return; }
 
         if cnt >= Limb::BITS as usize {
             let extra_limbs = (cnt / Limb::BITS as usize) as u32;
@@ -1658,7 +1682,7 @@ impl Shl<usize> for Int {
 
         debug_assert!(cnt < Limb::BITS as usize);
 
-        if cnt == 0 { return self; }
+        if cnt == 0 { return; }
 
         let size = self.abs_size();
 
@@ -1669,8 +1693,6 @@ impl Shl<usize> for Int {
                 self.push(c);
             }
         }
-
-        return self;
     }
 }
 
@@ -1679,31 +1701,34 @@ impl<'a> Shl<usize> for &'a Int {
 
     #[inline]
     fn shl(self, cnt: usize) -> Int {
-        self.clone() << cnt
+        let mut new = self.clone();
+        new <<= cnt;
+        new
     }
 }
 
-impl ShlAssign<usize> for Int {
-    #[inline]
-    fn shl_assign(&mut self, other: usize) {
-        let this = std::mem::replace(self, Int::zero());
-        *self = this << other;
-    }
-}
-
-impl Shr<usize> for Int {
+impl Shl<usize> for Int {
     type Output = Int;
 
     #[inline]
-    fn shr(mut self, mut cnt: usize) -> Int {
+    fn shl(mut self, other: usize) -> Int {
+        self <<= other;
+        self
+    }
+}
+
+impl ShrAssign<usize> for Int {
+    #[inline]
+    fn shr_assign(&mut self, mut cnt: usize) {
         debug_assert!(self.well_formed());
-        if self.sign() == 0 { return self; }
+        if self.sign() == 0 { return; }
 
         if cnt >= Limb::BITS as usize {
             let removed_limbs = (cnt / Limb::BITS as usize) as u32;
             let size = self.abs_size();
             if removed_limbs as i32 >= size {
-                return Int::zero();
+                *self = Int::zero();
+                return;
             }
             debug_assert!(removed_limbs > 0);
             cnt = cnt % Limb::BITS as usize;
@@ -1723,7 +1748,7 @@ impl Shr<usize> for Int {
         }
 
         debug_assert!(cnt < Limb::BITS as usize);
-        if cnt == 0 { return self; }
+        if cnt == 0 { return; }
 
         let size = self.abs_size();
 
@@ -1732,8 +1757,6 @@ impl Shr<usize> for Int {
             ll::shr(ptr, ptr, size, cnt as u32);
             self.normalize();
         }
-
-        return self;
     }
 }
 
@@ -1742,15 +1765,19 @@ impl<'a> Shr<usize> for &'a Int {
 
     #[inline]
     fn shr(self, other: usize) -> Int {
-        self.clone() >> other
+        let mut new = self.clone();
+        new >>= other;
+        new
     }
 }
 
-impl ShrAssign<usize> for Int {
+impl Shr<usize> for Int {
+    type Output = Int;
+
     #[inline]
-    fn shr_assign(&mut self, other: usize) {
-        let this = std::mem::replace(self, Int::zero());
-        *self = this >> other;
+    fn shr(mut self, other: usize) -> Int {
+        self >>= other;
+        self
     }
 }
 
@@ -1828,8 +1855,8 @@ fn bitop_ref(this: &mut Int, other: &Int, op: BitOp) -> Result<(), ()> {
 // of it, if necessary.
 fn bitop_neg(mut a: Int, mut b: Int, op: BitOp) -> Int {
     debug_assert!(a.sign() < 0 || b.sign() < 0);
-    let mut a_sign = a.sign();
-    let mut b_sign = b.sign();
+    let a_sign = a.sign();
+    let b_sign = b.sign();
 
     if a_sign < 0 {
         a.negate_twos_complement();
@@ -1837,11 +1864,11 @@ fn bitop_neg(mut a: Int, mut b: Int, op: BitOp) -> Int {
     if b_sign < 0 {
         b.negate_twos_complement();
     }
-    if a.abs_size() < b.abs_size() {
-        // self should be the longer one
-        std::mem::swap(&mut a, &mut b);
-        std::mem::swap(&mut a_sign, &mut b_sign);
-    }
+    let (mut a, b, a_sign, b_sign) = if a.abs_size() < b.abs_size() {
+        (b, a, b_sign, a_sign)
+    } else {
+        (a, b, a_sign, b_sign)
+    };
 
     unsafe {
         let a_ptr = a.ptr.get_mut() as *mut _;
@@ -2018,15 +2045,19 @@ impl BitAnd<Int> for Int {
 impl BitAndAssign<Int> for Int {
     #[inline]
     fn bitand_assign(&mut self, other: Int) {
-        let this = std::mem::replace(self, Int::zero());
-        *self = this & other;
+        if let Err(_) = bitop_ref(self, &other, BitOp::And) {
+            let res = &*self & other;
+            *self = res;
+        }
     }
 }
 impl<'a> BitAndAssign<&'a Int> for Int {
     #[inline]
     fn bitand_assign(&mut self, other: &'a Int) {
-        let this = std::mem::replace(self, Int::zero());
-        *self = this & other;
+        if let Err(_) = bitop_ref(self, other, BitOp::And) {
+            let res = &*self & other;
+            *self = res;
+        }
     }
 }
 
@@ -2091,15 +2122,19 @@ impl BitOr<Int> for Int {
 impl BitOrAssign<Int> for Int {
     #[inline]
     fn bitor_assign(&mut self, other: Int) {
-        let this = std::mem::replace(self, Int::zero());
-        *self = this | other;
+        if let Err(_) = bitop_ref(self, &other, BitOp::Or) {
+            let res = &*self | other;
+            *self = res;
+        }
     }
 }
 impl<'a> BitOrAssign<&'a Int> for Int {
     #[inline]
     fn bitor_assign(&mut self, other: &'a Int) {
-        let this = std::mem::replace(self, Int::zero());
-        *self = this | other;
+        if let Err(_) = bitop_ref(self, &other, BitOp::Or) {
+            let res = &*self | other;
+            *self = res;
+        }
     }
 }
 
@@ -2164,15 +2199,19 @@ impl BitXor<Int> for Int {
 impl BitXorAssign<Int> for Int {
     #[inline]
     fn bitxor_assign(&mut self, other: Int) {
-        let this = std::mem::replace(self, Int::zero());
-        *self = this ^ other;
+        if let Err(_) = bitop_ref(self, &other, BitOp::Xor) {
+            let res = &*self ^ other;
+            *self = res;
+        }
     }
 }
 impl<'a> BitXorAssign<&'a Int> for Int {
     #[inline]
     fn bitxor_assign(&mut self, other: &'a Int) {
-        let this = std::mem::replace(self, Int::zero());
-        *self = this ^ other;
+        if let Err(_) = bitop_ref(self, &other, BitOp::Xor) {
+            let res = &*self ^ other;
+            *self = res;
+        }
     }
 }
 
@@ -2291,8 +2330,8 @@ macro_rules! impl_arith_prim (
         impl RemAssign<$t> for Int {
             #[inline]
             fn rem_assign(&mut self, other: $t) {
-                let this = std::mem::replace(self, Int::zero());
-                *self = this % other;
+                let res = &*self % other;
+                *self = res;
             }
         }
 
@@ -2453,8 +2492,7 @@ macro_rules! impl_arith_prim (
         impl RemAssign<$t> for Int {
             #[inline]
             fn rem_assign(&mut self, other: $t) {
-                let this = std::mem::replace(self, Int::zero());
-                *self = this % other;
+                *self %= Limb(other as BaseInt);
             }
         }
 
