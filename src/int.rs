@@ -475,6 +475,64 @@ impl Int {
     }
 
     /**
+     * Compute the sqrt of this number, returning its floor, S,  and the
+     * remainder, R, as Some((S, R)), or None if this number is negative.
+     *
+     * The numbers S, R are both positive and satisfy `self = S * S +
+     * R`.
+     */
+    pub fn sqrt_rem(mut self) -> Option<(Int, Int)> {
+        debug_assert!(self.well_formed());
+
+        if self.sign() < 0 {
+            return None
+        }
+
+        // the floor of a (correctly rounded) f64 sqrt gives the right
+        // answer, until this number (it is 67108865**2 - 1, but
+        // f64::sqrt is rounded *up* to 67108865 precisely).
+        if self < 4_503_599_761_588_224_usize {
+            let this = u64::from(&self);
+            let sqrt = (this as f64).sqrt().floor() as u64;
+            let rem = this - sqrt * sqrt;
+
+            // reuse the memory
+            self.size = 0;
+            self.push(Limb(sqrt as BaseInt));
+            self.normalize();
+
+            Some((self,
+                  Int::from(rem)))
+        } else {
+            let n = self.bit_length();
+            let l = (n as usize - 1) / 4;
+            assert!(l > 0);
+
+            let mask = (Int::from(1) << l) - 1;
+            let low = &self & &mask;
+            self >>= l;
+            let mut middle = &self & mask;
+            self >>= l;
+            let (high_sqrt, mut high_rem) = self.sqrt_rem().unwrap();
+
+            high_rem <<= l;
+            middle |= high_rem;
+            let (q, u) = middle.divmod(&(&high_sqrt << 1));
+
+            let mut s = (high_sqrt << l) + &q;
+            let mut r = (u << l) + low - q.dsquare();
+
+            if r < 0 {
+                r += &s << 1;
+                r -= 1;
+                s -= 1;
+            }
+            debug_assert!(r >= 0);
+            Some((s, r))
+        }
+    }
+
+    /**
      * Negates `self` in-place
      */
     pub fn negate(&mut self) {
@@ -3546,6 +3604,39 @@ mod test {
 
             let val = &l % &r;
             assert_mp_eq!(val, a);
+        }
+    }
+
+    #[test]
+    fn sqrt_rem() {
+        let cases = [
+            ("0", "0", "0"),
+            ("1", "1", "0"),
+            ("2", "1", "1"),
+            ("3", "1", "2"),
+            ("4", "2", "0"),
+            ("1000", "31", "39"),
+            ("15241578753238836750495351562536198787501905199875019052100",
+             "123456789012345678901234567890", "0"),
+            ("15241578753238836750495351562536198787501905199875019052099",
+             "123456789012345678901234567889", "246913578024691357802469135778"),
+            ("15241578753238836750495351562536198787501905199875019052101",
+             "123456789012345678901234567890", "1"),
+                ];
+
+        for &(x, sqrt, rem) in &cases {
+            let x : Int = x.parse().unwrap();
+            let sqrt : Int = sqrt.parse().unwrap();
+            let rem : Int = rem.parse().unwrap();
+
+            if x != 0 {
+                assert!((-&x).sqrt_rem().is_none());
+            }
+
+            let (s, r) = x.sqrt_rem().unwrap();
+            assert_mp_eq!(s, sqrt);
+            assert_mp_eq!(r, rem);
+
         }
     }
 

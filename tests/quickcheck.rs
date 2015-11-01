@@ -193,6 +193,21 @@ fn dsquare(a: BigIntStr) -> TestResult {
 }
 
 #[quickcheck]
+fn sqrt_rem(a: BigIntStr) -> TestResult {
+    let (ar, ag) = a.parse();
+    if ar < 0 {
+        return TestResult::discard();
+    }
+
+    let (s_r, rem_r) = ar.sqrt_rem().unwrap();
+    let s_g = ag.sqrt();
+    let rem_g = ag - &s_g * &s_g;
+
+    eq!(s_r, s_g);
+    eq!(rem_r, rem_g)
+}
+
+#[quickcheck]
 fn negate(a: BigIntStr) -> TestResult {
     let (mut ar, ag) = a.parse();
     ar.negate();
