@@ -19,12 +19,16 @@
  * Primarily aimed at improving the efficiency when using temporary variables
  * like so:
  *
+ * ```ignore
  *     t = &a * &b
+ * ```
  *
  * Will allocate a new Int for the result and destroy the value already in `t`.
  * Instead, these traits allow you to write:
  *
+ * ```ignore
  *    t.add_into(&a, &b)
+ * ```
  *
  * Which will attempt to re-use the allocation in `t`.
  */

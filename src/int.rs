@@ -812,6 +812,230 @@ impl hash::Hash for Int {
     }
 }
 
+unsafe fn add_raw(dst: *mut Int, l: *const Int, r: *const Int) {
+    // l is zero, if dst != r, copy r to dst
+    if (*l).sign() == 0 {
+        if (dst as *const _) != r {
+            (*dst).clone_from(&*r);
+        }
+        return;
+    }
+
+    if (*r).sign() == 0 {
+        if (dst as *const _) != l {
+            (*dst).clone_from(&*l);
+        }
+        return;
+    }
+
+    let (l, r) = if (*l).abs_size() >= (*r).abs_size() {
+        (l, r)
+    } else {
+        (r, l)
+    };
+
+    (*dst).ensure_capacity((*l).abs_size() as u32);
+
+    if (*l).sign() == (*r).sign() {
+        let sign = (*l).sign();
+
+        let xp = (*l).ptr.get();
+        let xs = (*l).abs_size();
+
+        let yp = (*r).ptr.get();
+        let ys = (*r).abs_size();
+
+        let r = (*dst).ptr.get_mut() as *mut Limb;
+
+        let carry = ll::add(r, xp, xs, yp, ys);
+        (*dst).size = xs * sign;
+
+        if carry != 0 {
+            (*dst).push(carry);
+        }
+
+        (*dst).normalize();
+    } else {
+        let (xp, xs, yp, ys) = if (*l).abs_size() == (*r).abs_size() {
+            match (*l).abs_cmp(&*r) {
+                Ordering::Equal => {
+                    (*dst).size = 0;
+                    return;
+                }
+                Ordering::Greater =>
+                    ((*l).ptr.get(), (*l).size, (*r).ptr.get(), (*r).size),
+                Ordering::Less =>
+                    ((*r).ptr.get(), (*r).size, (*l).ptr.get(), (*l).size)
+            }
+        } else {
+            ((*l).ptr.get(), (*l).size, (*r).ptr.get(), (*r).size)
+        };
+
+        let r = (*dst).ptr.get_mut() as *mut Limb;
+
+        let _borrow = ll::sub(r, xp, xs.abs(), yp, ys.abs());
+        debug_assert!(_borrow == 0);
+
+        (*dst).size = xs;
+        (*dst).normalize();
+
+        debug_assert!((*dst).abs_size() > 0);
+    }
+}
+
+unsafe fn sub_raw(dst: *mut Int, l: *const Int, r: *const Int) {
+    if (*r).sign() == 0 {
+        if (dst as *const _) != l {
+            (*dst).clone_from(&*l);
+        }
+        return;
+    }
+
+    if (*l).sign() == 0 {
+        if (dst as *const _) != r {
+            (*dst).clone_from(&*r);
+        }
+        (*dst).size *= -1;
+        return;
+    }
+
+    if (*l).sign() == (*r).sign() {
+        let (l, r, flip) = match (*l).abs_cmp(&*r) {
+            Ordering::Equal => {
+                // x - x, set dst to zero
+                (*dst).size = 0;
+                return;
+            }
+            Ordering::Less => (r, l, true),
+            Ordering::Greater => (l, r, false)
+        };
+
+        (*dst).ensure_capacity((*l).abs_size() as u32);
+
+        let xp = (*l).ptr.get();
+        let xs = (*l).size;
+
+        let yp = (*r).ptr.get();
+        let ys = (*r).size;
+
+        let r = (*dst).ptr.get_mut() as *mut Limb;
+
+        let _borrow = ll::sub(r, xp, xs.abs(), yp, ys.abs());
+        debug_assert!(_borrow == 0);
+        (*dst).size = if flip {
+            xs * -1
+        } else {
+            xs
+        };
+
+        (*dst).normalize();
+    } else {
+        let flip = (*l).sign() == -1;
+
+        let (l, r) = if (*l).abs_size() >= (*r).abs_size() {
+            (l, r)
+        } else {
+            (r, l)
+        };
+
+        (*dst).ensure_capacity((*l).abs_size() as u32);
+
+        let xp = (*l).ptr.get();
+        let xs = (*l).abs_size();
+
+        let yp = (*r).ptr.get();
+        let ys = (*r).abs_size();
+
+        let r = (*dst).ptr.get_mut() as *mut Limb;
+
+        let carry = ll::add(r, xp, xs, yp, ys);
+        (*dst).size = xs;
+        if carry != 0 {
+            (*dst).push(carry);
+        }
+        (*dst).normalize();
+
+        if flip {
+            (*dst).size *= -1;
+        }
+    }
+}
+
+unsafe fn mul_raw(dst: *mut Int, l: *const Int, r: *const Int) {
+    if (*l).sign() == 0 || (*r).sign() == 0 {
+        (*dst).size = 0;
+        return;
+    }
+
+    let (l, r) = if (*l).abs_size() >= (*r).abs_size() {
+        (l, r)
+    } else {
+        (r, l)
+    };
+
+    let out_sign = (*l).sign() * (*r).sign();
+
+    if (*r).abs_size() == 1 {
+        (*dst).ensure_capacity((*l).abs_size() as u32);
+        let r = (*r).to_single_limb();
+
+        if r == 1 {
+            if (dst as *const _) != l {
+                (*dst).clone_from(&*l);
+            }
+            (*dst).size = (*dst).abs_size() * out_sign;
+            return;
+        }
+
+        (*dst).size = (*l).abs_size() * out_sign;
+
+        let xp = (*l).ptr.get();
+        let xs = (*l).abs_size();
+
+        let res = (*dst).ptr.get_mut() as *mut Limb;
+
+        let carry = ll::mul_1(res, xp, xs, r);
+        if carry != 0 {
+            (*dst).push(carry);
+        }
+        (*dst).normalize();
+        return;
+    }
+
+    let out_size = (*l).abs_size() + (*r).abs_size();
+
+
+    let xp = (*l).ptr.get() as *const Limb;
+    let xs = (*l).abs_size();
+
+    let yp = (*r).ptr.get() as *const Limb;
+    let ys = (*r).abs_size();
+
+    if (dst as *const _) == l || (dst as *const _) == r {
+        let mut tmp = Int::zero();
+
+        tmp.ensure_capacity(out_size as u32);
+        tmp.size = out_size * out_sign;
+
+        let r = tmp.ptr.get_mut() as *mut Limb;
+        ll::mul(r, xp, xs, yp, ys);
+
+        tmp.normalize();
+
+        *dst = tmp;
+    } else {
+        (*dst).ensure_capacity(out_size as u32);
+        (*dst).size = out_size * out_sign;
+
+        let r = (*dst).ptr.get_mut();
+        ll::mul(r, xp, xs, yp, ys);
+
+        (*dst).normalize();
+    }
+
+    debug_assert!((*dst).well_formed());
+}
+
 impl AddAssign<Limb> for Int {
     fn add_assign(&mut self, other: Limb) {
         debug_assert!(self.well_formed());
@@ -870,86 +1094,12 @@ impl<'a> AddAssign<&'a Int> for Int {
         debug_assert!(self.well_formed());
         debug_assert!(other.well_formed());
 
-        if self.sign() == 0 {
-            // Try to reuse the allocation from `self`
-            self.clone_from(other);
-            return;
-        }
-        if other.sign() == 0 {
-            return;
-        }
+        unsafe {
+            let dst = self as *mut Int;
+            let l = self as *const Int;
+            let r = other as *const Int;
 
-
-        if self.sign() == other.sign() {
-            // Signs are the same, add the two numbers together and re-apply
-            // the sign after.
-            let sign = self.sign();
-
-            unsafe {
-                // There's a restriction that x-size >= y-size, we can swap the operands
-                // no problem, but we'd like to re-use `self`s memory if possible, so
-                // if `self` is the smaller of the two we make sure it has enough space
-                // for the result
-                let (xp, xs, yp, ys): (*const Limb, _, *const Limb, _) = if self.abs_size() >= other.abs_size() {
-                    (self.ptr.get(), self.abs_size(), other.ptr.get(), other.abs_size())
-                } else {
-                    self.ensure_capacity(other.abs_size() as u32);
-                    (other.ptr.get(), other.abs_size(), self.ptr.get(), self.abs_size())
-                };
-
-                // Fetch the pointer first to make completely sure the compiler
-                // won't make bogus claims about nonaliasing due to the &mut
-                let ptr = self.ptr.get_mut() as *mut Limb;
-
-                let carry = ll::add(ptr,
-                                    xp, xs,
-                                    yp, ys);
-                self.size = xs * sign;
-                self.normalize();
-
-                if carry != 0 {
-                    self.push(carry);
-                }
-            }
-        } else {
-            // Signs are different, use the sign from the bigger (absolute value)
-            // of the two numbers and subtract the smaller one.
-
-            unsafe {
-                let (xp, xs, yp, ys): (*const Limb, _, *const Limb, _) = if self.abs_size() > other.abs_size() {
-                    (self.ptr.get(), self.size, other.ptr.get(), other.size)
-                } else if self.abs_size() < other.abs_size() {
-                    self.ensure_capacity(other.abs_size() as u32);
-                    (other.ptr.get(), other.size, self.ptr.get(), self.size)
-                } else {
-                    match self.abs_cmp(other) {
-                        Ordering::Equal => {
-                            // They're equal, but opposite signs, so the result
-                            // will be zero, clear `self` and return
-                            self.size = 0;
-                            return;
-                        }
-                        Ordering::Greater =>
-                            (self.ptr.get(), self.size, other.ptr.get(), other.size),
-                        Ordering::Less =>
-                            (other.ptr.get(), other.size, self.ptr.get(), self.size)
-                    }
-                };
-
-                // Fetch the pointer first to make completely sure the compiler
-                // won't make bogus claims about nonaliasing due to the &mut
-                let ptr = self.ptr.get_mut() as *mut Limb;
-
-                let _borrow = ll::sub(ptr,
-                                      xp, xs.abs(),
-                                      yp, ys.abs());
-                // There shouldn't be any borrow
-                debug_assert!(_borrow == 0);
-
-                self.size = xs;
-                self.normalize();
-                debug_assert!(self.abs_size() > 0);
-            }
+            add_raw(dst, l, r);
         }
     }
 }
@@ -1020,19 +1170,12 @@ impl<'a, 'b> Add<&'a Int> for &'b Int {
 
     #[inline]
     fn add(self, other: &'a Int) -> Int {
-        if self.sign() == 0 {
-            return other.clone();
+        let mut result = Int::zero();
+        unsafe {
+            let dst = &mut result as *mut Int;
+            add_raw(dst, self, other);
         }
-        if other.sign() == 0 {
-            return self.clone();
-        }
-
-        // Clone the bigger of the two
-        if self.abs_size() >= other.abs_size() {
-            self.clone().add(other)
-        } else {
-            other.clone().add(self)
-        }
+        result
     }
 }
 
@@ -1097,77 +1240,11 @@ impl<'a> SubAssign<&'a Int> for Int {
         debug_assert!(self.well_formed());
         debug_assert!(other.well_formed());
 
-        // LHS is zero, set self to the negation of the RHS
-        if self.sign() == 0 {
-            self.clone_from(other);
-            self.size *= -1;
-            return;
-        }
-        // RHS is zero, do nothing
-        if other.sign() == 0 {
-            return;
-        }
-
-        if self.sign() == other.sign() {
-            unsafe {
-                // Signs are the same, subtract the smaller one from
-                // the bigger one and adjust the sign as appropriate
-                let (xp, xs, yp, ys, flip): (*const Limb, _, *const Limb, _, _) = match self.abs_cmp(other) {
-                    Ordering::Equal => {
-                        // x - x, just return zero
-                        self.size = 0;
-                        return;
-                    }
-                    Ordering::Less => {
-                        self.ensure_capacity(other.abs_size() as u32);
-                        (other.ptr.get(), other.size, self.ptr.get(), self.size, true)
-                    }
-                    Ordering::Greater =>
-                        (self.ptr.get(), self.size, other.ptr.get(), other.size, false)
-                };
-
-                // Fetch the pointer first to make completely sure the compiler
-                // won't make bogus claims about nonaliasing due to the &mut
-                let ptr = self.ptr.get_mut() as *mut Limb;
-
-                let _borrow = ll::sub(ptr, xp, xs.abs(), yp, ys.abs());
-                debug_assert!(_borrow == 0);
-                self.size = if flip {
-                    xs * -1
-                } else {
-                    xs
-                };
-            }
-
-            self.normalize();
-        } else { // Different signs
-            if self.sign() == -1 {
-                // self is negative, use addition and negation
-                self.size *= -1;
-                *self += other;
-                self.size *= -1;
-            } else {
-                unsafe {
-                    // Other is negative, handle as addition
-                    let (xp, xs, yp, ys): (*const Limb, _, *const Limb, _) = if self.abs_size() >= other.abs_size() {
-                        (self.ptr.get(), self.abs_size(), other.ptr.get(), other.abs_size())
-                    } else {
-                        self.ensure_capacity(other.abs_size() as u32);
-                        (other.ptr.get(), other.abs_size(), self.ptr.get(), self.abs_size())
-                    };
-
-                    // Fetch the pointer first to make completely sure the compiler
-                    // won't make bogus claims about nonaliasing due to the &mut
-                    let ptr = self.ptr.get_mut() as *mut Limb;
-
-                    let carry = ll::add(ptr, xp, xs, yp, ys);
-                    self.size = xs;
-                    self.normalize();
-                    if carry != 0 {
-                        self.push(carry);
-                    }
-                }
-            }
+        unsafe {
+            let dst = self as *mut Int;
+            let l = self as *const Int;
+            let r = other as *const Int;
+            sub_raw(dst, l, r);
         }
     }
 }
@@ -1187,15 +1264,15 @@ impl<'a> Sub<Int> for &'a Int {
 
     #[inline]
     fn sub(self, mut other: Int) -> Int {
-        if self.sign() == 0 {
-            return -other;
-        }
-        if other.sign() == 0 {
-            other.clone_from(self);
-            return other;
+        unsafe {
+            let dst = &mut other as *mut Int;
+            let l = self;
+            let r = &other as *const Int;
+
+            sub_raw(dst, l, r);
         }
 
-        -(other.sub(self))
+        other
     }
 }
 
@@ -1241,7 +1318,12 @@ impl<'a, 'b> Sub<&'a Int> for &'b Int {
             return self.clone();
         }
 
-        self.clone().sub(other)
+        let mut result = Int::zero();
+        unsafe {
+            let dst = &mut result;
+            sub_raw(dst, self, other);
+        }
+        result
     }
 }
 
@@ -1290,47 +1372,15 @@ impl<'a, 'b> Mul<&'a Int> for &'b Int {
         // we need to allocate space for the return. Special cases
         // where this isn't necessary are handled in the other impls
 
-        // 0 * x = 0
-        if self.sign() == 0 || other.sign() == 0 {
-            return Int::zero();
-        }
-
-        let out_sign = self.sign() * other.sign();
-
-        if self.abs_size() == 1 {
-            unsafe {
-                let mut ret = other.clone() * *self.ptr.get();
-                let size = ret.abs_size();
-                ret.size = size * out_sign;
-                return ret;
-            }
-        }
-        if other.abs_size() == 1 {
-            unsafe {
-                let mut ret = self.clone() * *other.ptr.get();
-                let size = ret.abs_size();
-                ret.size = size * out_sign;
-                return ret;
-            }
-        }
-
-        let out_size = self.abs_size() + other.abs_size();
-
-        let mut out = Int::with_capacity(out_size as u32);
-        out.size = out_size * out_sign;
-
+        let mut out = Int::zero();
         unsafe {
-            let (xp, xs, yp, ys) = if self.abs_size() >= other.abs_size() {
-                (self.ptr.get(), self.abs_size(), other.ptr.get(), other.abs_size())
-            } else {
-                (other.ptr.get(), other.abs_size(), self.ptr.get(), self.abs_size())
-            };
-            ll::mul(out.ptr.get_mut(), xp, xs, yp, ys);
-
-            // Top limb may be zero
-            out.normalize();
-            return out;
+            let dst = &mut out as *mut Int;
+            let l = self;
+            let r = other;
+            mul_raw(dst, l, r);
         }
+
+        out
     }
 }
 
@@ -1339,23 +1389,15 @@ impl<'a> Mul<&'a Int> for Int {
 
     #[inline]
     fn mul(mut self, other: &'a Int) -> Int {
-        // `other` is zero
-        if other.sign() == 0 {
-            self.size = 0;
-            return self;
+        unsafe {
+            let dst = &mut self as *mut Int;
+            let l = &self as *const Int;
+            let r = other as *const Int;
+
+            mul_raw(dst, l, r);
         }
 
-        // `other` is a single limb, reuse the allocation of self
-        if other.abs_size() == 1 {
-            unsafe {
-                let mut out = self * *other.ptr.get();
-                out.size *= other.sign();
-                return out;
-            }
-        }
-
-        // Forward to the by-reference impl
-        (&self) * other
+        self
     }
 }
 
@@ -1372,60 +1414,50 @@ impl<'a> Mul<Int> for &'a Int {
 impl Mul<Int> for Int {
     type Output = Int;
 
-    fn mul(mut self, other: Int) -> Int {
-        if self.sign() == 0 || other.sign() == 0 {
-            self.size = 0;
-            return self;
+    fn mul(self, other: Int) -> Int {
+
+        // Use the larger of the two as the destination
+        let (mut l, r) = if self.abs_size() >= other.abs_size() {
+            (self, other)
+        } else {
+            (other, self)
+        };
+
+        unsafe {
+            let dst = &mut l as *mut Int;
+            let l = &l as *const Int;
+            let r = &r as *const Int;
+
+            mul_raw(dst, l, r);
         }
 
-        // One of them is a single limb big, so we can re-use the
-        // allocation of the other
-        if self.abs_size() == 1 {
-            let val = unsafe { *self.ptr.get() };
-            let mut out = other * val;
-            out.size *= self.sign();
-            return out;
-        }
-        if other.abs_size() == 1 {
-            let val = unsafe { *other.ptr.get() };
-            let mut out = self * val;
-            out.size *= other.sign();
-            return out;
-        }
-
-        // Still need to allocate for the result, just forward to
-        // the by-reference impl
-        (&self) * (&other)
+        l
     }
 }
 
 impl<'a> MulAssign<&'a Int> for Int {
     #[inline]
     fn mul_assign(&mut self, other: &'a Int) {
-        if self.sign() == 0 {
-            return;
+        unsafe {
+            let dst = self as *mut Int;
+            let l = self as *const Int;
+            let r = other as *const Int;
+
+            mul_raw(dst, l, r);
         }
-        if other.sign() == 0 {
-            self.size = 0;
-            return;
-        }
-        let res = &*self * other;
-        *self = res;
     }
 }
 
 impl MulAssign<Int> for Int {
     #[inline]
     fn mul_assign(&mut self, other: Int) {
-        if self.sign() == 0 {
-            return;
+        unsafe {
+            let dst = self as *mut Int;
+            let l = self as *const Int;
+            let r = &other as *const Int;
+
+            mul_raw(dst, l, r);
         }
-        if other.sign() == 0 {
-            self.size = 0;
-            return;
-        }
-        let res = &*self * other;
-        *self = res;
     }
 }
 
@@ -3422,9 +3454,9 @@ mod test {
             let r : Int = r.parse().unwrap();
             let a : Int = a.parse().unwrap();
 
-            assert_mp_eq!(&l - &r, a.clone());
-            assert_mp_eq!(&l - r.clone(), a.clone());
-            assert_mp_eq!(l.clone() - &r, a.clone());
+            assert_mp_eq!(&l - &r, a);
+            assert_mp_eq!(&l - r.clone(), a);
+            assert_mp_eq!(l.clone() - &r, a);
             assert_mp_eq!(l - r, a);
         }
     }
@@ -3441,6 +3473,8 @@ mod test {
             ("8", "-9", "-72"),
             ("1234567891011", "9876543210123", "12193263121400563935904353"),
             ("-1234567891011", "9876543210123", "-12193263121400563935904353"),
+            ("691236393930044307188336", "-118740205731250700287",
+             "-82077551624181313819831485969288447998252432"),
         ];
 
         for &(l, r, a) in cases.iter() {
@@ -3448,6 +3482,8 @@ mod test {
             let r : Int = r.parse().unwrap();
             let a : Int = a.parse().unwrap();
 
+            // Test both ref-ref and value-value
+            assert_mp_eq!(&l * &r, a);
             assert_mp_eq!(l * r, a);
         }
     }
