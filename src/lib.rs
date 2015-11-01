@@ -29,6 +29,7 @@ extern crate hamming;
 
 pub mod ll;
 mod mem;
+pub mod traits;
 
 pub mod int;
 
@@ -36,3 +37,4 @@ pub mod int;
 
 pub use int::Int;
 pub use int::RandomInt;
+pub use traits::*;
