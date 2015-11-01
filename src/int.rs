@@ -575,6 +575,59 @@ impl Int {
         }
     }
 
+    /**
+     * Set the `bit`th bit of this number to `bit_val`, treating
+     * negative numbers as if they're stored in two's complement.
+     */
+    pub fn set_bit(&mut self, bit: u32, bit_val: bool) {
+        debug_assert!(self.well_formed());
+        let word = bit / Limb::BITS as u32;
+        let subbit = bit % Limb::BITS as u32;
+        let flag = Limb(1 << subbit);
+
+        let sign = self.sign();
+
+        unsafe {
+
+            if word >= self.abs_size() as u32 {
+                // the bit is beyond the end, so more space is needed,
+                // and we need to be careful to ensure it's all zero
+                // because they'll all be part of the number itself
+                // used once the bit is set
+                self.ensure_capacity(word + 1);
+
+                let size = self.abs_size();
+                let end_ptr = (self.ptr.get_mut() as *mut _).offset(size as isize);
+                ll::zero(end_ptr, word as i32 - size + 1);
+
+                self.size = word as i32 + 1;
+                if sign < 0 {
+                    self.size = -self.size
+                }
+            }
+
+            if sign < 0 {
+                // this could probably be replaced by something
+                // similar to what `bit` does
+                self.negate_twos_complement();
+            }
+
+            let ptr = (self.ptr.get_mut() as *mut _).offset(word as isize);
+            let val = if bit_val {
+                *ptr | flag
+            } else {
+                *ptr & !flag
+            };
+            *ptr = val;
+
+            if sign < 0 {
+                // put self back to normal
+                self.negate_twos_complement();
+            }
+        }
+        self.normalize()
+    }
+
     fn ensure_capacity(&mut self, cap: u32) {
         if cap > self.cap {
             let old_cap = self.cap as usize;
