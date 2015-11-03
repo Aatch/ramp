@@ -359,10 +359,16 @@ impl Int {
      * Divide self by other, returning the quotient, Q, and remainder, R as (Q, R).
      *
      * With N = self, D = other, Q and R satisfy: `N = QD + R`.
+     *
+     * This will panic if `other` is zero.
      */
     pub fn divmod(&self, other: &Int) -> (Int, Int) {
         debug_assert!(self.well_formed());
         debug_assert!(other.well_formed());
+        if other.sign() == 0 {
+            ll::divide_by_zero();
+        }
+
         let out_size = if self.abs_size() < other.abs_size() {
             1
         } else {
@@ -3590,6 +3596,13 @@ mod test {
             let val = &l / &r;
             assert_mp_eq!(val, a);
         }
+    }
+
+    #[test]
+    #[should_panic(expected = "divide by zero")]
+    #[cfg(debug_assertions)] // only a panic in this mode
+    fn divmod_zero() {
+        Int::from(1).divmod(&Int::zero());
     }
 
     #[test]
