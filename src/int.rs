@@ -967,6 +967,7 @@ impl AddAssign<Limb> for Int {
                     // There was a borrow, ignore it but flip the sign on self
                     self.size = self.abs_size();
                 }
+                self.normalize();
             }
         }
     }
@@ -3824,6 +3825,13 @@ mod test {
 
         assert_mp_eq!(&x + (-1i32), "99".parse().unwrap());
         assert_mp_eq!(&x - (-1i32), "101".parse().unwrap());
+
+        assert_mp_eq!(&x - 100usize, Int::zero());
+        assert_mp_eq!(-&x + 100usize, Int::zero());
+        assert_mp_eq!(&x - 100i32, Int::zero());
+        assert_mp_eq!(&x + (-100i32), Int::zero());
+        assert_mp_eq!(-&x + 100i32, Int::zero());
+        assert_mp_eq!(-&x - (-100i32), Int::zero());
 
         assert_mp_eq!(&x * 2usize, "200".parse().unwrap());
 
