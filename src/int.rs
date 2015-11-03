@@ -1189,8 +1189,10 @@ impl SubAssign<Limb> for Int {
                 let carry = ll::sub_1(ptr, ptr, size, other);
                 self.normalize();
                 if carry != 0 {
-                    // There was a carry, ignore it but flip the sign on self
-                    self.size = -self.abs_size();
+                    // There was a carry, and the native operations
+                    // work with two's complement, so we need to get
+                    // everything back into sign-magnitude form
+                    self.negate_twos_complement()
                 }
             }
         }
@@ -3825,6 +3827,8 @@ mod test {
 
         assert_mp_eq!(&x + (-1i32), "99".parse().unwrap());
         assert_mp_eq!(&x - (-1i32), "101".parse().unwrap());
+        assert_mp_eq!(&x + (-101i32), "-1".parse().unwrap());
+        assert_mp_eq!(&x - 101i32, "-1".parse().unwrap());
 
         assert_mp_eq!(&x - 100usize, Int::zero());
         assert_mp_eq!(-&x + 100usize, Int::zero());
