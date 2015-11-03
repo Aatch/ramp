@@ -583,6 +583,63 @@ macro_rules! test_cmpop {
                     assert_eq!(ar.$method(&b),
                                ag.$method(&bg));
                 }
+                #[quickcheck]
+                fn int_u64(a: BigIntStr, b: u64) {
+                    let (ar, ag) = a.parse();
+                    let bg = Mpz::from(b);
+
+                    assert_eq!(ar.$method(&b),
+                               ag.$method(&bg));
+                }
+                #[quickcheck]
+                fn int_i64(a: BigIntStr, b: i64) {
+                    let (ar, ag) = a.parse();
+                    let bg = Mpz::from(b);
+
+                    assert_eq!(ar.$method(&b),
+                               ag.$method(&bg));
+                }
+
+                #[quickcheck]
+                fn limb_int(a: BaseInt, b: BigIntStr) {
+                    let ag = Mpz::from(a);
+                    let (br, bg) = b.parse();
+
+                    assert_eq!(Limb(a).$method(&br),
+                               ag.$method(&bg));
+                }
+                #[quickcheck]
+                fn i32_int(a: i32, b: BigIntStr) {
+                    let ag = Mpz::from(a);
+                    let (br, bg) = b.parse();
+
+                    assert_eq!(a.$method(&br),
+                               ag.$method(&bg));
+                }
+                #[quickcheck]
+                fn usize_int(a: usize, b: BigIntStr) {
+                    let ag = Mpz::from(a as u64);
+                    let (br, bg) = b.parse();
+
+                    assert_eq!(a.$method(&br),
+                               ag.$method(&bg));
+                }
+                #[quickcheck]
+                fn u64_int(a: u64, b: BigIntStr) {
+                    let ag = Mpz::from(a);
+                    let (br, bg) = b.parse();
+
+                    assert_eq!(a.$method(&br),
+                               ag.$method(&bg));
+                }
+                #[quickcheck]
+                fn i64_int(a: i64, b: BigIntStr) {
+                    let ag = Mpz::from(a);
+                    let (br, bg) = b.parse();
+
+                    assert_eq!(a.$method(&br),
+                               ag.$method(&bg));
+                }
             })*
         }
     }

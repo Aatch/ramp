@@ -359,10 +359,16 @@ impl Int {
      * Divide self by other, returning the quotient, Q, and remainder, R as (Q, R).
      *
      * With N = self, D = other, Q and R satisfy: `N = QD + R`.
+     *
+     * This will panic if `other` is zero.
      */
     pub fn divmod(&self, other: &Int) -> (Int, Int) {
         debug_assert!(self.well_formed());
         debug_assert!(other.well_formed());
+        if other.sign() == 0 {
+            ll::divide_by_zero();
+        }
+
         let out_size = if self.abs_size() < other.abs_size() {
             1
         } else {
@@ -491,7 +497,7 @@ impl Int {
         // the floor of a (correctly rounded) f64 sqrt gives the right
         // answer, until this number (it is 67108865**2 - 1, but
         // f64::sqrt is rounded *up* to 67108865 precisely).
-        if self < 4_503_599_761_588_224_usize {
+        if self < 4_503_599_761_588_224_u64 {
             let this = u64::from(&self);
             let sqrt = (this as f64).sqrt().floor() as u64;
             let rem = this - sqrt * sqrt;
@@ -961,6 +967,7 @@ impl AddAssign<Limb> for Int {
                     // There was a borrow, ignore it but flip the sign on self
                     self.size = self.abs_size();
                 }
+                self.normalize();
             }
         }
     }
@@ -1016,11 +1023,10 @@ impl<'a> AddAssign<&'a Int> for Int {
                                     xp, xs,
                                     yp, ys);
                 self.size = xs * sign;
-                self.normalize();
-
                 if carry != 0 {
                     self.push(carry);
                 }
+                self.normalize();
             }
         } else {
             // Signs are different, use the sign from the bigger (absolute value)
@@ -1183,8 +1189,10 @@ impl SubAssign<Limb> for Int {
                 let carry = ll::sub_1(ptr, ptr, size, other);
                 self.normalize();
                 if carry != 0 {
-                    // There was a carry, ignore it but flip the sign on self
-                    self.size = -self.abs_size();
+                    // There was a carry, and the native operations
+                    // work with two's complement, so we need to get
+                    // everything back into sign-magnitude form
+                    self.negate_twos_complement()
                 }
             }
         }
@@ -1273,10 +1281,10 @@ impl<'a> SubAssign<&'a Int> for Int {
 
                     let carry = ll::add(ptr, xp, xs, yp, ys);
                     self.size = xs;
-                    self.normalize();
                     if carry != 0 {
                         self.push(carry);
                     }
+                    self.normalize();
                 }
             }
         }
@@ -3033,6 +3041,126 @@ impl PartialOrd<Int> for usize {
     }
 }
 
+
+const MAX_LIMB: u64 = !0 >> (64 - Limb::BITS);
+
+// do a sign-magnitude comparison
+fn eq_64(x: &Int, mag: u64, neg: bool) -> bool {
+    let sign = if mag == 0 { 0 } else if neg { -1 } else { 1 };
+    if x.sign() != sign {
+        return false
+    } else if mag == 0 {
+        // we're guaranteed to have x == 0 since the signs match
+        return true
+    }
+
+
+    let abs_size = x.abs_size();
+    debug_assert!(abs_size >= 1);
+    let ptr = unsafe {x.ptr.get() as *const Limb};
+    let lo_limb = unsafe {*ptr};
+
+    if mag < MAX_LIMB {
+        abs_size == 1 && lo_limb.0 == mag as BaseInt
+    } else {
+        // we can only get here when Limbs are small, and the Int
+        // is large
+        assert_eq!(Limb::BITS, 32);
+
+        if abs_size == 2 {
+            let hi_limb = unsafe {*ptr.offset(1)};
+            hi_limb.0 == (mag >> 32) as BaseInt
+                && lo_limb.0 == mag as BaseInt
+        } else {
+            false
+        }
+    }
+}
+
+fn cmp_64(x: &Int, mag: u64, neg: bool) -> Ordering {
+    if mag == 0 {
+        return x.sign().cmp(&0)
+    }
+
+    let size = x.size;
+    if (size < 0) != neg || size == 0 {
+        // they have different signs
+        return size.cmp(&if neg {-1} else {1})
+    }
+    let ptr = unsafe {x.ptr.get() as *const Limb};
+    let lo_limb = unsafe {*ptr};
+
+    let mag_ord = if mag < MAX_LIMB {
+        (size.abs(), lo_limb.0).cmp(&(1, mag as BaseInt))
+    } else {
+        assert_eq!(Limb::BITS, 32);
+        debug_assert!(size.abs() >= 1);
+        let hi_limb = if size.abs() == 1 {
+            Limb(0)
+        } else {
+            unsafe {*ptr.offset(1)}
+        };
+
+        (size.abs(), hi_limb.0, lo_limb.0)
+            .cmp(&(2, (mag >> 32) as BaseInt, mag as BaseInt))
+    };
+    if size < 0 && neg {
+        // both negative, so the magnitude orderings need to be
+        // flipped
+        mag_ord.reverse()
+    } else {
+        mag_ord
+    }
+}
+
+impl PartialEq<u64> for Int {
+    fn eq(&self, &other: &u64) -> bool {
+        eq_64(self, other, false)
+    }
+}
+
+impl PartialEq<Int> for u64 {
+    fn eq(&self, other: &Int) -> bool {
+        eq_64(other, *self, false)
+    }
+}
+
+impl PartialOrd<u64> for Int {
+    fn partial_cmp(&self, &other: &u64) -> Option<Ordering> {
+        Some(cmp_64(self, other, false))
+    }
+}
+
+impl PartialOrd<Int> for u64 {
+    fn partial_cmp(&self, other: &Int) -> Option<Ordering> {
+        Some(cmp_64(other, *self, false).reverse())
+    }
+}
+
+impl PartialEq<i64> for Int {
+    fn eq(&self, &other: &i64) -> bool {
+        eq_64(self, other.abs() as u64, other < 0)
+    }
+}
+
+impl PartialEq<Int> for i64 {
+    fn eq(&self, other: &Int) -> bool {
+        eq_64(other, self.abs() as u64, *self < 0)
+    }
+}
+
+impl PartialOrd<i64> for Int {
+    fn partial_cmp(&self, &other: &i64) -> Option<Ordering> {
+        Some(cmp_64(self, other.abs() as u64, other < 0))
+    }
+}
+
+impl PartialOrd<Int> for i64 {
+    fn partial_cmp(&self, other: &Int) -> Option<Ordering> {
+        Some(cmp_64(other, self.abs() as u64, *self < 0).reverse())
+    }
+}
+
 macro_rules! impl_from_prim (
     (signed $($t:ty),*) => {
         $(impl ::std::convert::From<$t> for Int {
@@ -3499,6 +3627,9 @@ mod test {
             ("100000000", "-1", "99999999"),
             ("-100", "-100", "-200"),
             ("-192834857324591531", "-431343873217510631841", "-431536708074835223372"),
+            // (2**64 - 1) * 2**64 + 2**64 == 2**128
+            ("340282366920938463444927863358058659840", "18446744073709551616",
+             "340282366920938463463374607431768211456"),
         ];
 
         for &(l, r, a) in cases.iter() {
@@ -3525,7 +3656,10 @@ mod test {
             ("-100", "-100", "0"),
             ("-100", "100", "-200"),
             ("237", "236", "1"),
-            ("-192834857324591531", "-431343873217510631841", "431151038360186040310")
+            ("-192834857324591531", "-431343873217510631841", "431151038360186040310"),
+            // (2**64 - 1) * 2**64 - -2**64 == 2**128
+            ("340282366920938463444927863358058659840", "-18446744073709551616",
+             "340282366920938463463374607431768211456"),
         ];
 
         for &(l, r, a) in cases.iter() {
@@ -3585,6 +3719,13 @@ mod test {
             let val = &l / &r;
             assert_mp_eq!(val, a);
         }
+    }
+
+    #[test]
+    #[should_panic(expected = "divide by zero")]
+    #[cfg(debug_assertions)] // only a panic in this mode
+    fn divmod_zero() {
+        Int::from(1).divmod(&Int::zero());
     }
 
     #[test]
@@ -3806,6 +3947,15 @@ mod test {
 
         assert_mp_eq!(&x + (-1i32), "99".parse().unwrap());
         assert_mp_eq!(&x - (-1i32), "101".parse().unwrap());
+        assert_mp_eq!(&x + (-101i32), "-1".parse().unwrap());
+        assert_mp_eq!(&x - 101i32, "-1".parse().unwrap());
+
+        assert_mp_eq!(&x - 100usize, Int::zero());
+        assert_mp_eq!(-&x + 100usize, Int::zero());
+        assert_mp_eq!(&x - 100i32, Int::zero());
+        assert_mp_eq!(&x + (-100i32), Int::zero());
+        assert_mp_eq!(-&x + 100i32, Int::zero());
+        assert_mp_eq!(-&x - (-100i32), Int::zero());
 
         assert_mp_eq!(&x * 2usize, "200".parse().unwrap());
 
