@@ -583,6 +583,22 @@ macro_rules! test_cmpop {
                     assert_eq!(ar.$method(&b),
                                ag.$method(&bg));
                 }
+                #[quickcheck]
+                fn int_u64(a: BigIntStr, b: u64) {
+                    let (ar, ag) = a.parse();
+                    let bg = Mpz::from(b);
+
+                    assert_eq!(ar.$method(&b),
+                               ag.$method(&bg));
+                }
+                #[quickcheck]
+                fn int_i64(a: BigIntStr, b: i64) {
+                    let (ar, ag) = a.parse();
+                    let bg = Mpz::from(b);
+
+                    assert_eq!(ar.$method(&b),
+                               ag.$method(&bg));
+                }
             })*
         }
     }

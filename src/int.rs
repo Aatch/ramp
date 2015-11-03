@@ -497,7 +497,7 @@ impl Int {
         // the floor of a (correctly rounded) f64 sqrt gives the right
         // answer, until this number (it is 67108865**2 - 1, but
         // f64::sqrt is rounded *up* to 67108865 precisely).
-        if self < 4_503_599_761_588_224_usize {
+        if self < 4_503_599_761_588_224_u64 {
             let this = u64::from(&self);
             let sqrt = (this as f64).sqrt().floor() as u64;
             let rem = this - sqrt * sqrt;
@@ -3038,6 +3038,126 @@ impl PartialOrd<Int> for usize {
     #[inline]
     fn partial_cmp(&self, other: &Int) -> Option<Ordering> {
         Limb(*self as BaseInt).partial_cmp(other)
+    }
+}
+
+
+const MAX_LIMB: u64 = !0 >> (64 - Limb::BITS);
+
+// do a sign-magnitude comparison
+fn eq_64(x: &Int, mag: u64, neg: bool) -> bool {
+    let sign = if mag == 0 { 0 } else if neg { -1 } else { 1 };
+    if x.sign() != sign {
+        return false
+    } else if mag == 0 {
+        // we're guaranteed to have x == 0 since the signs match
+        return true
+    }
+
+
+    let abs_size = x.abs_size();
+    debug_assert!(abs_size >= 1);
+    let ptr = unsafe {x.ptr.get() as *const Limb};
+    let lo_limb = unsafe {*ptr};
+
+    if mag < MAX_LIMB {
+        abs_size == 1 && lo_limb.0 == mag as BaseInt
+    } else {
+        // we can only get here when Limbs are small, and the Int
+        // is large
+        assert_eq!(Limb::BITS, 32);
+
+        if abs_size == 2 {
+            let hi_limb = unsafe {*ptr.offset(1)};
+            hi_limb.0 == (mag >> 32) as BaseInt
+                && lo_limb.0 == mag as BaseInt
+        } else {
+            false
+        }
+    }
+}
+
+fn cmp_64(x: &Int, mag: u64, neg: bool) -> Ordering {
+    if mag == 0 {
+        return x.sign().cmp(&0)
+    }
+
+    let size = x.size;
+    if (size < 0) != neg || size == 0 {
+        // they have different signs
+        return size.cmp(&if neg {-1} else {1})
+    }
+    let ptr = unsafe {x.ptr.get() as *const Limb};
+    let lo_limb = unsafe {*ptr};
+
+    let mag_ord = if mag < MAX_LIMB {
+        (size.abs(), lo_limb.0).cmp(&(1, mag as BaseInt))
+    } else {
+        assert_eq!(Limb::BITS, 32);
+        debug_assert!(size.abs() >= 1);
+        let hi_limb = if size.abs() == 1 {
+            Limb(0)
+        } else {
+            unsafe {*ptr.offset(1)}
+        };
+
+        (size.abs(), hi_limb.0, lo_limb.0)
+            .cmp(&(2, (mag >> 32) as BaseInt, mag as BaseInt))
+    };
+    if size < 0 && neg {
+        // both negative, so the magnitude orderings need to be
+        // flipped
+        mag_ord.reverse()
+    } else {
+        mag_ord
+    }
+}
+
+impl PartialEq<u64> for Int {
+    fn eq(&self, &other: &u64) -> bool {
+        eq_64(self, other, false)
+    }
+}
+
+impl PartialEq<Int> for u64 {
+    fn eq(&self, other: &Int) -> bool {
+        eq_64(other, *self, false)
+    }
+}
+
+impl PartialOrd<u64> for Int {
+    fn partial_cmp(&self, &other: &u64) -> Option<Ordering> {
+        Some(cmp_64(self, other, false))
+    }
+}
+
+impl PartialOrd<Int> for u64 {
+    fn partial_cmp(&self, other: &Int) -> Option<Ordering> {
+        Some(cmp_64(other, *self, false).reverse())
+    }
+}
+
+impl PartialEq<i64> for Int {
+    fn eq(&self, &other: &i64) -> bool {
+        eq_64(self, other.abs() as u64, other < 0)
+    }
+}
+
+impl PartialEq<Int> for i64 {
+    fn eq(&self, other: &Int) -> bool {
+        eq_64(other, self.abs() as u64, *self < 0)
+    }
+}
+
+impl PartialOrd<i64> for Int {
+    fn partial_cmp(&self, &other: &i64) -> Option<Ordering> {
+        Some(cmp_64(self, other.abs() as u64, other < 0))
+    }
+}
+
+impl PartialOrd<Int> for i64 {
+    fn partial_cmp(&self, other: &Int) -> Option<Ordering> {
+        Some(cmp_64(other, self.abs() as u64, *self < 0).reverse())
     }
 }
 
