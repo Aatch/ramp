@@ -1855,14 +1855,15 @@ impl ShrAssign<usize> for Int {
             unsafe {
                 let ptr = self.limbs_mut();
                 let shift = ptr.offset(removed_limbs as isize);
+                let new_size = size - removed_limbs as i32;
 
                 // Shift down a whole number of limbs
-                ll::copy_incr(shift.as_const(), ptr, size);
+                ll::copy_incr(shift.as_const(), ptr, new_size);
                 // Zero out the high limbs
-                ll::zero(ptr.offset((size - (removed_limbs as i32)) as isize),
+                ll::zero(ptr.offset(new_size as isize),
                          removed_limbs as i32);
 
-                self.size -= (removed_limbs as i32) * self.sign();
+                self.size = new_size * self.sign();
             }
         }
 
