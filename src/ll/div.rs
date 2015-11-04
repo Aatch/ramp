@@ -41,6 +41,9 @@ pub unsafe fn divrem_1(mut qp: LimbsMut, qxn: i32,
     let mut n = xs + qxn;
     if n == 0 { return Limb(0); }
 
+    // FIXME (#49): this is used for bounds checks below, which may be
+    // unnecessary.
+    let qp_lo = qp;
     qp = qp.offset((n - 1) as isize);
 
     let mut r = Limb(0);
@@ -49,7 +52,9 @@ pub unsafe fn divrem_1(mut qp: LimbsMut, qxn: i32,
             r = *xp.offset((xs - 1) as isize);
             let q = if r >= d { Limb(1) } else { Limb(0) };
             *qp = q;
-            qp = qp.offset(-1);
+            if qp > qp_lo {
+                qp = qp.offset(-1);
+            }
             r = r - (d & -q);
             xs -= 1;
         }
@@ -61,7 +66,9 @@ pub unsafe fn divrem_1(mut qp: LimbsMut, qxn: i32,
             let (q, rem) = limb::div_preinv(r, n0, d, dinv);
             r = rem;
             *qp = q;
-            qp = qp.offset(-1);
+            if qp > qp_lo {
+                qp = qp.offset(-1);
+            }
             i -= 1;
         }
         let mut i = qxn - 1;
@@ -69,7 +76,9 @@ pub unsafe fn divrem_1(mut qp: LimbsMut, qxn: i32,
             let (q, rem) = limb::div_preinv(r, Limb(0), d, dinv);
             r = rem;
             *qp = q;
-            qp = qp.offset(-1);
+            if qp > qp_lo {
+                qp = qp.offset(-1);
+            }
             i -= 1;
         }
 
@@ -80,7 +89,9 @@ pub unsafe fn divrem_1(mut qp: LimbsMut, qxn: i32,
             if n1 < d {
                 r = n1;
                 *qp = Limb(0);
-                qp = qp.offset(-1);
+                if qp > qp_lo {
+                    qp = qp.offset(-1);
+                }
                 n -= 1;
                 if n == 0 {
                     return r;
@@ -114,7 +125,9 @@ pub unsafe fn divrem_1(mut qp: LimbsMut, qxn: i32,
             let (q, rem) = limb::div_preinv(r, n1 << cnt, d, dinv);
             r = rem;
             *qp = q;
-            qp = qp.offset(-1);
+            if qp > qp_lo {
+                qp = qp.offset(-1);
+            }
         }
 
         let mut i = qxn - 1;
@@ -123,7 +136,9 @@ pub unsafe fn divrem_1(mut qp: LimbsMut, qxn: i32,
             r = rem;
             *qp = q;
 
-            qp = qp.offset(-1);
+            if qp > qp_lo {
+                qp = qp.offset(-1);
+            }
             i -= 1;
         }
 
