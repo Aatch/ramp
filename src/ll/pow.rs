@@ -16,6 +16,8 @@ use ll;
 use ll::limb::Limb;
 use mem;
 
+use ll::limb_ptr::{Limbs, LimbsMut};
+
 /**
  * Takes `{ap, an}` to the power of `exp` and stores the result to `wp`. `wp` is
  * assumed to have enough space to store the result (which can be calculated using
@@ -25,7 +27,7 @@ use mem;
  * `{ap, an}` must not be zero.
  * `exp` must be greater than 2
  */
-pub unsafe fn pow(mut wp: *mut Limb, mut ap: *const Limb, mut an: i32, mut exp: u32) {
+pub unsafe fn pow(mut wp: LimbsMut, mut ap: Limbs, mut an: i32, mut exp: u32) {
     debug_assert!(exp > 2);
     debug_assert!(!ll::is_zero(ap, an));
 
@@ -70,12 +72,12 @@ pub unsafe fn pow(mut wp: *mut Limb, mut ap: *const Limb, mut an: i32, mut exp: 
     loop {
         if (exp & 1) == 1 {
             if wn > bn {
-                ll::mul(scratch, wp, wn, bp, bn);
+                ll::mul(scratch, wp.as_const(), wn, bp.as_const(), bn);
             } else {
-                ll::mul(scratch, bp, bn, wp, wn);
+                ll::mul(scratch, bp.as_const(), bn, wp.as_const(), wn);
             }
-            wn = ll::normalize(scratch, wn + bn);
-            ll::copy_incr(scratch, wp, wn);
+            wn = ll::normalize(scratch.as_const(), wn + bn);
+            ll::copy_incr(scratch.as_const(), wp, wn);
         }
 
         exp >>= 1;
@@ -86,15 +88,15 @@ pub unsafe fn pow(mut wp: *mut Limb, mut ap: *const Limb, mut an: i32, mut exp: 
             break;
         }
 
-        ll::sqr(scratch, bp, bn);
-        bn = ll::normalize(scratch, bn + bn);
+        ll::sqr(scratch, bp.as_const(), bn);
+        bn = ll::normalize(scratch.as_const(), bn + bn);
 
-        ll::copy_incr(scratch, bp, bn);
+        ll::copy_incr(scratch.as_const(), bp, bn);
 
     }
 
     if shift > 0 {
-        let v = ll::shl(wp, wp, wn, shift);
+        let v = ll::shl(wp, wp.as_const(), wn, shift);
         if v > 0 {
             *wp.offset(wn as isize) = v;
         }
@@ -103,7 +105,7 @@ pub unsafe fn pow(mut wp: *mut Limb, mut ap: *const Limb, mut an: i32, mut exp: 
 
 /// Calculates the number of limbs required to store the result of taking
 /// `{xp, xn}` to the power of `exp`
-pub unsafe fn num_pow_limbs(xp: *const Limb, xn: i32, exp: u32) -> i32 {
+pub unsafe fn num_pow_limbs(xp: Limbs, xn: i32, exp: u32) -> i32 {
     // This is a better approximation of log_b(x^e) than simply using the
     // the number of digits, n.
     // Instead it uses the most significant digit, a, to calculate

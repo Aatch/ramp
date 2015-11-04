@@ -21,10 +21,12 @@ use ll::limb::Limb;
 use super::{overlap, same_or_separate, same_or_incr};
 use mem;
 
+use ll::limb_ptr::{Limbs, LimbsMut};
+
 const TOOM22_THRESHOLD : i32 = 20;
 
 #[allow(dead_code)]
-unsafe fn mul_1_generic(mut wp: *mut Limb, mut xp: *const Limb, mut n: i32, vl: Limb) -> Limb {
+unsafe fn mul_1_generic(mut wp: LimbsMut, mut xp: Limbs, mut n: i32, vl: Limb) -> Limb {
     let mut cl = Limb(0);
     loop {
         let xl = *xp;
@@ -52,7 +54,7 @@ unsafe fn mul_1_generic(mut wp: *mut Limb, mut xp: *const Limb, mut n: i32, vl: 
  */
 #[cfg(not(asm))]
 #[inline]
-pub unsafe fn mul_1(wp: *mut Limb, xp: *const Limb, n: i32, vl: Limb) -> Limb {
+pub unsafe fn mul_1(wp: LimbsMut, xp: Limbs, n: i32, vl: Limb) -> Limb {
     debug_assert!(n > 0);
     debug_assert!(same_or_incr(wp, n, xp, n));
 
@@ -67,18 +69,18 @@ pub unsafe fn mul_1(wp: *mut Limb, xp: *const Limb, n: i32, vl: Limb) -> Limb {
  */
 #[cfg(asm)]
 #[inline]
-pub unsafe fn mul_1(wp: *mut Limb, xp: *const Limb, n: i32, vl: Limb) -> Limb {
+pub unsafe fn mul_1(mut wp: LimbsMut, xp: Limbs, n: i32, vl: Limb) -> Limb {
     debug_assert!(n > 0);
     debug_assert!(same_or_incr(wp, n, xp, n));
     extern "C" {
         fn ramp_mul_1(wp: *mut Limb, xp: *const Limb, n: i32, vl: Limb) -> Limb;
     }
 
-    ramp_mul_1(wp, xp, n, vl)
+    ramp_mul_1(&mut *wp, &*xp, n, vl)
 }
 
 #[allow(dead_code)]
-unsafe fn addmul_1_generic(mut wp: *mut Limb, mut xp: *const Limb, mut n: i32, vl: Limb) -> Limb {
+unsafe fn addmul_1_generic(mut wp: LimbsMut, mut xp: Limbs, mut n: i32, vl: Limb) -> Limb {
     debug_assert!(n > 0);
     debug_assert!(same_or_separate(wp, n, xp, n));
 
@@ -110,7 +112,7 @@ unsafe fn addmul_1_generic(mut wp: *mut Limb, mut xp: *const Limb, mut n: i32, v
  */
 #[cfg(not(asm))]
 #[inline]
-pub unsafe fn addmul_1(wp: *mut Limb, xp: *const Limb, n: i32, vl: Limb) -> Limb {
+pub unsafe fn addmul_1(wp: LimbsMut, xp: Limbs, n: i32, vl: Limb) -> Limb {
     addmul_1_generic(wp, xp, n, vl)
 }
 
@@ -120,16 +122,16 @@ pub unsafe fn addmul_1(wp: *mut Limb, xp: *const Limb, n: i32, vl: Limb) -> Limb
  */
 #[cfg(asm)]
 #[inline]
-pub unsafe fn addmul_1(wp: *mut Limb, xp: *const Limb, n: i32, vl: Limb) -> Limb {
+pub unsafe fn addmul_1(mut wp: LimbsMut, xp:  Limbs, n: i32, vl: Limb) -> Limb {
     extern "C" {
         fn ramp_addmul_1(wp: *mut Limb, xp: *const Limb, n: i32, vl: Limb) -> Limb;
     }
 
-    ramp_addmul_1(wp, xp, n, vl)
+    ramp_addmul_1(&mut *wp, &*xp, n, vl)
 }
 
 #[allow(dead_code)]
-unsafe fn submul_1_generic(mut wp: *mut Limb, mut xp: *const Limb, mut n: i32, vl: Limb) -> Limb {
+unsafe fn submul_1_generic(mut wp: LimbsMut, mut xp: Limbs, mut n: i32, vl: Limb) -> Limb {
     debug_assert!(n > 0);
     debug_assert!(same_or_separate(wp, n, xp, n));
 
@@ -161,7 +163,7 @@ unsafe fn submul_1_generic(mut wp: *mut Limb, mut xp: *const Limb, mut n: i32, v
  */
 #[cfg(not(asm))]
 #[inline]
-pub unsafe fn submul_1(wp: *mut Limb, xp: *const Limb, n: i32, vl: Limb) -> Limb {
+pub unsafe fn submul_1(wp: LimbsMut, xp: Limbs, n: i32, vl: Limb) -> Limb {
     submul_1_generic(wp, xp, n, vl)
 }
 
@@ -171,12 +173,12 @@ pub unsafe fn submul_1(wp: *mut Limb, xp: *const Limb, n: i32, vl: Limb) -> Limb
  */
 #[cfg(asm)]
 #[inline]
-pub unsafe fn submul_1(wp: *mut Limb, xp: *const Limb, n: i32, vl: Limb) -> Limb {
+pub unsafe fn submul_1(mut wp: LimbsMut, xp: Limbs, n: i32, vl: Limb) -> Limb {
     extern "C" {
         fn ramp_submul_1(wp: *mut Limb, xp: *const Limb, n: i32, vl: Limb) -> Limb;
     }
 
-    ramp_submul_1(wp, xp, n, vl)
+    ramp_submul_1(&mut *wp, &*xp, n, vl)
 }
 
 /**
@@ -184,7 +186,7 @@ pub unsafe fn submul_1(wp: *mut Limb, xp: *const Limb, n: i32, vl: Limb) -> Limb
  *
  * `{wp, xs + ys}` must be disjoint from both inputs.
  */
-pub unsafe fn mul(wp: *mut Limb, xp: *const Limb, xs: i32, yp: *const Limb, ys: i32) {
+pub unsafe fn mul(wp: LimbsMut, xp: Limbs, xs: i32, yp: Limbs, ys: i32) {
     debug_assert!(xs >= ys);
     debug_assert!(ys > 0);
     debug_assert!(!overlap(wp, xs + ys, xp, xs));
@@ -207,7 +209,7 @@ pub unsafe fn mul(wp: *mut Limb, xp: *const Limb, xs: i32, yp: *const Limb, ys: 
     }
 }
 
-unsafe fn mul_basecase(mut wp: *mut Limb, xp: *const Limb, xs: i32, mut yp: *const Limb, mut ys: i32) {
+unsafe fn mul_basecase(mut wp: LimbsMut, xp: Limbs, xs: i32, mut yp: Limbs, mut ys: i32) {
 
     *wp.offset(xs as isize) = ll::mul_1(wp, xp, xs, *yp);
     wp = wp.offset(1);
@@ -225,10 +227,10 @@ unsafe fn mul_basecase(mut wp: *mut Limb, xp: *const Limb, xs: i32, mut yp: *con
 
 // Helper fn
 #[inline(always)]
-unsafe fn mul_rec(wp: *mut Limb,
-           xp: *const Limb, xs: i32,
-           yp: *const Limb, ys: i32,
-           scratch: *mut Limb) {
+unsafe fn mul_rec(wp: LimbsMut,
+           xp: Limbs, xs: i32,
+           yp: Limbs, ys: i32,
+           scratch: LimbsMut) {
     if ys < TOOM22_THRESHOLD {
         mul_basecase(wp, xp, xs, yp, ys);
     } else if (xs * 2) >= (ys*3) {
@@ -238,10 +240,10 @@ unsafe fn mul_rec(wp: *mut Limb,
     }
 }
 
-unsafe fn mul_toom22(wp: *mut Limb,
-                     xp: *const Limb, xs: i32,
-                     yp: *const Limb, ys: i32,
-                     scratch: *mut Limb) {
+unsafe fn mul_toom22(wp: LimbsMut,
+                     xp: Limbs, xs: i32,
+                     yp: Limbs, ys: i32,
+                     scratch: LimbsMut) {
     // Split x into x1, x0 where x = x1*(B^n) + x0
     // Split y into y1, y0 where y = y1*(B^n) + y0
     //
@@ -326,7 +328,7 @@ unsafe fn mul_toom22(wp: *mut Limb,
     let scratch_out = scratch.offset((nl * 2) as isize);
 
     // Calculate z1 - 2*nl limbs
-    mul_rec(z1, zx1, nl, zy1, nl, scratch_out);
+    mul_rec(z1, zx1.as_const(), nl, zy1.as_const(), nl, scratch_out);
 
     // Calculate z0 - 2*nl limbs
     mul_rec(z0, x0, nl, y0, nl, scratch_out);
@@ -357,29 +359,29 @@ unsafe fn mul_toom22(wp: *mut Limb,
 
     // LOW(z2) = HIGH(z0) + LOW(z2)
     let cy = ll::add_n(wp.offset((2*nl) as isize),
-                       z2, z0.offset(nl as isize),
+                       z2.as_const(), z0.offset(nl as isize).as_const(),
                        nl);
 
     // LOW(z0) + LOW(z2)
     let cy2 = cy + ll::add_n(wp.offset(nl as isize),
-                             z0, z2,
+                             z0.as_const(), z2.as_const(),
                              nl);
 
     // LOW(z2) + HIGH(z2)
     let mut cy = cy + ll::add(wp.offset((2*nl) as isize),
-                              z2, nl,
-                              z2.offset(nl as isize), yh+xh-nl);
+                              z2.as_const(), nl,
+                              z2.offset(nl as isize).as_const(), yh+xh-nl);
 
     // Add or subtract `z1` depending on the sign of the real result
     // (we calculate such that it's always positive, easier this way)
     if z1_neg {
         cy = cy + ll::add_n(wp.offset(nl as isize),
-                       wp.offset(nl as isize), z1,
-                       2*nl);
+                            wp.offset(nl as isize).as_const(), z1.as_const(),
+                            2*nl);
     } else {
         cy = cy - ll::sub_n(wp.offset(nl as isize),
-                       wp.offset(nl as isize), z1,
-                       2*nl);
+                            wp.offset(nl as isize).as_const(), z1.as_const(),
+                            2*nl);
     }
 
     // Apply the carries, has to be done last.
@@ -393,10 +395,10 @@ unsafe fn mul_toom22(wp: *mut Limb,
  * Works basically the same way `mul_1` does, except with `ys` limbs
  * instead of a single limb.
  */
-unsafe fn mul_unbalanced(mut wp: *mut Limb,
-                         mut xp: *const Limb, mut xs: i32,
-                         yp: *const Limb, ys: i32,
-                         scratch: *mut Limb) {
+unsafe fn mul_unbalanced(mut wp: LimbsMut,
+                         mut xp: Limbs, mut xs: i32,
+                         yp: Limbs, ys: i32,
+                         scratch: LimbsMut) {
     debug_assert!(xs  > ys);
 
     mul_toom22(wp, xp, ys, yp, ys, scratch);
@@ -416,8 +418,8 @@ unsafe fn mul_unbalanced(mut wp: *mut Limb,
         mul_toom22(w_tmp, xp, ys, yp, ys, scratch);
         xs -= ys;
         xp = xp.offset(ys as isize);
-        let cy = ll::add_n(wp, wp, w_tmp, ys);
-        ll::copy_incr(w_tmp.offset(ys as isize),
+        let cy = ll::add_n(wp, wp.as_const(), w_tmp.as_const(), ys);
+        ll::copy_incr(w_tmp.offset(ys as isize).as_const(),
                       wp.offset(ys as isize),
                       ys);
         ll::incr(wp.offset(ys as isize), cy);
@@ -431,8 +433,8 @@ unsafe fn mul_unbalanced(mut wp: *mut Limb,
         mul_rec(w_tmp, yp, ys, xp, xs, scratch);
     }
 
-    let cy = ll::add_n(wp, wp, w_tmp, ys);
-    ll::copy_incr(w_tmp.offset(ys as isize),
+    let cy = ll::add_n(wp, wp.as_const(), w_tmp.as_const(), ys);
+    ll::copy_incr(w_tmp.offset(ys as isize).as_const(),
                   wp.offset(ys as isize),
                   xs);
     ll::incr(wp.offset(ys as isize), cy);
@@ -445,7 +447,7 @@ unsafe fn mul_unbalanced(mut wp: *mut Limb,
  *
  * `{wp, xs*2}` must not overlap with `{xp, xs}`
  */
-pub unsafe fn sqr(wp: *mut Limb, xp: *const Limb, xs: i32) {
+pub unsafe fn sqr(wp: LimbsMut, xp: Limbs, xs: i32) {
     debug_assert!(xs > 0);
     debug_assert!(!overlap(wp, 2*xs, xp, xs));
 
@@ -460,7 +462,7 @@ pub unsafe fn sqr(wp: *mut Limb, xp: *const Limb, xs: i32) {
 }
 
 #[inline(always)]
-unsafe fn sqr_rec(wp: *mut Limb, xp: *const Limb, xs: i32, scratch: *mut Limb) {
+unsafe fn sqr_rec(wp: LimbsMut, xp: Limbs, xs: i32, scratch: LimbsMut) {
     if xs < TOOM22_THRESHOLD {
         mul_basecase(wp, xp, xs, xp, xs);
     } else {
@@ -468,7 +470,7 @@ unsafe fn sqr_rec(wp: *mut Limb, xp: *const Limb, xs: i32, scratch: *mut Limb) {
     }
 }
 
-unsafe fn sqr_toom2(wp: *mut Limb, xp: *const Limb, xs: i32, scratch: *mut Limb) {
+unsafe fn sqr_toom2(wp: LimbsMut, xp: Limbs, xs: i32, scratch: LimbsMut) {
     // This is very similar to regular mul_toom22, however it is slightly more efficient
     // as it can take advantage of the coefficents being the same.
     //
@@ -500,11 +502,11 @@ unsafe fn sqr_toom2(wp: *mut Limb, xp: *const Limb, xs: i32, scratch: *mut Limb)
     sqr_rec(z2, x1, xh, scratch_out);
 
     // Calculate 2*z1
-    let mut cy = ll::add_n(z1, z1, z1, xs);
+    let mut cy = ll::add_n(z1, z1.as_const(), z1.as_const(), xs);
 
     // wp now contains the result of (B^2n)*z2 + z0
 
-    cy = cy + ll::add_n(wp.offset(xl as isize), wp.offset(xl as isize), z1, xs);
+    cy = cy + ll::add_n(wp.offset(xl as isize), wp.offset(xl as isize).as_const(), z1.as_const(), xs);
 
     ll::incr(wp.offset((xl + xs) as isize), cy);
 }

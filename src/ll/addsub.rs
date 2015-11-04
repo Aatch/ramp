@@ -15,10 +15,11 @@
 #![allow(improper_ctypes)]
 
 use ll::limb::Limb;
+use ll::limb_ptr::{Limbs, LimbsMut};
 use super::{copy_rest, same_or_separate};
 
 #[allow(dead_code)]
-unsafe fn add_n_generic(mut wp: *mut Limb, mut xp: *const Limb, mut yp: *const Limb,
+unsafe fn add_n_generic(mut wp: LimbsMut, mut xp: Limbs, mut yp: Limbs,
                         mut n: i32) -> Limb {
 
     let mut carry = Limb(0);
@@ -51,7 +52,7 @@ unsafe fn add_n_generic(mut wp: *mut Limb, mut xp: *const Limb, mut yp: *const L
  */
 #[inline]
 #[cfg(asm)]
-pub unsafe fn add_n(wp: *mut Limb, xp: *const Limb, yp: *const Limb,
+pub unsafe fn add_n(mut wp: LimbsMut, xp: Limbs, yp: Limbs,
                     n: i32) -> Limb {
     #[cfg(target_arch="x86_64")]
     extern "C" { fn ramp_add_n(wp: *mut Limb, xp: *const Limb, yp: *const Limb,
@@ -61,7 +62,7 @@ pub unsafe fn add_n(wp: *mut Limb, xp: *const Limb, yp: *const Limb,
     debug_assert!(same_or_separate(wp, n, xp, n));
     debug_assert!(same_or_separate(wp, n, yp, n));
 
-    return ramp_add_n(wp, xp, yp, n);
+    return ramp_add_n(&mut *wp, &*xp, &*yp, n);
 }
 
 /**
@@ -70,7 +71,7 @@ pub unsafe fn add_n(wp: *mut Limb, xp: *const Limb, yp: *const Limb,
  */
 #[cfg(not(asm))]
 #[inline]
-pub unsafe fn add_n(wp: *mut Limb, xp: *const Limb, yp: *const Limb,
+pub unsafe fn add_n(wp: LimbsMut, xp: Limbs, yp: Limbs,
                     n: i32) -> Limb {
     debug_assert!(n >= 1);
     debug_assert!(same_or_separate(wp, n, xp, n));
@@ -80,7 +81,7 @@ pub unsafe fn add_n(wp: *mut Limb, xp: *const Limb, yp: *const Limb,
 }
 
 #[allow(dead_code)]
-unsafe fn sub_n_generic(mut wp: *mut Limb, mut xp: *const Limb, mut yp: *const Limb,
+unsafe fn sub_n_generic(mut wp: LimbsMut, mut xp: Limbs, mut yp: Limbs,
                         mut n: i32) -> Limb {
     let mut carry = Limb(0);
 
@@ -116,14 +117,14 @@ unsafe fn sub_n_generic(mut wp: *mut Limb, mut xp: *const Limb, mut yp: *const L
  */
 #[cfg(asm)]
 #[inline]
-pub unsafe fn sub_n(wp: *mut Limb, xp: *const Limb, yp: *const Limb,
+pub unsafe fn sub_n(mut wp: LimbsMut, xp: Limbs, yp: Limbs,
                     n: i32) -> Limb {
     extern "C" {
         fn ramp_sub_n(wp: *mut Limb, xp: *const Limb, yp: *const Limb,
                       n: i32) -> Limb;
     }
 
-    ramp_sub_n(wp, xp, yp, n)
+    ramp_sub_n(&mut *wp, &*xp, &*yp, n)
 }
 
 /**
@@ -132,7 +133,7 @@ pub unsafe fn sub_n(wp: *mut Limb, xp: *const Limb, yp: *const Limb,
  */
 #[cfg(not(asm))]
 #[inline]
-pub unsafe fn sub_n(wp: *mut Limb, xp: *const Limb, yp: *const Limb,
+pub unsafe fn sub_n(wp: LimbsMut, xp: Limbs, yp: Limbs,
                     n: i32) -> Limb {
     sub_n_generic(wp, xp, yp, n)
 }
@@ -140,9 +141,9 @@ pub unsafe fn sub_n(wp: *mut Limb, xp: *const Limb, yp: *const Limb,
 macro_rules! aors {
     ($op:ident, $lop:ident, $f:ident) => {
         #[inline]
-        pub unsafe fn $op(wp: *mut Limb,
-                          xp: *const Limb, xs: i32,
-                          yp: *const Limb, ys: i32) -> Limb {
+        pub unsafe fn $op(wp: LimbsMut,
+                          xp: Limbs, xs: i32,
+                          yp: Limbs, ys: i32) -> Limb {
 
             debug_assert!(xs >= ys);
             debug_assert!(ys >= 0);
@@ -162,7 +163,7 @@ macro_rules! aors {
                 }
             }
 
-            if wp as *const Limb != xp && i < xs {
+            if wp.as_const() != xp && i < xs {
                 copy_rest(xp, wp, xs, i);
             }
 
@@ -177,8 +178,8 @@ aors!(sub, sub_overflow, sub_n);
 macro_rules! aors_1 {
     ($op:ident, $f:ident) => {
         #[inline]
-        pub unsafe fn $op(wp: *mut Limb,
-                          xp: *const Limb, xs: i32,
+        pub unsafe fn $op(mut wp: LimbsMut,
+                          xp: Limbs, xs: i32,
                           y: Limb) -> Limb {
 
             if xs > 0 {
@@ -203,7 +204,7 @@ aors_1!(add_1, add_overflow);
 aors_1!(sub_1, sub_overflow);
 
 #[inline(always)]
-pub unsafe fn incr(mut ptr: *mut Limb, incr: Limb) {
+pub unsafe fn incr(mut ptr: LimbsMut, incr: Limb) {
     let (x, mut carry) = (*ptr).add_overflow(incr);
     *ptr = x;
 
@@ -216,7 +217,7 @@ pub unsafe fn incr(mut ptr: *mut Limb, incr: Limb) {
 }
 
 #[inline(always)]
-pub unsafe fn decr(mut ptr: *mut Limb, decr: Limb) {
+pub unsafe fn decr(mut ptr: LimbsMut, decr: Limb) {
     let x = *ptr;
     *ptr = x - decr;
 

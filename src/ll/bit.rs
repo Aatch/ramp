@@ -15,17 +15,19 @@
 use ll::limb::{Limb, BaseInt};
 use ll::{same_or_decr, same_or_incr};
 
+use ll::limb_ptr::{Limbs, LimbsMut};
+
 /**
  * Performs a bit-shift of the limbs in {xp, xs}, left by `cnt` bits storing the result in {rp,
  * rs}. The top-most shifted bits are returned.
  *
  * If `cnt` is greater than or equal to the number of bits in a limb, the result is undefined.
  */
-pub unsafe fn shl(mut rp: *mut Limb, mut xp: *const Limb, mut xs: i32, cnt: u32) -> Limb {
+pub unsafe fn shl(mut rp: LimbsMut, mut xp: Limbs, mut xs: i32, cnt: u32) -> Limb {
     debug_assert!(xs >= 1);
     debug_assert!(cnt >= 1);
     debug_assert!(cnt < Limb::BITS as u32);
-    debug_assert!(same_or_decr(rp as *const _, xs, xp, xs));
+    debug_assert!(same_or_decr(rp, xs, xp, xs));
 
     let cnt = cnt as usize;
 
@@ -61,11 +63,11 @@ pub unsafe fn shl(mut rp: *mut Limb, mut xp: *const Limb, mut xs: i32, cnt: u32)
  *
  * If `cnt` is greater than or equal to the number of bits in a limb, the result is undefined.
  */
-pub unsafe fn shr(mut rp: *mut Limb, mut xp: *const Limb, mut xs: i32, cnt: u32) -> Limb {
+pub unsafe fn shr(mut rp: LimbsMut, mut xp: Limbs, mut xs: i32, cnt: u32) -> Limb {
     debug_assert!(xs >= 1);
     debug_assert!(cnt >= 1);
     debug_assert!(cnt < Limb::BITS as u32);
-    debug_assert!(same_or_incr(rp as *const _, xs, xp, xs));
+    debug_assert!(same_or_incr(rp, xs, xp, xs));
 
     let cnt = cnt as usize;
 
@@ -96,8 +98,8 @@ pub unsafe fn shr(mut rp: *mut Limb, mut xp: *const Limb, mut xs: i32, cnt: u32)
 
 // Common function for the operations below, since they're all essentially the same
 #[inline(always)]
-unsafe fn bitop<F: Fn(Limb, Limb) -> Limb>(mut wp: *mut Limb,
-                                           mut xp: *const Limb, mut yp: *const Limb,
+unsafe fn bitop<F: Fn(Limb, Limb) -> Limb>(mut wp: LimbsMut,
+                                           mut xp: Limbs, mut yp: Limbs,
                                            n: i32, op: F) {
     debug_assert!(same_or_incr(wp, n, xp, n));
     debug_assert!(same_or_incr(wp, n, yp, n));
@@ -116,8 +118,8 @@ unsafe fn bitop<F: Fn(Limb, Limb) -> Limb>(mut wp: *mut Limb,
  * Performs a bitwise "and" (`&`) of the n least signficant limbs of `xp` and `yp`, storing the
  * result in `wp`
  */
-pub unsafe fn and_n(wp: *mut Limb,
-                    xp: *const Limb, yp: *const Limb,
+pub unsafe fn and_n(wp: LimbsMut,
+                    xp: Limbs, yp: Limbs,
                     n: i32) {
     bitop(wp, xp, yp, n, |x, y| x & y);
 }
@@ -128,8 +130,8 @@ pub unsafe fn and_n(wp: *mut Limb,
  *
  * The operation is x & !y
  */
-pub unsafe fn and_not_n(wp: *mut Limb,
-                     xp: *const Limb, yp: *const Limb,
+pub unsafe fn and_not_n(wp: LimbsMut,
+                     xp: Limbs, yp: Limbs,
                      n: i32) {
     bitop(wp, xp, yp, n, |x, y| x & !y);
 }
@@ -140,8 +142,8 @@ pub unsafe fn and_not_n(wp: *mut Limb,
  *
  * The operation is !(x & y)
  */
-pub unsafe fn nand_n(wp: *mut Limb,
-                     xp: *const Limb, yp: *const Limb,
+pub unsafe fn nand_n(wp: LimbsMut,
+                     xp: Limbs, yp: Limbs,
                      n: i32) {
     bitop(wp, xp, yp, n, |x, y| !(x & y));
 }
@@ -150,8 +152,8 @@ pub unsafe fn nand_n(wp: *mut Limb,
  * Performs a bitwise "or" (`|`) of the n least signficant limbs of `xp` and `yp`, storing the
  * result in `wp`
  */
-pub unsafe fn or_n(wp: *mut Limb,
-                    xp: *const Limb, yp: *const Limb,
+pub unsafe fn or_n(wp: LimbsMut,
+                    xp: Limbs, yp: Limbs,
                     n: i32) {
     bitop(wp, xp, yp, n, |x, y| x | y);
 }
@@ -160,8 +162,8 @@ pub unsafe fn or_n(wp: *mut Limb,
  * Performs a bitwise "or" of the n least signficant limbs of `xp` and `yp`, with the limbs of `yp`
  * being first inverted. The result is stored in `wp`.
  */
-pub unsafe fn or_not_n(wp: *mut Limb,
-                    xp: *const Limb, yp: *const Limb,
+pub unsafe fn or_not_n(wp: LimbsMut,
+                    xp: Limbs, yp: Limbs,
                     n: i32) {
     bitop(wp, xp, yp, n, |x, y| x | !y);
 }
@@ -172,8 +174,8 @@ pub unsafe fn or_not_n(wp: *mut Limb,
  *
  * The operation is !(x | y)
  */
-pub unsafe fn nor_n(wp: *mut Limb,
-                    xp: *const Limb, yp: *const Limb,
+pub unsafe fn nor_n(wp: LimbsMut,
+                    xp: Limbs, yp: Limbs,
                     n: i32) {
     bitop(wp, xp, yp, n, |x, y| !(x | y));
 }
@@ -182,8 +184,8 @@ pub unsafe fn nor_n(wp: *mut Limb,
  * Performs a bitwise "xor" (`^`) of the n least signficant limbs of `xp` and `yp`, storing the
  * result in `wp`
  */
-pub unsafe fn xor_n(wp: *mut Limb,
-                    xp: *const Limb, yp: *const Limb,
+pub unsafe fn xor_n(wp: LimbsMut,
+                    xp: Limbs, yp: Limbs,
                     n: i32) {
     bitop(wp, xp, yp, n, |x, y| x ^ y);
 }
@@ -192,7 +194,7 @@ pub unsafe fn xor_n(wp: *mut Limb,
  * Performs a bitwise inversion ("not") of the n least signficant limbs of `xp`, storing the
  * result in `wp`
  */
-pub unsafe fn not(mut wp: *mut Limb, mut xp: *const Limb, n: i32) {
+pub unsafe fn not(mut wp: LimbsMut, mut xp: Limbs, n: i32) {
     debug_assert!(same_or_incr(wp, n, xp, n));
 
     let mut i = 0;
@@ -209,7 +211,7 @@ pub unsafe fn not(mut wp: *mut Limb, mut xp: *const Limb, n: i32) {
  * of `xp`. The result is stored the result in `wp`, and a carry is
  * returned, if there is one.
  */
-pub unsafe fn twos_complement(mut wp: *mut Limb, mut xp: *mut Limb, xs: i32) -> Limb {
+pub unsafe fn twos_complement(mut wp: LimbsMut, mut xp: Limbs, xs: i32) -> Limb {
     let mut i = 0;
     let mut carry = Limb(1);
 
@@ -229,7 +231,7 @@ pub unsafe fn twos_complement(mut wp: *mut Limb, mut xp: *mut Limb, xs: i32) -> 
  * Scans for the first 1 bit starting from the least-significant bit the the most, returning
  * the bit index.
  */
-pub unsafe fn scan_1(mut xp: *const Limb, mut xs: i32) -> u32 {
+pub unsafe fn scan_1(mut xp: Limbs, mut xs: i32) -> u32 {
     debug_assert!(xs > 0);
     let mut cnt = 0u32;
 
@@ -248,7 +250,7 @@ pub unsafe fn scan_1(mut xp: *const Limb, mut xs: i32) -> u32 {
  * Scans for the first 0 bit starting from the least-significant bit the the most, returning
  * the bit index.
  */
-pub unsafe fn scan_0(mut xp: *const Limb, mut xs: i32) -> u32 {
+pub unsafe fn scan_0(mut xp: Limbs, mut xs: i32) -> u32 {
     debug_assert!(xs > 0);
     let mut cnt = 0u32;
 
