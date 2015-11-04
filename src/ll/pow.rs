@@ -48,7 +48,21 @@ pub unsafe fn pow(mut wp: LimbsMut, mut ap: Limbs, mut an: i32, mut exp: u32) {
     let trailing = (*ap).trailing_zeros() as u32;
 
     let sz = wn as usize;
-    let (bp, scratch) = tmp.allocate_2(sz, sz);
+
+    // An extra limb of scratch space is needed because the length
+    // estimation is precise: if you're doing something like x**7, the
+    // final multiplication is ``x**3 * x**4`. These could have
+    // lengths, like, say, 30 and 40 limbs, so the multiplication can
+    // take at most 30 + 40 + 1 limbs, and the multiplication
+    // algorithm will write to all of them, possibly putting a zero in
+    // the very highest limb... however, the x**7 length estimator may
+    // work out that the final result actually fits into only 70
+    // limbs, so if we don't account for this mismatch we risk memory
+    // corruption.
+    //
+    // (Examples of such x are 2**(k L), where k > 0 is an integer and
+    // L is the number of bits in a limb.)
+    let (bp, scratch) = tmp.allocate_2(sz, sz + 1);
     let mut bn = an;
 
     if trailing > 0 {
