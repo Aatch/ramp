@@ -369,6 +369,9 @@ impl Int {
         if other.sign() == 0 {
             ll::divide_by_zero();
         }
+        if self.sign() == 0 {
+            return (self.clone(), Int::zero())
+        }
 
         let out_size = if self.abs_size() < other.abs_size() {
             1
