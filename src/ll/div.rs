@@ -13,7 +13,7 @@
 //    limitations under the License.
 
 use std::intrinsics::assume;
-use std::cmp::Ordering;
+use std::cmp::{self, Ordering};
 
 use mem;
 use ll;
@@ -245,7 +245,11 @@ fn divrem_3by2(n2: Limb, n1: Limb, n0: Limb, d1: Limb, d0: Limb, dinv: Limb) -> 
 pub unsafe fn divrem(mut qp: LimbsMut, mut rp: LimbsMut,
                      np: Limbs, ns: i32,
                      dp: Limbs, ds: i32) {
-    debug_assert!(!overlap(qp, (ns - ds) + 1, np, ns));
+    // Space for at least one limb is always needed, even if
+    // (logarithmically) the result will be so small that negative
+    // would work.
+    let max_result_size = cmp::max((ns - ds) + 1, 1);
+    debug_assert!(!overlap(qp, max_result_size, np, ns));
 
     if ns < ds {
         *qp = Limb(0);
