@@ -858,7 +858,7 @@ impl PartialEq<Limb> for Int {
             return true;
         }
 
-        self.size == 1 && unsafe { *self.limbs() == *other }
+        self.size == 1 && *self.limbs() == *other
     }
 }
 
@@ -914,9 +914,7 @@ impl PartialOrd<Limb> for Int {
         } else if self.size > 1 {
             Some(Ordering::Greater)
         } else {
-            unsafe {
-                (*self.limbs()).partial_cmp(other)
-            }
+            (*self.limbs()).partial_cmp(other)
         }
     }
 }
@@ -1433,20 +1431,16 @@ impl<'a, 'b> Mul<&'a Int> for &'b Int {
         let out_sign = self.sign() * other.sign();
 
         if self.abs_size() == 1 {
-            unsafe {
-                let mut ret = other.clone() * *self.limbs();
-                let size = ret.abs_size();
-                ret.size = size * out_sign;
-                return ret;
-            }
+            let mut ret = other.clone() * *self.limbs();
+            let size = ret.abs_size();
+            ret.size = size * out_sign;
+            return ret;
         }
         if other.abs_size() == 1 {
-            unsafe {
-                let mut ret = self.clone() * *other.limbs();
-                let size = ret.abs_size();
-                ret.size = size * out_sign;
-                return ret;
-            }
+            let mut ret = self.clone() * *other.limbs();
+            let size = ret.abs_size();
+            ret.size = size * out_sign;
+            return ret;
         }
 
         let out_size = self.abs_size() + other.abs_size();
@@ -1482,11 +1476,9 @@ impl<'a> Mul<&'a Int> for Int {
 
         // `other` is a single limb, reuse the allocation of self
         if other.abs_size() == 1 {
-            unsafe {
-                let mut out = self * *other.limbs();
-                out.size *= other.sign();
-                return out;
-            }
+            let mut out = self * *other.limbs();
+            out.size *= other.sign();
+            return out;
         }
 
         // Forward to the by-reference impl
@@ -1516,13 +1508,13 @@ impl Mul<Int> for Int {
         // One of them is a single limb big, so we can re-use the
         // allocation of the other
         if self.abs_size() == 1 {
-            let val = unsafe { *self.limbs() };
+            let val = *self.limbs();
             let mut out = other * val;
             out.size *= self.sign();
             return out;
         }
         if other.abs_size() == 1 {
-            let val = unsafe { *other.limbs() };
+            let val = *other.limbs();
             let mut out = self * val;
             out.size *= other.sign();
             return out;
@@ -1603,7 +1595,7 @@ impl<'a, 'b> Div<&'a Int> for &'b Int {
             ll::divide_by_zero();
         }
         if other.abs_size() == 1 {
-            let l = unsafe { *other.limbs() };
+            let l = *other.limbs();
             let out_sign = self.sign() * other.sign();
             let mut out = self.clone() / l;
             out.size = out.abs_size() * out_sign;
@@ -1712,7 +1704,7 @@ impl<'a, 'b> Rem<&'a Int> for &'b Int {
             ll::divide_by_zero();
         }
         if other.abs_size() == 1 {
-            let l = unsafe { *other.limbs() };
+            let l = *other.limbs();
             return self.clone() % l;
         }
 
@@ -2960,9 +2952,7 @@ impl PartialEq<i32> for Int {
         // since it'll fail because of signs
         if sign < 0 {
             if self.abs_size() > 1 { return false; }
-            unsafe {
-                return *self.limbs() == (other.abs() as BaseInt);
-            }
+            return *self.limbs() == (other.abs() as BaseInt);
         }
 
         self.eq(&Limb(other.abs() as BaseInt))
@@ -3096,7 +3086,7 @@ fn cmp_64(x: &Int, mag: u64, neg: bool) -> Ordering {
         return size.cmp(&if neg {-1} else {1})
     }
     let ptr = x.limbs();
-    let lo_limb = unsafe {*ptr};
+    let lo_limb = *ptr;
 
     let mag_ord = if mag < MAX_LIMB {
         (size.abs(), lo_limb.0).cmp(&(1, mag as BaseInt))
