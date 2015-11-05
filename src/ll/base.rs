@@ -24,6 +24,7 @@ use std::intrinsics::assume;
 
 use ll;
 use ll::limb::Limb;
+use ll::limb_ptr::{Limbs, LimbsMut};
 
 /// Information for converting to/from a given base, B. Stored in a table generated
 /// by build.rs
@@ -44,7 +45,7 @@ fn div_unnorm(n: Limb, d: Limb) -> (Limb, Limb) {
 }
 
 #[inline]
-pub unsafe fn num_base_digits(p: *const Limb, n: i32, base: u32) -> usize {
+pub unsafe fn num_base_digits(p: Limbs, n: i32, base: u32) -> usize {
     debug_assert!(base >= 2);
     assume(base >= 2);
 
@@ -63,7 +64,7 @@ pub unsafe fn num_base_digits(p: *const Limb, n: i32, base: u32) -> usize {
 
         let lg2b = (base as f64).log2();
         let digits = total_bits / lg2b;
-        return digits.ceil() as usize;
+        return 1 + digits.ceil() as usize;
     }
 }
 
@@ -85,7 +86,7 @@ pub fn base_digits_to_len(num: usize, base: u32) -> usize {
  * The values in `out` are the raw values of the base. Conversion for output should be done as a second
  * step.
  */
-pub unsafe fn to_base<F: FnMut(u8)>(base: u32, np: *const Limb, nn: i32, mut out_byte: F) {
+pub unsafe fn to_base<F: FnMut(u8)>(base: u32, np: Limbs, nn: i32, mut out_byte: F) {
     debug_assert!(nn >= 0);
     debug_assert!(base < BASES.len() as u32);
     debug_assert!(base >= 2);
@@ -142,13 +143,13 @@ pub unsafe fn to_base<F: FnMut(u8)>(base: u32, np: *const Limb, nn: i32, mut out
     to_base_impl(0, base, np, nn, out_byte);
 }
 
-unsafe fn to_base_impl<F: FnMut(u8)>(mut len: u32, base: u32, np: *const Limb, mut nn: i32, mut out_byte: F) {
+unsafe fn to_base_impl<F: FnMut(u8)>(mut len: u32, base: u32, np: Limbs, mut nn: i32, mut out_byte: F) {
     debug_assert!(base > 2);
 
     let buf_len = num_base_digits(np, nn, base);
     let mut buf : Vec<u8> = vec![0; buf_len];
     let mut r : Vec<Limb> = vec![Limb(0); (nn + 1) as usize];
-    let rp : *mut Limb = &mut r[0];
+    let rp = LimbsMut::new(&mut r[0], 0, r.len() as i32);
 
     ll::copy_incr(np, rp.offset(1), nn);
 
@@ -170,7 +171,7 @@ unsafe fn to_base_impl<F: FnMut(u8)>(mut len: u32, base: u32, np: *const Limb, m
                 while $nn > 1 {
                     // Divide rp by the big_base, with a single fractional limb produced.
                     // The fractional limb is approximately 1/remainder
-                    ll::divrem_1($rp, 1, $rp.offset(1), $nn, big_base);
+                    ll::divrem_1($rp, 1, $rp.offset(1).as_const(), $nn, big_base);
 
                     $nn -= if *$rp.offset($nn as isize) == 0 { 1 } else { 0 };
                     let mut frac = *$rp + 1;
@@ -242,7 +243,7 @@ unsafe fn to_base_impl<F: FnMut(u8)>(mut len: u32, base: u32, np: *const Limb, m
  * Converts the base `base` bytestring {bp, bs}, storing the limbs in `out`. `out` is assumed to
  * have enough space to store the result.
  */
-pub unsafe fn from_base(out: *mut Limb, bp: *const u8, bs: i32, base: u32) -> usize {
+pub unsafe fn from_base(mut out: LimbsMut, bp: *const u8, bs: i32, base: u32) -> usize {
     debug_assert!(bs > 0);
     debug_assert!(base < BASES.len() as u32);
     debug_assert!(base >= 2);
@@ -290,7 +291,7 @@ pub unsafe fn from_base(out: *mut Limb, bp: *const u8, bs: i32, base: u32) -> us
     from_base_small(out, bp, bs, base)
 }
 
-unsafe fn from_base_small(out: *mut Limb, mut bp: *const u8, bs: i32, base: u32) -> usize {
+unsafe fn from_base_small(mut out: LimbsMut, mut bp: *const u8, bs: i32, base: u32) -> usize {
     debug_assert!(base > 2);
     assume(base > 2);
 
@@ -325,8 +326,8 @@ unsafe fn from_base_small(out: *mut Limb, mut bp: *const u8, bs: i32, base: u32)
                 size = 1;
             }
         } else {
-            let mut carry = ll::mul_1(out, out, size as i32, big_base);
-            carry = carry + ll::add_1(out, out, size as i32, res_digit);
+            let mut carry = ll::mul_1(out, out.as_const(), size as i32, big_base);
+            carry = carry + ll::add_1(out, out.as_const(), size as i32, res_digit);
             if carry != 0 {
                 *out.offset(size as isize) = carry;
                 size += 1;
@@ -364,8 +365,8 @@ unsafe fn from_base_small(out: *mut Limb, mut bp: *const u8, bs: i32, base: u32)
             size = 1;
         }
     } else {
-        let mut carry = ll::mul_1(out, out, size as i32, Limb(big_base));
-        carry = carry + ll::add_1(out, out, size as i32, res_digit);
+        let mut carry = ll::mul_1(out, out.as_const(), size as i32, Limb(big_base));
+        carry = carry + ll::add_1(out, out.as_const(), size as i32, res_digit);
         if carry != 0 {
             *out.offset(size as isize) = carry;
             size += 1;

@@ -21,6 +21,9 @@ use std::intrinsics::abort;
 use std::io::{self, Write};
 use std::ptr;
 
+use ll::limb::Limb;
+use ll::limb_ptr::LimbsMut;
+
 pub unsafe fn allocate_bytes(size: usize) -> *mut u8 {
     let ret = heap::allocate(size, mem::align_of::<usize>());
     if ret.is_null() {
@@ -66,17 +69,18 @@ impl TmpAllocator {
         ptr.offset(mem::size_of::<Marker>() as isize)
     }
 
-    /// Allocate space for n instances of `T`
-    pub unsafe fn allocate<T>(&mut self, n: usize) -> *mut T {
-        self.allocate_bytes(n * mem::size_of::<T>()) as *mut T
+    /// Allocate space for n limbs
+    pub unsafe fn allocate(&mut self, n: usize) -> LimbsMut {
+        let ptr = self.allocate_bytes(n * mem::size_of::<Limb>()) as *mut Limb;
+        LimbsMut::new(ptr, 0, n as i32)
     }
 
-    #[allow(dead_code)] // not used at this point
-    /// Allocates space for n1+n2 instances of `T` and returns a pair of pointers.
-    pub unsafe fn allocate_2<T>(&mut self, n1: usize, n2: usize) -> (*mut T, *mut T) {
-        let x = self.allocate(n1 + n2);
-        let y = x.offset(n1 as isize);
-        (x, y)
+    /// Allocates space for n1+n2 limbs and returns a pair of pointers.
+    pub unsafe fn allocate_2(&mut self, n1: usize, n2: usize) -> (LimbsMut, LimbsMut) {
+        let mut x = self.allocate(n1 + n2);
+        let mut y = x.offset(n1 as isize);
+        (LimbsMut::new(&mut *x, 0, n1 as i32),
+         LimbsMut::new(&mut *y, 0, n2 as i32))
     }
 }
 

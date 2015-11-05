@@ -88,7 +88,10 @@ mod bit;
 pub mod pow;
 pub mod base;
 pub mod limb;
+pub mod limb_ptr;
 use self::limb::Limb;
+
+use ll::limb_ptr::{Limbs, LimbsMut};
 
 pub use self::bit::{
     shl, shr,
@@ -103,31 +106,31 @@ pub use self::mul::{addmul_1, submul_1, mul_1, mul, sqr};
 pub use self::div::{divrem_1, divrem_2, divrem};
 
 #[inline(always)]
-pub unsafe fn overlap(xp: *const Limb, xs: i32, yp: *const Limb, ys: i32) -> bool {
-    xp.offset(xs as isize) > yp
-        && yp.offset(ys as isize) > xp
+pub unsafe fn overlap(xp: LimbsMut, xs: i32, yp: Limbs, ys: i32) -> bool {
+    xp.offset(xs as isize).as_const() > yp
+        && yp.offset(ys as isize) > xp.as_const()
 }
 
 #[inline(always)]
-pub unsafe fn same_or_separate(xp: *const Limb, xs: i32, yp: *const Limb, ys: i32) -> bool {
-    xp == yp || !overlap(xp, xs, yp, ys)
+pub unsafe fn same_or_separate(xp: LimbsMut, xs: i32, yp: Limbs, ys: i32) -> bool {
+    xp.as_const() == yp || !overlap(xp, xs, yp, ys)
 }
 
 #[inline(always)]
-pub unsafe fn same_or_incr(xp: *const Limb, xs: i32, yp: *const Limb, ys: i32) -> bool {
-    xp <= yp || !overlap(xp, xs, yp, ys)
+pub unsafe fn same_or_incr(xp: LimbsMut, xs: i32, yp: Limbs, ys: i32) -> bool {
+    xp.as_const() <= yp || !overlap(xp, xs, yp, ys)
 }
 
 #[inline(always)]
-pub unsafe fn same_or_decr(xp: *const Limb, xs: i32, yp: *const Limb, ys: i32) -> bool {
-    xp >= yp || !overlap(xp, xs, yp, ys)
+pub unsafe fn same_or_decr(xp: LimbsMut, xs: i32, yp: Limbs, ys: i32) -> bool {
+    xp.as_const() >= yp || !overlap(xp, xs, yp, ys)
 }
 
 /**
  * Copies the `n` limbs from `src` to `dst` in an incremental fashion.
  */
 #[inline]
-pub unsafe fn copy_incr(src: *const Limb, dst: *mut Limb, n: i32) {
+pub unsafe fn copy_incr(src: Limbs, dst: LimbsMut, n: i32) {
     debug_assert!(same_or_incr(dst, n, src, n));
 
     let mut i = 0;
@@ -141,7 +144,7 @@ pub unsafe fn copy_incr(src: *const Limb, dst: *mut Limb, n: i32) {
  * Copies the `n` limbs from `src` to `dst` in a decremental fashion.
  */
 #[inline]
-pub unsafe fn copy_decr(src: *const Limb, dst: *mut Limb, mut n: i32) {
+pub unsafe fn copy_decr(src: Limbs, dst: LimbsMut, mut n: i32) {
     debug_assert!(same_or_decr(dst, n, src, n));
 
     n -= 1;
@@ -155,9 +158,9 @@ pub unsafe fn copy_decr(src: *const Limb, dst: *mut Limb, mut n: i32) {
  * Copies the `n - start` limbs from `src + start` to `dst + start`
  */
 #[inline]
-pub unsafe fn copy_rest(src: *const Limb, dst: *mut Limb, n: i32, start: i32) {
+pub unsafe fn copy_rest(src: Limbs, dst: LimbsMut, n: i32, start: i32) {
     copy_incr(src.offset(start as isize), dst.offset(start as isize),
-              n - start);
+               n - start);
 }
 
 #[inline]
@@ -165,7 +168,7 @@ pub unsafe fn copy_rest(src: *const Limb, dst: *mut Limb, n: i32, start: i32) {
  * Returns the size of the integer pointed to by `p` such that the most
  * significant limb is non-zero.
  */
-pub unsafe fn normalize(p: *const Limb, mut n: i32) -> i32 {
+pub unsafe fn normalize(p: Limbs, mut n: i32) -> i32 {
     debug_assert!(n >= 0);
     while n > 0 && *p.offset((n - 1) as isize) == 0 {
         n -= 1;
@@ -193,7 +196,7 @@ pub fn divide_by_zero() -> ! {
 /**
  * Checks that all `nn` limbs in `np` are zero
  */
-pub unsafe fn is_zero(mut np: *const Limb, mut nn: i32) -> bool {
+pub unsafe fn is_zero(mut np: Limbs, mut nn: i32) -> bool {
     while nn > 0 {
         if *np != 0 { return false; }
         np = np.offset(1);
@@ -202,7 +205,7 @@ pub unsafe fn is_zero(mut np: *const Limb, mut nn: i32) -> bool {
     return true;
 }
 
-pub unsafe fn zero(mut np: *mut Limb, mut nn: i32) {
+pub unsafe fn zero(mut np: LimbsMut, mut nn: i32) {
     while nn > 0 {
         *np = Limb(0);
         np = np.offset(1);
@@ -214,7 +217,7 @@ pub unsafe fn zero(mut np: *mut Limb, mut nn: i32) {
  * Compares the `n` least-significant limbs of `xp` and `yp`, returning whether
  * {xp, n} is less than, equal to or greater than {yp, n}
  */
-pub unsafe fn cmp(xp: *const Limb, yp: *const Limb, n: i32) -> Ordering {
+pub unsafe fn cmp(xp: Limbs, yp: Limbs, n: i32) -> Ordering {
     let mut i = n - 1;
     while i >= 0 {
         let x = *xp.offset(i as isize);
@@ -235,7 +238,7 @@ pub unsafe fn cmp(xp: *const Limb, yp: *const Limb, n: i32) -> Ordering {
 #[doc(hidden)]
 #[allow(unused_must_use)]
 #[cold] #[inline(never)]
-pub unsafe fn dump(lbl: &str, mut p: *const Limb, mut n: i32) {
+pub unsafe fn dump(lbl: &str, mut p: Limbs, mut n: i32) {
     use std::io::{self, Write};
     let stdout = io::stdout();
     let mut stdout = stdout.lock();
@@ -265,20 +268,21 @@ pub unsafe fn dump(lbl: &str, mut p: *const Limb, mut n: i32) {
 mod test {
     use super::*;
     use ll::limb::Limb;
+    use ll::limb_ptr::{Limbs, LimbsMut};
 
     macro_rules! make_limbs {
         (const $nm:ident, $($d:expr),*) => (
             {
                 $nm = [$(Limb($d)),*];
-                let ptr : *const Limb = $nm.as_ptr();
                 let len = $nm.len() as i32;
+                let ptr = unsafe {Limbs::new($nm.as_ptr(), 0, len)};
                 (ptr, len)
             }
         );
         (out $nm:ident, $len:expr) => (
             {
                 $nm = [Limb(0);$len];
-                $nm.as_mut_ptr()
+                unsafe {LimbsMut::new($nm.as_mut_ptr(), 0, $len as i32)}
             }
         );
     }
@@ -341,7 +345,7 @@ mod test {
         b[0] = Limb(5); b[1] = Limb(10);
 
         unsafe {
-            assert_eq!(add(bp, ap, asz, bp as *const _, bsz), 1);
+            assert_eq!(add(bp, ap, asz, bp.as_const(), bsz), 1);
         }
         assert_eq!(b, [4, 1]);
     }
@@ -394,7 +398,7 @@ mod test {
         b[0] = Limb(2); b[1] = Limb(1);
 
         unsafe {
-            assert_eq!(sub(bp, ap, asz, bp as *const _, bsz), 0);
+            assert_eq!(sub(bp, ap, asz, bp.as_const(), bsz), 0);
         }
         assert_eq!(b, [!1, 0]);
     }
@@ -522,14 +526,12 @@ mod test {
 
         c = [Limb(0); 73];
 
-        {
-            let ap : *const Limb = &a[0];
-            let bp : *const Limb = &b[0];
-            let cp : *mut Limb = &mut c[0];
+        unsafe {
+            let ap = Limbs::new(&a[0], 0, a.len() as i32);
+            let bp = Limbs::new(&b[0], 0, b.len() as i32);
+            let cp = LimbsMut::new(&mut c[0], 0, c.len() as i32);
 
-            unsafe {
-                mul(cp, ap, 43, bp, 30);
-            }
+            mul(cp, ap, 43, bp, 30);
         }
 
         let ep : &[Limb] = &expected;
@@ -555,14 +557,12 @@ mod test {
 
         c = [Limb(0); 150];
 
-        {
-            let ap : *const Limb = &a[0];
-            let bp : *const Limb = &b[0];
-            let cp : *mut Limb = &mut c[0];
+        unsafe {
+            let ap = Limbs::new(&a[0], 0, a.len() as i32);
+            let bp = Limbs::new(&b[0], 0, b.len() as i32);
+            let cp = LimbsMut::new(&mut c[0], 0, c.len() as i32);
 
-            unsafe {
-                mul(cp, ap, 124, bp, 26);
-            }
+            mul(cp, ap, 124, bp, 26);
         }
 
         let ep : &[Limb] = &expected;
