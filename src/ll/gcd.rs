@@ -29,46 +29,30 @@ pub unsafe fn gcd(mut gp: *mut Limb, mut ap: *mut Limb, mut an: i32, mut bp: *mu
         ll::shr(bp, bp, bn, trailing);
     }
 
-    let mut ac : usize = trailing as usize;
-    let mut bc : usize = trailing as usize;
-    while an > 0 && !ll::is_zero(ap, an) {
+    while !ll::is_zero(ap, an) {
+
         while *ap == 0 && !ll::is_zero(ap, an) {
             ap = ap.offset(1);
             an -= 1;
-            // ac = 0;
-        }
-        if ll::is_zero(ap, an) {
-            break;
         }
 
         let at = (*ap).trailing_zeros() as u32;
         if at > 0 {
             ll::shr(ap, ap, an, at);
-            ac += at as usize;
-            if ac > Limb::BITS {
-                an -= 1;
-                ac = ac % (Limb::BITS  + 1);
-            }
         }
 
         while *bp == 0 && !ll::is_zero(bp, bn) {
             bp = bp.offset(1);
             bn -= 1;
-            // bc = 0;
-        }
-        if ll::is_zero(bp, bn) {
-            break;
         }
 
         let bt = (*bp).trailing_zeros() as u32;
         if bt > 0 {
             ll::shr(bp, bp, bn, bt);
-            bc += bt as usize;
-            if bc > Limb::BITS {
-                bn -= 1;
-                bc = bc % (Limb::BITS  + 1);
-            }
         }
+
+        an = ll::normalize(ap, an);
+        bn = ll::normalize(bp, bn);
 
         let c = if an == bn {
             ll::cmp(ap, bp, an)
@@ -78,7 +62,7 @@ pub unsafe fn gcd(mut gp: *mut Limb, mut ap: *mut Limb, mut an: i32, mut bp: *mu
             Ordering::Less
         };
 
-        if c == Ordering::Equal || c == Ordering::Greater {
+        if c == Ordering::Greater || c == Ordering::Equal  {
             ll::sub(ap, ap, an, bp, bn);
             ll::shr(ap, ap, an, 1);
         } else {
@@ -88,6 +72,7 @@ pub unsafe fn gcd(mut gp: *mut Limb, mut ap: *mut Limb, mut an: i32, mut bp: *mu
     }
 
     ll::copy_incr(bp, gp, bn);
+
     if trailing > 0 {
         let v = ll::shl(gp, gp, bn, trailing);
         if v > 0 {
