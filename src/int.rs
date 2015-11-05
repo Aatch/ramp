@@ -785,6 +785,45 @@ impl Int {
         }
         self.size = -self.size;
     }
+
+    /// Calculates the Greatest Common Divisor (GCD) of the number and `other`.
+    ///
+    /// The result is always positive.
+    #[inline]
+    pub fn gcd(&self, other: &Int) -> Int {
+        debug_assert!(self.well_formed());
+        debug_assert!(other.well_formed());
+
+        let (mut a, mut b) = if self.abs_size() >= other.abs_size() {
+            ((*self).clone(), (*other).clone())
+        } else {
+            ((*other).clone(), (*self).clone())
+        };
+
+        if a == Int::zero() {
+            return b;
+        }
+
+        if b == Int::zero() {
+            return a;
+        }
+
+        let out_size = a.abs_size();
+        let mut r = Int::with_capacity(out_size as u32);
+        r.size = out_size;
+
+        unsafe {
+            ll::gcd(r.limbs_mut(), a.limbs_mut(), a.abs_size(), b.limbs_mut(), b.abs_size());
+            r.normalize();
+            r
+        }
+    }
+
+    /// Calculates the Lowest Common Multiple (LCM) of the number and `other`.
+    #[inline]
+    pub fn lcm(&self, other: &Int) -> Int {
+        (self * other).abs() / self.gcd(other)
+    }
 }
 
 impl Clone for Int {
@@ -4196,6 +4235,68 @@ mod test {
         });
     }
 
+    #[test]
+    fn gcd() {
+        let cases = [
+            ("3", "0","3"), // special
+            ("0", "3", "3"),
+            ("0", "0", "0"),
+            ("13", "13", "13"),
+            ("37", "600", "1"), // prime numbers
+            ("2567", "997", "1"),
+            ("624129", "2061517", "18913"), // normal
+            ("18446744073709551616", "18446744073709551616", "18446744073709551616"),
+            ("184467440737095516201234", "493882992939324", "6"),
+            ("493882992939324", "184467440737095516201234", "6"),
+            ("18446744073709551620", "18446744073709551615", "5"),
+            ("-9223372036854775808", "-9223372036854775808", "9223372036854775808"),
+            ("-9223372036854775811", "-9223372036854775808", "1"),
+            ("-23465475685232342344366756745345", "-23423545489322535345", "5"),
+            ("-23423545489322535345", "-23465475685232342344366756745345", "5"),
+            ("-170141183460469231731687303715884105728", "-170141183460469231731687303715884105729", "1"),
+            ("-170141183460469231731687303715884105731", "-170141183460469231731687303715884105728", "1"),
+            ("170141183460469231731687303715884105731234234363462345234345547232443500000000000000000000000", "17014118346046923173168730371588410572836362453452345000000000000000000", "5000000000000000000")
+        ];
+
+        for &(l, r, a) in cases.iter() {
+            let l : Int = l.parse().unwrap();
+            let r : Int = r.parse().unwrap();
+            let a : Int = a.parse().unwrap();
+
+            let val = l.gcd(&r);
+            assert_mp_eq!(val, a);
+        }
+    }
+
+    #[test]
+    fn lcm() {
+        let cases = [
+            ("1", "0", "0"),
+            ("0", "1", "0"),
+            ("1", "1", "1"),
+            ("-1", "0", "0"),
+            ("0", "-1", "0"),
+            ("-1", "-1", "1"),
+            ("8", "9", "72"),
+            ("11", "5", "55"),
+            ("99", "17", "1683"),
+            ("18446744073709551616", "18446744073709551616", "18446744073709551616"),
+            ("18446744073709551620", "18446744073709551615", "68056473384187692703742967930579373260"),
+            ("-9223372036854775808", "-9223372036854775808", "9223372036854775808"),
+            ("-9223372036854775811", "-9223372036854775808", "85070591730234615893513767968506380288"),
+            ("-92233720368547758112345", "-235777694355", "4349330786055998253486590232462495")
+        ];
+
+        for &(l, r, a) in cases.iter() {
+            let l : Int = l.parse().unwrap();
+            let r : Int = r.parse().unwrap();
+            let a : Int = a.parse().unwrap();
+
+            let val = l.lcm(&r);
+            assert_mp_eq!(val.clone(), a.clone());
+        }
+    }
+
     #[bench]
     fn bench_add_1_1(b: &mut Bencher) {
         bench_add(b, 1, 1);
@@ -4436,4 +4537,62 @@ mod test {
     fn bench_div_1000_1000(b: &mut Bencher) {
         bench_div(b, 1000, 1000);
     }
+
+    fn bench_gcd(b: &mut Bencher, xs: usize, ys: usize) {
+        let mut rng = rand::thread_rng();
+
+        let x = rng.gen_int(xs * Limb::BITS);
+        let y = rng.gen_int(ys * Limb::BITS);
+
+        b.iter(|| {
+            let z = x.gcd(&y);
+            test::black_box(z);
+        });
+    }
+
+    #[bench]
+    fn bench_gcd_1_1(b: &mut Bencher) {
+        bench_gcd(b, 1, 1);
+    }
+
+    #[bench]
+    fn bench_gcd_10_10(b: &mut Bencher) {
+        bench_gcd(b, 10, 10);
+    }
+
+    #[bench]
+    fn bench_gcd_20_2(b: &mut Bencher) {
+        bench_gcd(b, 20, 2);
+    }
+
+    #[bench]
+    fn bench_gcd_50_50(b: &mut Bencher) {
+        bench_gcd(b, 50, 50);
+    }
+
+    #[bench]
+    fn bench_gcd_50_5(b: &mut Bencher) {
+        bench_gcd(b, 50, 5);
+    }
+
+    #[bench]
+    fn bench_gcd_250_150(b: &mut Bencher) {
+        bench_gcd(b, 250, 150);
+    }
+
+    #[bench]
+    fn bench_gcd_100_100(b: &mut Bencher) {
+        bench_gcd(b, 100, 100);
+    }
+
+    #[bench]
+    fn bench_gcd_100_10(b: &mut Bencher) {
+        bench_gcd(b, 100, 10);
+    }
+
+    #[bench]
+    fn bench_gcd_100_50(b: &mut Bencher) {
+        bench_gcd(b, 100, 50);
+    }
+
 }
