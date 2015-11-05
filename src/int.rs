@@ -813,7 +813,7 @@ impl Int {
         r.size = out_size;
 
         unsafe {
-            ll::gcd(r.ptr.get_mut(), a.ptr.get_mut(), a.abs_size(), b.ptr.get_mut(), b.abs_size());
+            ll::gcd(r.limbs_mut(), a.limbs_mut(), a.abs_size(), b.limbs_mut(), b.abs_size());
             r.normalize();
             r
         }
