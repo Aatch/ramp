@@ -70,23 +70,10 @@ impl Limb {
     /**
      * Performs `self + other`, returning the result and whether or not the addition overflowed
      */
-    #[cfg(target_pointer_width = "32")]
     #[inline(always)]
     pub fn add_overflow(self, other: Limb) -> (Limb, bool) {
         unsafe {
-            let (val, c) = std::intrinsics::u32_add_with_overflow(self.0, other.0);
-            (Limb(val), c)
-        }
-    }
-
-    /**
-     * Performs `self + other`, returning the result and whether or not the addition overflowed
-     */
-    #[cfg(target_pointer_width = "64")]
-    #[inline(always)]
-    pub fn add_overflow(self, other: Limb) -> (Limb, bool) {
-        unsafe {
-            let (val, c) = std::intrinsics::u64_add_with_overflow(self.0, other.0);
+            let (val, c) = std::intrinsics::add_with_overflow(self.0, other.0);
             (Limb(val), c)
         }
     }
@@ -94,23 +81,10 @@ impl Limb {
     /**
      * Performs `self - other`, returning the result and whether or not the subtraction overflowed
      */
-    #[cfg(target_pointer_width = "32")]
     #[inline(always)]
     pub fn sub_overflow(self, other: Limb) -> (Limb, bool) {
         unsafe {
-            let (val, c) = std::intrinsics::u32_sub_with_overflow(self.0, other.0);
-            (Limb(val), c)
-        }
-    }
-
-    /**
-     * Performs `self - other`, returning the result and whether or not the subtraction overflowed
-     */
-    #[cfg(target_pointer_width = "64")]
-    #[inline(always)]
-    pub fn sub_overflow(self, other: Limb) -> (Limb, bool) {
-        unsafe {
-            let (val, c) = std::intrinsics::u64_sub_with_overflow(self.0, other.0);
+            let (val, c) = std::intrinsics::sub_with_overflow(self.0, other.0);
             (Limb(val), c)
         }
     }
