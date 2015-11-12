@@ -54,9 +54,15 @@ pub unsafe fn num_base_digits(p: Limbs, n: i32, base: u32) -> usize {
     let cnt = (*p.offset((n - 1) as isize)).leading_zeros() as usize;
     let total_bits = (Limb::BITS * (n as usize)) - cnt;
 
-    if base.is_power_of_two() {
+    if base == 2 {
+        // no need to do anything complicated here at all, so let's go
+        // as fast as possible (this is a somewhat common case, due to
+        // `bit_length`)
+        total_bits
+    } else if base.is_power_of_two() {
         let big_base = BASES.get_unchecked(base as usize).big_base.0 as usize;
-        (total_bits + big_base - 1) / big_base
+        // doing an actual division here is much slower than this
+        (total_bits + big_base - 1) >> big_base.trailing_zeros()
     } else {
         // Not sure if using floating-point arithmetic here is the best idea,
         // but it should be a reasonable accurate result, maybe a little high
