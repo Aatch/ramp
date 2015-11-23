@@ -42,9 +42,9 @@ a nightly build of `rustc`.
 
 ## Why another library?
 
-The `num` crate provides some bignum types that can be used, why use Ramp instead? Well, Ramp is
-much more focussed, `num` is a general-purpose numerics library that happens to provide some
-multiple-precision arithmetic. Ramp is specifically focussed on multiple-precision arithmetic.
+The `num` crate provides some bignum types that can be used, so why use Ramp? Well, Ramp is
+specifically focussed on multiple-precision arithmetic, while `num` is a general-purpose numerics
+library that happens to provide some multiple-precision arithmetic.
 
 You should `num` if you aren't able to use unstable Rust features or just want a small amount of
 functionality. Ramp should be used when you need high-performance and extra functionality.
@@ -55,7 +55,7 @@ Ramp is split into two main parts: high-level code and low-level code. The high-
 you should be using, however the low-level code is where the real work is done.
 
 The low-level routines (in `ll`) are predominately unsafe functions that work with raw pointers,
-some of the routines are implemented using inline assembly to gain access to processor-specific
+and some of the routines are implemented using inline assembly to gain access to processor-specific
 functionality.
 
 ### Limbs
@@ -67,8 +67,8 @@ for the base that Ramp works in. Since the base is equal to 2^word_size, these a
 ## Future Work
 
 Ramp is currently very rough and incomplete. Broadly, there are three types Ramp aims to provide:
-integers, rationals and floats. Integers (`Int`), is present, but incomplete, the other two are not
-yet implemented.
+integers, rationals, and floats. Integers (`Int`) are present but incomplete, and the other two are
+not yet implemented.
 
 In the low-level routines, there are a few operations, notably multiplication and division, that
 are currently implemented using the simplest working algorithm. While this is sufficient for
