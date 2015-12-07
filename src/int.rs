@@ -3523,17 +3523,27 @@ impl<R: Rng> RandomInt for R {
 
     fn gen_uint_below(&mut self, bound: &Int) -> Int {
         assert!(*bound > Int::zero());
+        // If we haven't got a valid number after 10,000 tries, then something
+        // has probably gone wrong, as there is a 1 in 10^3000 chance of this
+        // happening, in the worst case.
+        const ITER_LIMIT : usize = 10000;
 
-        let mut i = (*bound).clone();
-        i.normalize();
+        let bits = bound.bit_length() as usize;
 
-        let lz = bound.to_single_limb().leading_zeros() as i32;
-        let bits = ((bound.abs_size() * Limb::BITS as i32) - lz) as usize;
-
-        loop {
+        // Since it uses a number of bits, gen_uint may return a number too large,
+        // loop until we generate a valid number.
+        // Since the greatest gap between the bound and the largest number produced
+        // is when bound = 2^n (bit string [100000....]), we have, at worst, a 50/50
+        // chance of producing an invalid number each iteration.
+        let mut count = 0;
+        while count < ITER_LIMIT {
             let n = self.gen_uint(bits);
             if n < *bound { return n; }
+            count += 1;
         }
+
+        panic!("No valid number generated in {} iterations.\n\
+                Please open an issue at https://github.com/Aatch/ramp", ITER_LIMIT);
     }
 
     fn gen_int_range(&mut self, lbound: &Int, ubound: &Int) -> Int {
@@ -4222,6 +4232,23 @@ mod test {
         }
     }
 
+    #[test]
+    fn gen_uint_below_all_ones() {
+        static N : &'static str =
+            "000001FFFFFFFFFFFFFFFFFFFFFFFFFFF\
+             FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF\
+             FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF";
+
+        let mut rng = rand::thread_rng();
+
+        let bound = Int::from_str_radix(N, 16).unwrap();
+
+        for _ in 0..10 {
+            let n: Int = rng.gen_uint_below(&bound);
+            assert!(n < bound);
+        }
+    }
+
 
     fn bench_add(b: &mut Bencher, xs: usize, ys: usize) {
         let mut rng = rand::thread_rng();
@@ -4593,6 +4620,21 @@ mod test {
     #[bench]
     fn bench_gcd_100_50(b: &mut Bencher) {
         bench_gcd(b, 100, 50);
+    }
+
+    #[bench]
+    fn bench_rng_all_ones(b: &mut Bencher) {
+        let mut rng = rand::thread_rng();
+
+        let num_bits : usize = rng.gen_range(512, 1024);
+
+        let mut bound = Int::from(1) << num_bits;
+        bound -= 1;
+
+        b.iter(|| {
+            let n = rng.gen_uint_below(&bound);
+            test::black_box(n);
+        });
     }
 
 }
