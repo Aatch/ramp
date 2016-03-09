@@ -22,7 +22,6 @@ use std::cmp::Ordering;
 
 /// A version of `*const Limb` that is bounds-checked when debug assertions are on
 #[derive(Copy, Clone, Debug)]
-#[allow(raw_pointer_derive)]
 pub struct Limbs {
     ptr: *const Limb,
     bounds: Bounds,
@@ -30,7 +29,6 @@ pub struct Limbs {
 
 /// A version of `*mut Limb` that is bounds-checked when debug assertions are on
 #[derive(Copy, Clone)]
-#[allow(raw_pointer_derive)]
 pub struct LimbsMut {
     ptr: *mut Limb,
     bounds: Bounds,
