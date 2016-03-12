@@ -745,6 +745,31 @@ fn from_str_decimal(a: BigIntStr) {
     assert_eq!(sr2, ar);
 }
 
+#[quickcheck]
+fn from_u8_radix(a: BigIntStr, b: u8) -> TestResult {
+    if b < 2 || b == 255 { return TestResult::discard() }
+
+    let (ar, _) = a.parse();
+
+    let mut buf : Vec<u8> = vec![0; 1000];
+
+    let result = ar.write_u8_be_radix(&mut buf[..], b);
+    let bytes_written = match result {
+        Err(_) => return TestResult::discard(),
+        Ok(bytes) => bytes
+    };
+
+    for b in &buf[bytes_written..] {
+        assert_eq!(0, *b); // not written bytes
+    }
+
+    let back = Int::from_u8_radix(&buf[0..bytes_written], b).unwrap();
+
+    assert_eq!(back, ar.abs());
+
+    TestResult::passed()
+}
+
 mod format {
     use ::BigIntStr;
 

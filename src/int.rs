@@ -266,13 +266,8 @@ impl Int {
             return "0".to_string();
         }
 
-        if base < 2 || base > 36 {
-            panic!("Invalid base: {}", base);
-        }
-
-        let size = self.abs_size();
         let mut num_digits = unsafe {
-            ll::base::num_base_digits(self.limbs(), size - 1, base as u32)
+            ll::base::num_base_digits(self.limbs(), self.abs_size() , base as u32)
         };
 
         if self.sign() == -1 {
@@ -280,33 +275,72 @@ impl Int {
         }
 
         let mut buf : Vec<u8> = Vec::with_capacity(num_digits);
-
         self.write_radix(&mut buf, base, upper).unwrap();
-
         unsafe { String::from_utf8_unchecked(buf) }
     }
 
     pub fn write_radix<W: io::Write>(&self, w: &mut W, base: u8, upper: bool) -> io::Result<()> {
-        debug_assert!(self.well_formed());
-
         if self.sign() == -1 {
             try!(w.write_all(b"-"));
         }
 
-        let letter = if upper { b'A' } else { b'a' };
-        let size = self.abs_size();
-
-        unsafe {
-            ll::base::to_base(base as u32, self.limbs(), size, |b| {
-                if b < 10 {
-                    w.write_all(&[b + b'0']).unwrap();
-                } else {
-                    w.write_all(&[(b - 10) + letter]).unwrap();
-                }
-            });
+        if base < 2 || base > 36 {
+            panic!("Invalid base: {}", base);
         }
 
+        let letter = if upper { b'A' } else { b'a' };
+
+        self.write_radix_callback(base, |b| {
+            if b < 10 {
+                w.write_all(&[b + b'0']).unwrap();
+            } else {
+                w.write_all(&[(b - 10) + letter]).unwrap();
+            }
+        });
+
         Ok(())
+    }
+
+    /// Writes u8s representing each one digit in base `base` into dst.
+    /// The bytes are sorted using Big Endian manner: The most significant byte
+    /// is stored in dst[0]. Returns the number of written bytes.
+    /// This does not take the sign into account.
+    /// Allows for base > 36.
+    pub fn write_u8_be_radix(&self, dst : &mut [u8], base : u8) -> Result<usize, BufferToSmallError>  {
+
+        let size = self.abs_size();
+
+        let estimat_num_digits = unsafe {
+            ll::base::num_base_digits(self.limbs(), size, base as u32)
+        };
+
+        if dst.len() < estimat_num_digits {
+            return Err(BufferToSmallError);
+        }
+
+        let mut bytes_written = 0;
+
+        self.write_radix_callback(base, |b| {
+            dst[bytes_written] = b;
+            bytes_written += 1;
+        });
+
+        debug_assert!(bytes_written == estimat_num_digits ||
+                      bytes_written == estimat_num_digits - 1);
+
+        Ok(bytes_written)
+    }
+
+    pub fn write_radix_callback<F: FnMut(u8)>(&self, base : u8, receiver: F) {
+        debug_assert!(self.well_formed());
+
+        if base < 2 {
+            panic!("Invalid base: {}", base);
+        }
+
+        unsafe {
+            ll::base::to_base(base as u32, self.limbs(), self.abs_size(), receiver);
+        }
     }
 
     /**
@@ -358,6 +392,43 @@ impl Int {
         }
 
         Ok(i)
+    }
+
+    /// Creates a new positive `Int` from the given bytes in base `base`.
+    /// Each byte represents a digit and must be lower than `base`. This
+    /// is not checked. Use from_u8_be_radix() if you need the checks.
+    /// The bytes must be ordered in big endian fashion. The most significant
+    /// byte is src[0].
+    pub unsafe fn from_u8_be_radix_unchecked(src: &[u8], base : u8) -> Result<Int, ParseIntError> {
+        if base < 2  {
+            panic!("Invalid base: {}", base);
+        }
+
+        if src.len() == 0 {
+            return Err(ParseIntError { kind: ErrorKind::Empty });
+        }
+
+        let num_digits = ll::base::base_digits_to_len(src.len(), base as u32);
+        let mut i = Int::with_capacity(num_digits as u32);
+
+        let size = ll::base::from_base(i.limbs_uninit(), src.as_ptr(), src.len() as i32, base as u32);
+        i.size = size as i32;
+
+        Ok(i)
+    }
+
+    /// Creates a new positive `Int` from the given bytes in base `base`.
+    /// Each byte represents a digit and must be lower than `base`. This
+    /// will be checked. Use from_u8_be_radix_unchecked() if you have checked before.
+    /// The bytes must be ordered in big endian fashion. The most significant
+    /// byte is src[0].
+    pub fn from_u8_be_radix(src: &[u8], base : u8) -> Result<Int, ParseIntError> {
+        for &b in src {
+            if b >= base { return Err(ParseIntError { kind: ErrorKind::InvalidDigit }); }
+        }
+        unsafe {
+            return Self::from_u8_be_radix_unchecked(src, base)
+        }
     }
 
     /**
@@ -3349,6 +3420,21 @@ impl FromStr for Int {
     }
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub struct BufferToSmallError;
+
+impl Error for BufferToSmallError {
+    fn description<'a>(&'a self) -> &'a str {
+        "destination buffer to small"
+    }
+}
+
+impl fmt::Display for BufferToSmallError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        self.description().fmt(f)
+    }
+}
+
 // Conversion *to* primitives via the From trait.
 
 macro_rules! impl_from_for_prim (
@@ -3703,6 +3789,37 @@ mod test {
                 assert!(digits == estimate || digits == estimate - 1);
             }
         }
+    }
+
+    #[test]
+    fn high_radix_conversion() {
+        use ::ll::base::num_base_digits;
+
+        // empty input
+        assert!(Int::from_u8_be_radix(&[], 10).is_err());
+
+        // input error check
+        assert!(Int::from_u8_be_radix(&[10], 10).is_err());
+        assert!(unsafe{Int::from_u8_be_radix_unchecked(&[10], 10).is_ok()});
+
+        let raw = [15u8, 15]; // in base 16 = 255d
+        let i = Int::from_u8_be_radix(&raw, 16).unwrap();
+        assert_eq!(i, 255);
+
+        let raw = [2u8, 5, 6]; // 256
+        let i = Int::from_u8_be_radix(&raw, 10).unwrap();
+        assert_eq!(i, 256);
+
+        let raw = [64u8, 64, 64]; // 274624
+        let i = Int::from_u8_be_radix(&raw, 65).unwrap();
+        assert_eq!(i, 274624);
+
+        // back to buffer
+        let mut buf = vec![0; 4];
+        assert!(            i.write_u8_be_radix(&mut buf[0..3], 65).is_err());
+        let bytes_written = i.write_u8_be_radix(&mut buf[0..4], 65).unwrap();
+        assert_eq!(bytes_written, 3);
+        assert_eq!(&buf[..], &[64u8, 64, 64, 0]);
     }
 
     #[test]
