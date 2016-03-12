@@ -60,9 +60,13 @@ pub unsafe fn num_base_digits(p: Limbs, n: i32, base: u32) -> usize {
         // `bit_length`)
         total_bits
     } else if base.is_power_of_two() {
-        let big_base = BASES.get_unchecked(base as usize).big_base.0 as usize;
-        // doing an actual division here is much slower than this
-        (total_bits + big_base - 1) >> big_base.trailing_zeros()
+        let bits_per_digit = BASES.get_unchecked(base as usize).big_base.0 as usize;
+        if bits_per_digit.is_power_of_two() {
+            // doing an actual division here is much slower than this
+            (total_bits + bits_per_digit - 1) >> bits_per_digit.trailing_zeros()
+        } else {
+            (total_bits + bits_per_digit - 1) / bits_per_digit
+        }
     } else {
         // Not sure if using floating-point arithmetic here is the best idea,
         // but it should be a reasonable accurate result, maybe a little high
