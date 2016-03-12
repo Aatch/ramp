@@ -271,9 +271,13 @@ impl Int {
         }
 
         let size = self.abs_size();
-        let num_digits = unsafe {
+        let mut num_digits = unsafe {
             ll::base::num_base_digits(self.limbs(), size - 1, base as u32)
         };
+
+        if self.sign() == -1 {
+            num_digits += 1;
+        }
 
         let mut buf : Vec<u8> = Vec::with_capacity(num_digits);
 
@@ -3673,6 +3677,30 @@ mod test {
             unsafe {
                 assert_eq!(digits,
                            num_base_digits(i.limbs(), i.abs_size(), base));
+            }
+        }
+    }
+
+    #[test]
+    fn num_base_digits() {
+        use ::ll::base::num_base_digits;
+        let cases = [
+            ("0", 15, 1),
+            ("0", 58, 1),
+            ("49172", 10, 5),
+            ("49172", 57, 3), // [15, 7, 38], 38 + 7*57 + 15*57**2 = 49172
+            ("185192", 57, 3), // [56, 56, 56], 56 + 56*57 + 56*57**2 = 185192
+            ("185193", 57, 4), // [1, 0, 0, 0], 1*57**3 = 185193
+            ("250046", 63, 3), // [62, 62, 62], 62 + 62*63 + 62*63**2 = 250046
+            ("250047", 63, 4), // [1, 0, 0, 0], 1*63**3 = 250047
+            ("274624", 65, 3), // [64, 64, 64], 64 + 64*65 + 64*65**2 = 274624
+            ("274625", 65, 4), // [1, 0, 0, 0], 1*65**3 = 274625
+        ];
+        for &(s, base, digits) in cases.iter() {
+            let i : Int = s.parse().unwrap();
+            unsafe {
+                let estimate = num_base_digits(i.limbs(), i.abs_size(), base);
+                assert!(digits == estimate || digits == estimate - 1);
             }
         }
     }

@@ -45,6 +45,11 @@ fn div_unnorm(n: Limb, d: Limb) -> (Limb, Limb) {
 }
 
 #[inline]
+/// Returns the number of digits needed to represent `p` in base `base`
+/// without sign. If the base is not a power of two, the result is only
+/// an estimate. It can equal the the actually needed digits or overestimate
+/// by 1.
+/// Returns 1 if the number is 0;
 pub unsafe fn num_base_digits(p: Limbs, n: i32, base: u32) -> usize {
     debug_assert!(base >= 2);
     assume(base >= 2);
@@ -74,7 +79,7 @@ pub unsafe fn num_base_digits(p: Limbs, n: i32, base: u32) -> usize {
 
         let lg2b = (base as f64).log2();
         let digits = total_bits / lg2b;
-        return 1 + digits.ceil() as usize;
+        return digits.ceil() as usize;
     }
 }
 
