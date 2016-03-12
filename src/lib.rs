@@ -16,8 +16,7 @@
 #![crate_name="ramp"]
 
 #![feature(core_intrinsics, asm, heap_api, associated_consts)]
-#![feature(zero_one, step_trait, unique, alloc, op_assign_traits)]
-#![feature(augmented_assignments)]
+#![feature(zero_one, step_trait, unique, alloc)]
 
 #![cfg_attr(test, feature(test))]
 
