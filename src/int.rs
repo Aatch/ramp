@@ -431,6 +431,101 @@ impl Int {
         }
     }
 
+    /// Creates a new positive `Int` from a big endian byte slice.
+    /// Effectively the whole byte slice is threated as one single
+    /// giant number (in big endian format).
+    /// Returns 0 if input is empty given.
+    #[allow(unreachable_code)]
+    pub fn from_big_endian_slice(src: &[u8]) -> Int {
+        let num_input_bytes = src.len() * std::mem::size_of::<u8>();
+
+        if num_input_bytes == 0 {
+            return Int::zero();
+        }
+
+        // The compiler should turn this into a shift operation -> verified
+        // https://play.rust-lang.org/?gist=513389ce211df11eec86&version=stable
+        let mut num_limbs = num_input_bytes / std::mem::size_of::<Limb>();
+
+        // The division rounds down. We have to add a limb if
+        // input bytes do not fall on limb boundaries.
+        let mut num_bytes_in_limbs = num_limbs * std::mem::size_of::<Limb>();
+        if num_input_bytes > num_bytes_in_limbs {
+            num_limbs += 1;
+            num_bytes_in_limbs += std::mem::size_of::<Limb>();
+        }
+
+        let mut i = Int::with_capacity(num_limbs as u32);
+        unsafe {
+            let mut limbs : LimbsMut = i.limbs_uninit();
+            use std::ops::DerefMut;
+            let mut as_u8 : &mut[u8] = std::slice::from_raw_parts_mut(
+                                            limbs.deref_mut() as *mut _ as *mut u8,
+                                            num_bytes_in_limbs);
+
+            if cfg!(target_endian = "big") {
+                panic!("from_big_endian_slice untested on big endian systems");
+                // Start with least significant src byte (that means calling .rev())
+                // limb[0] is least significant limb.
+                // The least significant byte in the least significant limb
+                // is the last byte, here accessible as as_u8[limb_size-1].
+                // That means, the incomming bytes a..m (already .rev()ed,
+                // m is most significant ) must be placed into the e.g. two
+                // destination limbs (if 64_86) like this:
+                // L0[ h g f e d c b a ] L1[ 0 0 0 m l k j i ]
+                // or if x86 into 4 limbs:
+                // L0[ d c b a ] L1[ h g f e ] L2[ l k j i ] L3[ 0 0 0 m ]
+
+                let limb_size = std::mem::size_of::<Limb>();
+
+                let mut in_bytes = src.iter().rev();
+                for i in 1..num_limbs+1 {
+                    for j in 1..limb_size+1 {
+                        let out_pos = i * limb_size - j;
+                        let b = as_u8.get_unchecked_mut(out_pos);
+                        *b = match in_bytes.next() {
+                            Some(e) => *e,
+                            None => 0
+                        };
+                    }
+                }
+                // Manual test:
+                // Input [14,  252, 125,  13,  15, 26,  26, 231,
+                //        121,  63,  53,  255, 24, 152, 199, 1,
+                //        121,  63,  53,  255, 24, 152, 199, 2,
+                //        121,  63,  53,  255, 24, 152, 199, 3, ]
+                // will be converted into
+                //       [121, 63, 53, 255, 24, 152, 199, 3,
+                //        121, 63, 53, 255, 24, 152, 199, 2,
+                //        121, 63, 53, 255, 24, 152, 199, 1,
+                //        14, 252, 125, 13, 15, 26, 26, 231]
+                // which seems fine to me. But test!
+
+
+            } else {
+                // Start with least significant src byte (that means calling .rev())
+                // limb[0] is least significant limb.
+                // The least significant byte in the least significant limb
+                // is the first byte, here accessible as as_u8[0].
+                // That means, the incomming bytes a..m (already .rev()ed )
+                // must be placed into the e.g. two destination limbs (if 64_86) like this:
+                // L0[ a b c d e f g h ] L1[ i j k l m 0 0 0 ]
+                for (s, d) in src.iter().rev().zip(as_u8.iter_mut()) {
+                    *d = *s;
+                }
+                // Missing bytes must be filled up with zeros.
+                for i in num_input_bytes..num_bytes_in_limbs {
+                    let b = as_u8.get_unchecked_mut(i);
+                    *b = 0;
+                }
+            }
+            i.size = num_limbs as i32;
+            i.normalize();
+        }
+
+        return i;
+    }
+
     /**
      * Divide self by other, returning the quotient, Q, and remainder, R as (Q, R).
      *
@@ -3793,8 +3888,6 @@ mod test {
 
     #[test]
     fn high_radix_conversion() {
-        use ::ll::base::num_base_digits;
-
         // empty input
         assert!(Int::from_u8_be_radix(&[], 10).is_err());
 
@@ -3820,6 +3913,43 @@ mod test {
         let bytes_written = i.write_u8_be_radix(&mut buf[0..4], 65).unwrap();
         assert_eq!(bytes_written, 3);
         assert_eq!(&buf[..], &[64u8, 64, 64, 0]);
+    }
+
+    #[test]
+    fn from_big_endian_slice() {
+        let raw = vec![14u8, 252, 125, 13,  15, 26,  26, 231,
+                           121,  63,  53,  255, 24, 152, 199, 1,
+                           121,  63,  53,  255, 24, 152, 199, 2,
+                           121,  63,  53,  255, 24, 152, 199, 3,
+                           ];
+
+        assert_eq!(Int::from_big_endian_slice(&raw[0..32]),
+                   "6778488410852961169736838906603090358023300821981235894893398721818619594499".parse::<Int>().unwrap());
+
+        assert_eq!(Int::from_big_endian_slice(&raw[0..16]),
+                   "19920187085180002197375719240334100225".parse::<Int>().unwrap());
+
+        assert_eq!(Int::from_big_endian_slice(&raw[0..8]),
+                   "1079875505703492327".parse::<Int>().unwrap());
+
+        assert_eq!(Int::from_big_endian_slice(&raw[3..6]),
+                   "855834".parse::<Int>().unwrap());
+
+        assert_eq!(Int::from_big_endian_slice(&raw[3..5]),
+                   "3343".parse::<Int>().unwrap());
+
+        assert_eq!(Int::from_big_endian_slice(&raw[3..4]),
+                   "13".parse::<Int>().unwrap());
+
+        assert_eq!(Int::from_big_endian_slice(&raw[3..3]),
+                   "0".parse::<Int>().unwrap());
+
+        // Python helper: from_be([13,15,26])
+        //  def from_be(n):
+        //      b = [256] * len(n)
+        //      c = [ b**i for i, b in enumerate(b) ]
+        //      c.reverse()
+        //      return sum([b*n for b, n in zip(c, n)])
     }
 
     #[test]
