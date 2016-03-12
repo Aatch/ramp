@@ -763,7 +763,7 @@ fn from_u8_radix(a: BigIntStr, b: u8) -> TestResult {
         assert_eq!(0, *b); // not written bytes
     }
 
-    let back = Int::from_u8_radix(&buf[0..bytes_written], b).unwrap();
+    let back = Int::from_u8_be_radix(&buf[0..bytes_written], b).unwrap();
 
     assert_eq!(back, ar.abs());
 
