@@ -50,8 +50,12 @@ impl Clone for Limb {
 impl Limb {
     #[cfg(target_pointer_width = "32")]
     pub const BITS : usize = 32;
+    #[cfg(target_pointer_width = "32")]
+    pub const BYTES : usize = 4;
     #[cfg(target_pointer_width = "64")]
     pub const BITS : usize = 64;
+    #[cfg(target_pointer_width = "64")]
+    pub const BYTES : usize = 8;
 
     pub const B : Limb = Limb(1 << (Limb::BITS / 2));
 
@@ -144,6 +148,44 @@ impl Limb {
     #[inline(always)]
     pub fn trailing_zeros(self) -> BaseInt {
         self.0.trailing_zeros() as BaseInt
+    }
+
+    pub unsafe fn iter_raw_bytes<'a>(&'a self) -> LimbRawBytesIteratorState<'a> {
+        LimbRawBytesIteratorState {
+            limb: &self,
+            index: 0,
+            index_back: Limb::BYTES
+        }
+    }
+
+}
+
+pub struct LimbRawBytesIteratorState<'a> {
+    limb : &'a Limb,
+    index : usize,
+    index_back : usize,
+}
+
+impl<'a> Iterator for LimbRawBytesIteratorState<'a> {
+    type Item = u8;
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.index == Limb::BYTES {
+            return None;
+        }
+        let byte = ((self.limb.0 >> (self.index * 8)) & 0xFF) as u8;
+        self.index += 1;
+        Some(byte)
+    }
+}
+
+impl<'a> DoubleEndedIterator for LimbRawBytesIteratorState<'a> {
+    fn next_back(&mut self) -> Option<Self::Item> {
+        if self.index_back == 0 {
+            return None;
+        }
+        self.index_back -= 1;
+        let byte : u8 = ((self.limb.0 >> (self.index_back * 8)) & 0xFF) as u8;
+        Some(byte)
     }
 }
 

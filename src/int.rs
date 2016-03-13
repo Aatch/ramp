@@ -240,6 +240,14 @@ impl Int {
         }
     }
 
+    fn iter<'a>(&'a self) -> LimbsIteratorState<'a> {
+        LimbsIteratorState {
+            int: &self,
+            index: 0,
+            index_back: self.abs_size()
+        }
+    }
+
     /**
      * Try to shrink the allocated data for this Int.
      */
@@ -255,20 +263,45 @@ impl Int {
         })
     }
 
-    /**
-     * Returns a string containing the value of self in base `base`. For bases greater than
-     * ten, if `upper` is true, upper-case letters are used, otherwise lower-case ones are used.
-     *
-     * Panics if `base` is less than two or greater than 36.
-     */
+    /// Returns an estimate for the needed buffer size to store
+    /// the current absolute value of this `Int` in base `base`.
+    ///
+    /// Returns 1 if the number is 0;
+    ///
+    /// It may overestimate by one if the base is not a power of two.
+    ///
+    /// Pay attention to the actually number of written bytes in the
+    /// return values of the `write_u8_be_radix` method.
+    #[inline]
+    pub fn estimate_num_base_digits(&self, base: u8) -> usize {
+        unsafe {
+            ll::base::num_base_digits(self.limbs(), self.abs_size() , base as u32)
+        }
+    }
+
+    /// Returns the needed buffer size to store the current
+    /// absolute value of this `Int` as one giant big endian number.
+    ///
+    /// Returns 0 if the number is 0;
+    #[inline]
+    pub fn minimal_buffer_size(&self) -> usize {
+        debug_assert!(self.well_formed());
+
+        let leading_zeros = self.leading_zeros() as u32;
+        let bytes_needed = self.abs_size() as u32 * std::mem::size_of::<Limb>() as u32 - (leading_zeros / 8);
+        bytes_needed as usize
+    }
+
+    ///Returns a string containing the value of self in base `base`. For bases greater than
+    ///ten, if `upper` is true, upper-case letters are used, otherwise lower-case ones are used.
+    ///Prepends a '-' if self is negative.
+    ///Panics if `base` is less than two or greater than 36.
     pub fn to_str_radix(&self, base: u8, upper: bool) -> String {
         if self.size == 0 {
             return "0".to_string();
         }
 
-        let mut num_digits = unsafe {
-            ll::base::num_base_digits(self.limbs(), self.abs_size() , base as u32)
-        };
+        let mut num_digits = self.estimate_num_base_digits(base);
 
         if self.sign() == -1 {
             num_digits += 1;
@@ -341,6 +374,94 @@ impl Int {
         unsafe {
             ll::base::to_base(base as u32, self.limbs(), self.abs_size(), receiver);
         }
+    }
+
+    /// Write this `Int`s number as one giant big endian into buffer `dst`.
+    /// Will not write any bytes if this `Int` equals 0.
+    /// Will not write more bytes than needed, even if the buffer is greater.
+    /// The most significant byte will be in dst[0]. If you want the output
+    /// to be right aligned, use `write_big_endian_buffer_align()`
+    ///
+    /// Returns the number of bytes written.
+    #[allow(unreachable_code)]
+    pub fn write_big_endian_buffer(&self, dst : &mut [u8]) -> Result<usize, BufferToSmallError> {
+        debug_assert!(self.well_formed());
+
+        if self.size == 0 {
+            return Ok(0);
+        }
+
+        let bytes_needed = self.minimal_buffer_size();
+
+        if dst.len() < bytes_needed {
+            return Err(BufferToSmallError);
+        }
+
+        let num_bytes_in_limbs = (self.abs_size() as usize) * std::mem::size_of::<Limb>();
+
+        unsafe {
+            let limbs : Limbs = self.limbs();
+            use std::ops::Deref;
+            let as_u8 : &[u8] = std::slice::from_raw_parts(
+                                            limbs.deref() as *const _ as *const u8,
+                                            num_bytes_in_limbs);
+
+            if cfg!(target_endian = "big") {
+                panic!("write_big_endian_buffer untested on big endian systems");
+                // This is a number as it is saved in the Limbs.
+                // m is the most significant byte and must be
+                // written to dst[0]
+                // L0[ h g f e d c b a ] L1[ 0 0 0 m l k j i ]
+                // or if x86 into 4 limbs:
+                // L0[ d c b a ] L1[ h g f e ] L2[ l k j i ] L3[ 0 0 0 m ]
+
+                // untested, unperformant and guessed!
+                let skip = num_bytes_in_limbs - bytes_needed;
+                for (s, d) in self.iter().rev()
+                                      .flat_map(|limb| { limb.iter_raw_bytes() })
+                                      .skip(skip)
+                                      .zip(dst.iter_mut()) {
+                    *d = s
+                }
+
+            } else {
+                // This is a number as it is saved in the Limbs.
+                // m is the most significant byte and must be
+                // written to dst[0]
+                // L0[ a b c d e f g h ] L1[ i j k l m 0 0 0 ]
+                let as_u8 = &as_u8[0..bytes_needed];
+                for (s, d) in  as_u8.iter().rev().zip(dst.iter_mut()) {
+                    *d = *s;
+                }
+            }
+        }
+
+        Ok(bytes_needed)
+    }
+
+    /// Write this `Int`s number as one giant big endian into buffer `dst`.
+    /// Will zero out `dst` if this `Int` equals 0.
+    /// The least significant byte will be in dst[end].
+    /// It will fill up leading zero bytes until dst[0]
+    ///
+    /// Returns the number of bytes written aka dst.len()
+    pub fn write_big_endian_buffer_align(&self, dst : &mut [u8]) -> Result<usize, BufferToSmallError> {
+        debug_assert!(self.well_formed());
+
+        let bytes_needed = self.minimal_buffer_size();
+        let num_leading_zeros = dst.len() - bytes_needed;
+        let bytes_written = match self.write_big_endian_buffer(&mut dst[num_leading_zeros..]) {
+            Ok(size) => size,
+            Err(e) => return Err(e)
+        };
+        debug_assert!(bytes_written == bytes_needed);
+        for i in 0..num_leading_zeros {
+            unsafe {
+                let b = dst.get_unchecked_mut(i);
+                *b = 0;
+            }
+        }
+        Ok(dst.len())
     }
 
     /**
@@ -743,6 +864,17 @@ impl Int {
         } else {
             unsafe {
                 ll::scan_1(self.limbs(), self.abs_size())
+            }
+        }
+    }
+
+    pub fn leading_zeros(&self) -> u32 {
+        debug_assert!(self.well_formed());
+        if self.sign() == 0 {
+            0
+        } else {
+            unsafe {
+                (self.limbs()).offset((self.abs_size() - 1) as isize).leading_zeros() as u32
             }
         }
     }
@@ -3629,6 +3761,41 @@ impl std::iter::Step for Int {
     }
 }
 
+struct LimbsIteratorState<'a> {
+    int : &'a Int,
+    index : i32,
+    index_back : i32,
+}
+
+impl<'a> Iterator for LimbsIteratorState<'a> {
+    type Item = &'a Limb;
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.index == self.int.abs_size() {
+            return None;
+        }
+        use std::ops::Deref;
+        unsafe {
+            let limb = self.int.limbs().offset(self.index as isize).deref() as *const Limb;
+            self.index += 1;
+            return Some(&*limb);
+        };
+    }
+}
+
+impl<'a> DoubleEndedIterator for LimbsIteratorState<'a> {
+    fn next_back(&mut self) -> Option<Self::Item> {
+        if self.index_back == 0 {
+            return None;
+        }
+        use std::ops::Deref;
+        unsafe {
+            self.index_back -= 1;
+            let limb = self.int.limbs().offset(self.index_back as isize).deref() as *const Limb;
+            return Some(&*limb);
+        };
+    }
+}
+
 /// Trait for generating random `Int`.
 ///
 /// # Example
@@ -3832,9 +3999,8 @@ mod test {
 
     #[test]
     fn num_base_digits_pow2() {
-        use ::ll::base::num_base_digits;
         let cases = [
-            ("10", 2, 4), // 0b 1010
+            ("10", 2, 4usize), // 0b 1010
             ("15", 2, 4), // 0b 1111
             ("16", 2, 5), // 0b10000
             ("1023", 2, 10), // 0b 1111111111
@@ -3855,18 +4021,15 @@ mod test {
         ];
         for &(s, base, digits) in cases.iter() {
             let i : Int = s.parse().unwrap();
-            unsafe {
-                assert_eq!(digits,
-                           num_base_digits(i.limbs(), i.abs_size(), base));
-            }
+            assert_eq!(digits,
+                       i.estimate_num_base_digits(base));
         }
     }
 
     #[test]
     fn num_base_digits() {
-        use ::ll::base::num_base_digits;
         let cases = [
-            ("0", 15, 1),
+            ("0", 15, 1usize),
             ("0", 58, 1),
             ("49172", 10, 5),
             ("49172", 57, 3), // [15, 7, 38], 38 + 7*57 + 15*57**2 = 49172
@@ -3879,12 +4042,29 @@ mod test {
         ];
         for &(s, base, digits) in cases.iter() {
             let i : Int = s.parse().unwrap();
-            unsafe {
-                let estimate = num_base_digits(i.limbs(), i.abs_size(), base);
-                assert!(digits == estimate || digits == estimate - 1);
-            }
+            let estimate = i.estimate_num_base_digits(base);
+            assert!(digits == estimate || digits == estimate - 1);
         }
     }
+
+    #[test]
+    fn minimal_buffer_size() {
+        let cases = [
+            ("0", 0),
+            ("49172", 2),
+            ("185192", 3),
+            ("250046", 3),
+            ("130944", 3), // 0x 01 FF 80
+            ("16777088", 3), // 0x FF FF 80
+            ("18446744073709551615", 8), // 0x    FFFF FFFF FFFF FFFF
+            ("18446744073709551616", 9), // 0x 01 0000 0000 0000 0000
+        ];
+        for &(s, bufferlen) in cases.iter() {
+            let i : Int = s.parse().unwrap();
+            assert_eq!(bufferlen, i.minimal_buffer_size());
+        }
+    }
+
 
     #[test]
     fn high_radix_conversion() {
@@ -3916,12 +4096,73 @@ mod test {
     }
 
     #[test]
+    fn write_big_endian_buffer() {
+        let raw = vec![14u8, 252, 125, 13,  15, 26,  26, 231,
+                       121,  63,  53,  255, 24, 152, 199, 1,
+                       121,  63,  53,  255, 24, 152, 199, 2,
+                       121,  63,  53,  255, 24, 152, 199, 3, ];
+
+        let cases = [
+            ("6778488410852961169736838906603090358023300821981235894893398721818619594499", &raw[0..32]),
+            ("19920187085180002197375719240334100225", &raw[0..16]),
+            ("1079875505703492327", &raw[0..8]),
+            ("855834", &raw[3..6]),
+            ("3343", &raw[3..5]),
+            ("13", &raw[3..4]),
+        ];
+        for &(s, orig) in cases.iter() {
+            let i : Int = s.parse().unwrap();
+            let mut buf = vec![0u8; i.minimal_buffer_size()];
+            i.write_big_endian_buffer(&mut buf[..]).unwrap();
+            assert_eq!(&buf[..], orig);
+        }
+
+        let i : Int = Int::zero();
+        let mut buf = vec![0u8; i.minimal_buffer_size()];
+        let bytes_written = i.write_big_endian_buffer(&mut buf[..]).unwrap();
+        assert_eq!(bytes_written, 0);
+    }
+
+    #[test]
+    fn write_big_endian_buffer_aligned() {
+        let raw = vec![14u8, 252, 125, 13,  15, 26,  26, 231,
+                       121,  63,  53,  255, 24, 152, 199, 1,
+                       121,  63,  53,  255, 24, 152, 199, 2,
+                       121,  63,  53,  255, 24, 152, 199, 3, ];
+
+        let cases = [
+            ("6778488410852961169736838906603090358023300821981235894893398721818619594499", &raw[0..32]),
+            ("19920187085180002197375719240334100225", &raw[0..16]),
+            ("1079875505703492327", &raw[0..8]),
+            ("855834", &raw[3..6]),
+            ("3343", &raw[3..5]),
+            ("13", &raw[3..4]),
+        ];
+
+        for &(s, orig) in cases.iter() {
+            let i : Int = s.parse().unwrap();
+            let numsize = i.minimal_buffer_size();
+            assert_eq!(numsize, orig.len());
+            let mut buf = vec![1u8; 100]; // filled with 1
+            let bytes_written = i.write_big_endian_buffer_align(&mut buf[..]).unwrap();
+            assert_eq!(bytes_written, buf.len());
+            assert_eq!(&buf[buf.len() - numsize..], orig);
+            assert!(buf[..buf.len() - numsize].iter().all(|b| *b == 0));
+        }
+
+        let i : Int = Int::zero();
+        let mut buf = vec![1u8; i.minimal_buffer_size()];
+        let bytes_written = i.write_big_endian_buffer_align(&mut buf[..]).unwrap();
+        assert!(buf[..].iter().all(|b| *b == 0));
+        assert_eq!(bytes_written, buf.len());
+    }
+
+    #[test]
     fn from_big_endian_slice() {
         let raw = vec![14u8, 252, 125, 13,  15, 26,  26, 231,
-                           121,  63,  53,  255, 24, 152, 199, 1,
-                           121,  63,  53,  255, 24, 152, 199, 2,
-                           121,  63,  53,  255, 24, 152, 199, 3,
-                           ];
+                       121,  63,  53,  255, 24, 152, 199, 1,
+                       121,  63,  53,  255, 24, 152, 199, 2,
+                       121,  63,  53,  255, 24, 152, 199, 3, ];
 
         assert_eq!(Int::from_big_endian_slice(&raw[0..32]),
                    "6778488410852961169736838906603090358023300821981235894893398721818619594499".parse::<Int>().unwrap());
@@ -3950,6 +4191,44 @@ mod test {
         //      c = [ b**i for i, b in enumerate(b) ]
         //      c.reverse()
         //      return sum([b*n for b, n in zip(c, n)])
+    }
+
+    #[test]
+    fn leading_zeros() {
+        let limbsize = Limb::BITS as u32;
+        assert_eq!(0,
+                  "0".parse::<Int>().unwrap().leading_zeros());
+        assert_eq!(limbsize - 1,
+                  "1".parse::<Int>().unwrap().leading_zeros());
+        assert_eq!(limbsize - 7,
+                  "100".parse::<Int>().unwrap().leading_zeros());
+        assert_eq!(0, // all bits 1 at u64
+                  "18446744073709551615".parse::<Int>().unwrap().leading_zeros());
+        assert_eq!(limbsize - 1, // overflow to next limb
+                  "18446744073709551616".parse::<Int>().unwrap().leading_zeros());
+    }
+
+    #[test]
+    fn iterators() {
+        let raw = vec![0u8, 252, 125, 13,  15, 26,  26, 231,
+                       121,  63,  53, 255, 24, 152, 199, 0 ];
+        let int = Int::from_big_endian_slice(&raw[..]);
+
+        let limbs : Vec<&Limb> = int.iter().collect();
+        let limbs_rev : Vec<&Limb> = int.iter().rev().collect();
+        assert_eq!(limbs[0], limbs_rev[limbs_rev.len()-1]);
+        assert_eq!(limbs_rev[0], limbs[limbs.len()-1]);
+
+        unsafe {
+            for (i, b) in limbs[0].iter_raw_bytes().enumerate() {
+                assert_eq!(b, raw[raw.len() - 1 - i]);
+                assert!(i < Limb::BYTES);
+            }
+            for (i, b) in limbs[0].iter_raw_bytes().rev().enumerate() {
+                assert_eq!(b, raw[raw.len() - Limb::BYTES + i]);
+                assert!(i < Limb::BYTES);
+            }
+        }
     }
 
     #[test]
