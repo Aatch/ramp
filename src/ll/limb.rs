@@ -437,7 +437,7 @@ fn mul(u: Limb, v: Limb) -> (Limb, Limb) {
             unsafe {
                 asm!("mulq $3"
                      : "={rdx}"(high.0), "={rax}"(low.0)
-                     : "{rax}"(u.0), "r|m"(v.0));
+                     : "{rax}"(u.0), "r"(v.0));
             }
 
             (high, low)
@@ -451,7 +451,7 @@ fn mul(u: Limb, v: Limb) -> (Limb, Limb) {
             unsafe {
                 asm!("mull $3"
                      : "={edx}"(high.0), "={eax}"(low.0)
-                     : "{eax}"(u.0), "r|m"(v.0));
+                     : "{eax}"(u.0), "r"(v.0));
             }
 
             (high, low)
@@ -497,7 +497,7 @@ pub fn add_2(ah: Limb, al: Limb, bh: Limb, bl: Limb) -> (Limb, Limb) {
                 asm!("addq $4, $0
                       adcq $5, $1"
                      : "=r"(low.0), "=r"(high.0)
-                     : "0"(al.0), "1"(ah.0), "r|e|m"(bl.0), "r|e|m"(bh.0));
+                     : "0"(al.0), "1"(ah.0), "r"(bl.0), "r"(bh.0));
             }
 
             (high, low)
@@ -512,7 +512,7 @@ pub fn add_2(ah: Limb, al: Limb, bh: Limb, bl: Limb) -> (Limb, Limb) {
                 asm!("addl $4, $0
                       adcl $5, $1"
                      : "=r"(low.0), "=r"(high.0)
-                     : "0"(al.0), "1"(ah.0), "r|e|m"(bl.0), "r|e|m"(bh.0));
+                     : "0"(al.0), "1"(ah.0), "r"(bl.0), "r"(bh.0));
             }
 
             (high, low)
@@ -545,7 +545,7 @@ pub fn sub_2(ah: Limb, al: Limb, bh: Limb, bl: Limb) -> (Limb, Limb) {
                 asm!("subq $4, $0
                       sbbq $5, $1"
                      : "=r"(low.0), "=r"(high.0)
-                     : "0"(al.0), "1"(ah.0), "r|e|m"(bl.0), "r|e|m"(bh.0));
+                     : "0"(al.0), "1"(ah.0), "r"(bl.0), "r"(bh.0));
             }
 
             (high, low)
@@ -560,7 +560,7 @@ pub fn sub_2(ah: Limb, al: Limb, bh: Limb, bl: Limb) -> (Limb, Limb) {
                 asm!("subl $4, $0
                       sbbl $5, $1"
                      : "=r"(low.0), "=r"(high.0)
-                     : "0"(al.0), "1"(ah.0), "r|e|m"(bl.0), "r|e|m"(bh.0));
+                     : "0"(al.0), "1"(ah.0), "r"(bl.0), "r"(bh.0));
             }
 
             (high, low)
@@ -599,7 +599,7 @@ pub fn div(nh: Limb, nl: Limb, d: Limb) -> (Limb, Limb) {
             unsafe {
                 asm!("divq $4"
                      : "={rdx}"(r.0), "={rax}"(q.0)
-                     : "0"(nh.0), "1"(nl.0), "r|m"(d.0));
+                     : "0"(nh.0), "1"(nl.0), "r"(d.0));
             }
             (q, r)
         }
@@ -612,7 +612,7 @@ pub fn div(nh: Limb, nl: Limb, d: Limb) -> (Limb, Limb) {
             unsafe {
                 asm!("divl $4"
                      : "={edx}"(r.0), "={eax}"(q.0)
-                     : "0"(nh.0), "1"(nl.0), "r|m"(d.0));
+                     : "0"(nh.0), "1"(nl.0), "r"(d.0));
             }
             (q, r)
         }
