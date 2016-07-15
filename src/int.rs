@@ -19,8 +19,7 @@ use std::cmp::{
     PartialOrd, PartialEq
 };
 use std::error::Error;
-use std::{fmt, hash};
-use std::io;
+use std::{io, mem, fmt, hash};
 use std::num::Zero;
 use std::ops::{
     Add, Sub, Mul, Div, Rem, Neg,
@@ -3445,6 +3444,30 @@ impl std::iter::Step for Int {
         } else {
             Some(usize::from(&diff))
         }
+    }
+
+    fn steps_between_by_one(start: &Self, end: &Self) -> Option<usize> {
+        Self::steps_between(start, end, &Self::one())
+    }
+
+    fn is_negative(&self) -> bool {
+        self.sign() < 0
+    }
+
+    fn replace_one(&mut self) -> Self {
+        mem::replace(self, Self::one())
+    }
+
+    fn replace_zero(&mut self) -> Self {
+        mem::replace(self, Self::zero())
+    }
+
+    fn add_one(&self) -> Self {
+        self + 1
+    }
+
+    fn sub_one(&self) -> Self {
+        self - 1
     }
 }
 
