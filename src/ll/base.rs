@@ -100,8 +100,10 @@ pub fn base_digits_to_len(num: usize, base: u32) -> usize {
  *
  * The values in `out` are the raw values of the base. Conversion for output should be done as a second
  * step.
+ *
+ * `out_byte` will be called at least min_len times, inserting leading zeros if needed.
  */
-pub unsafe fn to_base<F: FnMut(u8)>(base: u32, np: Limbs, nn: i32, mut out_byte: F) {
+pub unsafe fn to_base<F: FnMut(u8)>(base: u32, np: Limbs, nn: i32, mut out_byte: F, min_len: u32) {
     debug_assert!(nn >= 0);
     debug_assert!(base < BASES.len() as u32);
     debug_assert!(base >= 2);
@@ -155,7 +157,7 @@ pub unsafe fn to_base<F: FnMut(u8)>(base: u32, np: Limbs, nn: i32, mut out_byte:
         return;
     }
     // TODO: Use divide-and-conquer for large numbers
-    to_base_impl(0, base, np, nn, out_byte);
+    to_base_impl(min_len, base, np, nn, out_byte);
 }
 
 unsafe fn to_base_impl<F: FnMut(u8)>(mut len: u32, base: u32, np: Limbs, mut nn: i32, mut out_byte: F) {

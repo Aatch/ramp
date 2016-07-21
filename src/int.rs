@@ -365,6 +365,11 @@ impl Int {
     }
 
     pub fn write_radix_callback<F: FnMut(u8)>(&self, base : u8, receiver: F) {
+        self.write_radix_callback_minlen(base, 0, receiver);
+    }
+
+    #[inline]
+    pub fn write_radix_callback_minlen<F: FnMut(u8)>(&self, base : u8, min_len: u32, receiver: F) {
         debug_assert!(self.well_formed());
 
         if base < 2 {
@@ -372,7 +377,7 @@ impl Int {
         }
 
         unsafe {
-            ll::base::to_base(base as u32, self.limbs(), self.abs_size(), receiver);
+            ll::base::to_base(base as u32, self.limbs(), self.abs_size(), receiver, min_len);
         }
     }
 
@@ -3758,6 +3763,32 @@ impl std::iter::Step for Int {
         } else {
             Some(usize::from(&diff))
         }
+    }
+
+    fn steps_between_by_one(start: &Self, end: &Self) -> Option<usize> {
+        Self::steps_between(&start, &end, &Int::from(1))
+    }
+
+    fn is_negative(&self) -> bool {
+        self.lt(&0)
+    }
+
+    fn replace_one(mut self : &mut Self) -> Self {
+        use std::mem;
+        mem::replace(&mut self, Int::from(1))
+    }
+
+    fn replace_zero(mut self : &mut Self) -> Self {
+        use std::mem;
+        mem::replace(&mut self, Int::from(0))
+    }
+
+    fn add_one(&self) -> Self {
+        self + Int::from(1)
+    }
+
+    fn sub_one(&self) -> Self {
+        self - Int::from(1)
     }
 }
 
