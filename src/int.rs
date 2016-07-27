@@ -828,6 +828,34 @@ impl Int {
     pub fn lcm(&self, other: &Int) -> Int {
         (self * other).abs() / self.gcd(other)
     }
+
+    pub fn to_f64(&self) -> f64 {
+        let sz = self.abs_size();
+        if sz == 0 {
+            return 0.0;
+        }
+
+        let mut highest_limb = unsafe {
+            *self.limbs().offset((sz - 1) as isize)
+        };
+        let leading_zeros = highest_limb.leading_zeros();
+        let mut shifted = 0;
+        if leading_zeros > 11 && sz > 1 {
+            highest_limb = highest_limb << leading_zeros;
+            let next_limb = unsafe {
+                *self.limbs().offset((sz - 2) as isize)
+            };
+
+            highest_limb = highest_limb | (next_limb >> (Limb::BITS - leading_zeros as usize));
+            shifted = leading_zeros;
+        }
+
+        let exp = ((sz - 1) * Limb::BITS as i32) - shifted as i32;
+
+        let f = highest_limb.0 as f64;
+        let exp = (2.0f64).powi(exp);
+        f * exp
+    }
 }
 
 impl Clone for Int {
