@@ -20,8 +20,16 @@ use std::ops::{
 };
 use std::fmt;
 
+use ll;
+
 use int::Int;
 
+/**
+ * An arbitrary-precision rational number.
+ *
+ * This type is used to represent numbers in the form `a / b` where `a` and `b`
+ * are integers and `b` is non-zero.
+ */
 #[derive(Clone)]
 pub struct Rational {
     n: Int,
@@ -29,7 +37,17 @@ pub struct Rational {
 }
 
 impl Rational {
+
     pub fn new(n: Int, d: Int) -> Rational {
+        assert!(d != 0, "Denominator is zero");
+
+        if n == 0 {
+            return Rational {
+                n: n,
+                d: Int::one()
+            }
+        }
+
         let mut rat = Rational {
             n: n,
             d: d
@@ -40,11 +58,25 @@ impl Rational {
         rat
     }
 
+    /**
+     * Returns whether or not this rational is normalized or not
+     */
     pub fn normalized(&self) -> bool {
         let gcd = self.n.gcd(&self.d);
         gcd == 1
     }
 
+    /**
+     * Normalize this Rational.
+     *
+     * This method will cause the value to be represented in the
+     * form `a/b` where `a` and `b` are relatively prime. It also
+     * ensures that the denominator is positive.
+     *
+     * Normalizing rationals will result in faster calculations as
+     * it ensures that the numerator and denominator are as small as
+     * they can be.
+     */
     pub fn normalize(&mut self) {
         let gcd = self.n.gcd(&self.d);
 
@@ -58,6 +90,9 @@ impl Rational {
         }
     }
 
+    /**
+     * Returns the reciprocal of this Rational
+     */
     pub fn invert(self) -> Rational {
         Rational {
             n: self.d,
@@ -65,6 +100,9 @@ impl Rational {
         }
     }
 
+    /**
+     * Converts this Rational to an `f64` value.
+     */
     pub fn to_f64(&self) -> f64 {
         let mut normalized = self.clone();
         normalized.normalize();
@@ -404,25 +442,31 @@ impl<'a> Mul<&'a Rational> for &'a Int {
 }
 
 impl DivAssign<Rational> for Rational {
-    fn div_assign(&mut self, other: &'a Rational) {
+    fn div_assign(&mut self, other: Rational) {
         *self *= other.invert();
     }
 }
 
 impl<'a> DivAssign<&'a Rational> for Rational {
-    fn div_assign(&mut self, other: Rational) {
+    fn div_assign(&mut self, other: &'a Rational) {
         *self *= other.clone();
     }
 }
 
 impl DivAssign<Int> for Rational {
     fn div_assign(&mut self, other: Int) {
+        if other == 0 {
+            ll::divide_by_zero();
+        }
         self.d *= other;
     }
 }
 
 impl<'a> DivAssign<&'a Int> for Rational {
     fn div_assign(&mut self, other: &'a Int) {
+        if *other == 0 {
+            ll::divide_by_zero();
+        }
         self.d *= other;
     }
 }
