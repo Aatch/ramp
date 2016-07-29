@@ -106,7 +106,7 @@ use alloc::raw_vec::RawVec;
  * Addition, subtraction and multiplication follow the expected rules for integers. Division of two
  * integers, `N / D` is defined as producing two values: a quotient, `Q`, and a remainder, `R`,
  * such that the following equation holds: `N = Q*D + R`. The division operator itself returns `Q`
- * while the remainder/modulo operator returns `R`.
+ * while the remainder/modulo operator returns `R`. The sign of `R` is the same as the sign of `Q`.
  *
  * The "bit-shift" operations are defined as being multiplication and division by a power-of-two for
  * shift-left and shift-right respectively. The sign of the number is unaffected.
@@ -363,6 +363,7 @@ impl Int {
      * Divide self by other, returning the quotient, Q, and remainder, R as (Q, R).
      *
      * With N = self, D = other, Q and R satisfy: `N = QD + R`.
+     * The sign of `Q` and `R` are the same.
      *
      * This will panic if `other` is zero.
      */
