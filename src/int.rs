@@ -253,6 +253,7 @@ impl Int {
      * is wasteful
      */
     pub fn abs_hash<H>(&self, state: &mut H) where H: hash::Hasher {
+        use std::hash::Hash;
         let mut size = self.abs_size();
         unsafe {
             let mut ptr = self.limbs();
@@ -3582,9 +3583,9 @@ impl<R: Rng> RandomInt for R {
             // the probability of generating a zero BigInt would be
             // double that of any other number.
             if self.gen() {
-             return self.gen_uint(bits);
+                return self.gen_uint(bits);
             } else {
-             i
+                i
             }
         } else if self.gen() {
             -i
@@ -4380,18 +4381,6 @@ mod test {
     }
 
 
-    fn bench_add(b: &mut Bencher, xs: usize, ys: usize) {
-        let mut rng = rand::thread_rng();
-
-        let x = rng.gen_int(xs * Limb::BITS);
-        let y = rng.gen_int(ys * Limb::BITS);
-
-        b.iter(|| {
-            let z = &x + &y;
-            test::black_box(z);
-        });
-    }
-
     #[test]
     fn gcd() {
         let cases = [
@@ -4452,6 +4441,18 @@ mod test {
             let val = l.lcm(&r);
             assert_mp_eq!(val.clone(), a.clone());
         }
+    }
+
+    fn bench_add(b: &mut Bencher, xs: usize, ys: usize) {
+        let mut rng = rand::thread_rng();
+
+        let x = rng.gen_int(xs * Limb::BITS);
+        let y = rng.gen_int(ys * Limb::BITS);
+
+        b.iter(|| {
+            let z = &x + &y;
+            test::black_box(z);
+        });
     }
 
     #[bench]

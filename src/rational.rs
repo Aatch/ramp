@@ -14,6 +14,7 @@
 
 #![allow(dead_code, unused_imports)]
 
+use std;
 use std::cmp::{
     Ordering,
     Ord, Eq,
@@ -98,9 +99,16 @@ impl Rational {
      * Returns the reciprocal of this Rational
      */
     pub fn invert(self) -> Rational {
-        Rational {
-            n: self.d,
-            d: self.n
+        if self.sign() == -1 {
+            Rational {
+                n: -self.d,
+                d: -self.n
+            }
+        } else {
+            Rational {
+                n: self.d,
+                d: self.n
+            }
         }
     }
 
@@ -172,10 +180,10 @@ impl PartialEq<Rational> for Rational {
         // then the equality of the other part is the
         // overall equality
         if self.n.abs_eq(&other.n) {
-            return abs_eq(&self.d, &other.d);
+            return self.d.abs_eq(&other.d);
         }
         if self.d.abs_eq(&other.d) {
-            return abs_eq(&self.n, &other.n);
+            return self.n.abs_eq(&other.n);
         }
 
         // Neither numerator or denominator are equal,
@@ -184,27 +192,8 @@ impl PartialEq<Rational> for Rational {
 
         let gcd = self.d.gcd(&other.d);
 
-        // The GCD is 1, so they can't be reduced to the
-        // same fraction
-        if gcd == 1 {
-            return false;
-        }
-
-        // If the GCD equals one of the denominators, we
-        // can do a single multiply to get the numerator
-        // of the common-denominator fraction
-        if gcd.abs_eq(&self.d) {
-            let n_adj = &self.n * gcd;
-            return abs_eq(&other.n, &n_adj);
-        }
-        if gcd.abs_eq(&other.d) {
-            let n_adj = &other.n * gcd;
-            return abs_eq(&self.n, &n_adj);
-        }
-
         // Final case, we need to get the numerators for the
         // fractions with a common denominator.
-
         let self_n  = (&self.n * &other.d) / &gcd;
         let other_n = (&other.n * &self.d) / gcd;
 
@@ -290,7 +279,7 @@ impl PartialOrd<Int> for Rational {
             Some(Ordering::Greater)
         } else {
             // Denominator is 1
-            if self.d == 1 || other.d == -1 {
+            if self.d == 1 || self.d == -1 {
                 let ord = self.n.abs_cmp(other);
                 return if self.sign() == 1 {
                     Some(ord)
@@ -677,13 +666,21 @@ impl<'a> Mul<&'a Rational> for &'a Int {
 
 impl DivAssign<Rational> for Rational {
     fn div_assign(&mut self, other: Rational) {
-        *self *= other.invert();
+        if other.n == 0 {
+            ll::divide_by_zero();
+        }
+        self.n *= other.d;
+        self.d *= other.n;
     }
 }
 
 impl<'a> DivAssign<&'a Rational> for Rational {
     fn div_assign(&mut self, other: &'a Rational) {
-        *self *= other.clone();
+        if other.n == 0 {
+            ll::divide_by_zero();
+        }
+        self.n *= &other.d;
+        self.d *= &other.n;
     }
 }
 
@@ -821,5 +818,244 @@ impl fmt::Display for Rational {
         } else {
             write!(f, "{}/{}", self.n, self.d)
         }
+    }
+}
+
+
+#[cfg(test)]
+mod test {
+    use std;
+    use std::hash::{Hash, Hasher};
+    use rand::{self, Rng};
+    use test::{self, Bencher};
+    use super::*;
+    use ll::limb::Limb;
+    use std::str::FromStr;
+    use std::num::Zero;
+
+    use std::cmp::Ordering;
+
+    use int::RandomInt;
+
+    macro_rules! assert_mp_eq (
+        ($l:expr, $r:expr) => (
+            {
+                let l : &Rational = &$l;
+                let r : &Rational = &$r;
+                if l != r {
+                    println!("assertion failed: {} == {}", stringify!($l), stringify!($r));
+                    panic!("{:?} != {:?}", l, r);
+                }
+            }
+        )
+    );
+
+    macro_rules! cases {
+        ($(($ln:tt/$ld:tt, $rn:tt/$rd:tt, $an:tt/$ad:tt)),+) => (
+            [$((Rational::new(cases!(@e $ln).parse().unwrap(),
+                              cases!(@e $ld).parse().unwrap()),
+                Rational::new(cases!(@e $rn).parse().unwrap(),
+                              cases!(@e $rd).parse().unwrap()),
+                Rational::new(cases!(@e $an).parse().unwrap(),
+                              cases!(@e $ad).parse().unwrap()))),+]
+        );
+        (@e $e:expr) => ($e)
+    }
+
+    #[test]
+    fn add() {
+        let cases = cases! {
+            ("0"/"1", "0"/"1", "0"/"1"),
+            ("1"/"1", "1"/"1", "2"/"1"),
+            ("1"/"2", "1"/"2", "1"/"1"),
+            ("1"/"2", "2"/"4", "1"/"1"),
+            ("1"/"3", "1"/"4", "7"/"12"),
+            ("-1"/"1", "1"/"1", "0"/"1"),
+            ("1"/"2", "-1"/"1", "-1"/"2"),
+            ("1"/"1", "-1"/"2", "1"/"2")
+        };
+
+        for &(ref l, ref r, ref a) in cases.iter() {
+            assert_mp_eq!(l + r, *a);
+        }
+    }
+
+    #[test]
+    fn sub() {
+        let cases = cases! {
+            ("0"/"1", "0"/"1", "0"/"1"),
+            ("1"/"1", "1"/"1", "0"/"1"),
+            ("1"/"1", "1"/"2", "1"/"2"),
+            ("1"/"2", "1"/"1", "-1"/"2"),
+            ("-1"/"2", "1"/"1", "-3"/"2"),
+            ("1"/"3", "1"/"4", "1"/"12")
+        };
+
+        for &(ref l, ref r, ref a) in cases.iter() {
+            assert_mp_eq!(l - r, *a);
+        }
+    }
+
+    #[test]
+    fn mul() {
+        let cases = cases! {
+            ("0"/"1", "0"/"1", "0"/"1"),
+            ("1"/"1", "0"/"1", "0"/"1"),
+            ("1"/"1", "1"/"1", "1"/"1"),
+            ("1"/"1", "1"/"2", "1"/"2"),
+            ("1"/"3", "2"/"1", "2"/"3"),
+            ("3"/"8", "2"/"5", "3"/"20")
+        };
+
+        for &(ref l, ref r, ref a) in cases.iter() {
+            assert_mp_eq!(l * r, *a);
+        }
+    }
+
+    #[test]
+    fn div() {
+        let cases = cases! {
+            ("0"/"1", "1"/"1", "0"/"1"),
+            ("1"/"1", "1"/"1", "1"/"1"),
+            ("1"/"1", "1"/"2", "2"/"1"),
+            ("1"/"3", "2"/"1", "1"/"6"),
+            ("3"/"8", "2"/"5", "15"/"16")
+        };
+
+        for &(ref l, ref r, ref a) in cases.iter() {
+            assert_mp_eq!(l / r, *a);
+        }
+    }
+
+    #[test]
+    fn ord() {
+        macro_rules! ord_cases {
+            ($(($ln:tt/$ld:tt, $rn:tt/$rd:tt, $ord:expr)),+) => (
+                [$((Rational::new(cases!(@e $ln).parse().unwrap(),
+                                  cases!(@e $ld).parse().unwrap()),
+                    Rational::new(cases!(@e $rn).parse().unwrap(),
+                                  cases!(@e $rd).parse().unwrap()),
+                    $ord)),+]
+            );
+            (@e $e:expr) => ($e)
+        }
+
+        let cases = ord_cases! {
+            ("0"/"1", "0"/"1", Ordering::Equal),
+            ("1"/"1", "2"/"2", Ordering::Equal),
+            ("1"/"2", "1"/"1", Ordering::Less),
+            ("1"/"1", "1"/"2", Ordering::Greater),
+            ("4"/"5", "1"/"2", Ordering::Greater),
+            ("-4"/"5", "1"/"2", Ordering::Less)
+        };
+
+        for &(ref l, ref r, a) in cases.iter() {
+            let o = l.cmp(r);
+            assert_eq!(o, a);
+        }
+    }
+
+    fn rand_rational(x: usize) -> Rational {
+        let mut rng = rand::thread_rng();
+
+        let xn = rng.gen_int(x * Limb::BITS);
+        let mut xd = rng.gen_int(x * Limb::BITS);
+        while xd == 0 {
+            xd = rng.gen_int(x * Limb::BITS);
+        }
+
+        Rational::new(xn, xd)
+    }
+
+    #[bench]
+    fn bench_add(b: &mut Bencher) {
+        let x = rand_rational(20);
+        let y = rand_rational(20);
+
+        b.iter(|| {
+            let z = &x + &y;
+            test::black_box(z);
+        });
+    }
+
+    #[bench]
+    fn bench_add_normalize(b: &mut Bencher) {
+        let x = rand_rational(20);
+        let y = rand_rational(20);
+
+        b.iter(|| {
+            let mut z = &x + &y;
+            z.normalize();
+            test::black_box(z);
+        });
+    }
+
+    #[bench]
+    fn bench_sub(b: &mut Bencher) {
+        let x = rand_rational(20);
+        let y = rand_rational(20);
+
+        b.iter(|| {
+            let z = &x - &y;
+            test::black_box(z);
+        });
+    }
+
+    #[bench]
+    fn bench_sub_normalize(b: &mut Bencher) {
+        let x = rand_rational(20);
+        let y = rand_rational(20);
+
+        b.iter(|| {
+            let mut z = &x - &y;
+            z.normalize();
+            test::black_box(z);
+        });
+    }
+
+    #[bench]
+    fn bench_mul(b: &mut Bencher) {
+        let x = rand_rational(20);
+        let y = rand_rational(20);
+
+        b.iter(|| {
+            let z = &x * &y;
+            test::black_box(z);
+        });
+    }
+
+    #[bench]
+    fn bench_mul_normalize(b: &mut Bencher) {
+        let x = rand_rational(20);
+        let y = rand_rational(20);
+
+        b.iter(|| {
+            let mut z = &x * &y;
+            z.normalize();
+            test::black_box(z);
+        });
+    }
+
+    #[bench]
+    fn bench_div(b: &mut Bencher) {
+        let x = rand_rational(20);
+        let y = rand_rational(20);
+
+        b.iter(|| {
+            let z = &x / &y;
+            test::black_box(z);
+        });
+    }
+
+    #[bench]
+    fn bench_div_normalize(b: &mut Bencher) {
+        let x = rand_rational(20);
+        let y = rand_rational(20);
+
+        b.iter(|| {
+            let mut z = &x / &y;
+            z.normalize();
+            test::black_box(z);
+        });
     }
 }
