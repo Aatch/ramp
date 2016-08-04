@@ -240,6 +240,33 @@ impl Int {
     }
 
     /**
+     * Returns the equality of the absolute values of self and
+     * other.
+     */
+    pub fn abs_eq(&self, other: &Int) -> bool {
+        self.abs_cmp(other) == Ordering::Equal
+    }
+
+    /**
+     * Hashes the value without including the sign, useful for when the
+     * sign is handled elsewhere and making a copy just to change the sign
+     * is wasteful
+     */
+    pub fn abs_hash<H>(&self, state: &mut H) where H: hash::Hasher {
+        let mut size = self.abs_size();
+        unsafe {
+            let mut ptr = self.limbs();
+            while size > 0 {
+                let l = *ptr;
+                l.hash(state);
+
+                ptr = ptr.offset(1);
+                size -= 1;
+            }
+        }
+    }
+
+    /**
      * Try to shrink the allocated data for this Int.
      */
     pub fn shrink_to_fit(&mut self) {
@@ -971,6 +998,7 @@ impl Ord for Int {
 }
 
 impl PartialOrd<Int> for Int {
+    #[inline]
     fn partial_cmp(&self, other: &Int) -> Option<Ordering> {
         Some(self.cmp(other))
     }
@@ -1004,17 +1032,7 @@ impl hash::Hash for Int {
     fn hash<H>(&self, state: &mut H) where H: hash::Hasher {
         debug_assert!(self.well_formed());
         self.sign().hash(state);
-        let mut size = self.abs_size();
-        unsafe {
-            let mut ptr = self.limbs();
-            while size > 0 {
-                let l = *ptr;
-                l.hash(state);
-
-                ptr = ptr.offset(1);
-                size -= 1;
-            }
-        }
+        self.abs_hash(state);
     }
 }
 

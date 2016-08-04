@@ -14,11 +14,16 @@
 
 #![allow(dead_code, unused_imports)]
 
+use std::cmp::{
+    Ordering,
+    Ord, Eq,
+    PartialOrd, PartialEq
+};
+use std::{fmt, hash};
 use std::ops::{
     Add, Sub, Mul, Div, Rem, Neg,
     AddAssign, SubAssign, MulAssign, DivAssign,
 };
-use std::fmt;
 
 use ll;
 
@@ -30,7 +35,6 @@ use int::Int;
  * This type is used to represent numbers in the form `a / b` where `a` and `b`
  * are integers and `b` is non-zero.
  */
-#[derive(Clone)]
 pub struct Rational {
     n: Int,
     d: Int
@@ -101,6 +105,20 @@ impl Rational {
     }
 
     /**
+     * Returns the sign of the Int as either -1, 0 or 1 for self being negative, zero
+     * or positive, respectively.
+     */
+    pub fn sign(&self) -> i32 {
+        if self.n.sign() == 0 {
+            0
+        } else if self.n.sign() == self.d.sign() {
+            1
+        } else {
+            -1
+        }
+    }
+
+    /**
      * Converts this Rational to an `f64` value.
      */
     pub fn to_f64(&self) -> f64 {
@@ -110,22 +128,238 @@ impl Rational {
     }
 }
 
+impl Clone for Rational {
+    fn clone(&self) -> Rational {
+        Rational {
+            n: self.n.clone(),
+            d: self.d.clone()
+        }
+    }
+
+    fn clone_from(&mut self, other: &Rational)  {
+        self.n.clone_from(&other.n);
+        self.d.clone_from(&other.d);
+
+    }
+}
+
+impl std::default::Default for Rational {
+    #[inline]
+    fn default() -> Rational {
+        Rational::new(
+            Int::zero(),
+            Int::one())
+    }
+}
+
+impl PartialEq<Rational> for Rational {
+    fn eq(&self, other: &Rational) -> bool {
+        // If both numerators are zero, return true,
+        // if only one of the numerators are zero,
+        // return false
+        if self.n == 0 && other.n == 0 {
+            return true;
+        } else if self.n == 0 || other.n == 0 {
+            return false;
+        }
+
+        // If the signs are different, return false
+        if self.sign() != other.sign() {
+            return false;
+        }
+
+        // If the numerators or denominators are equal,
+        // then the equality of the other part is the
+        // overall equality
+        if self.n.abs_eq(&other.n) {
+            return abs_eq(&self.d, &other.d);
+        }
+        if self.d.abs_eq(&other.d) {
+            return abs_eq(&self.n, &other.n);
+        }
+
+        // Neither numerator or denominator are equal,
+        // now we have to do some actual work to figure
+        // it out
+
+        let gcd = self.d.gcd(&other.d);
+
+        // The GCD is 1, so they can't be reduced to the
+        // same fraction
+        if gcd == 1 {
+            return false;
+        }
+
+        // If the GCD equals one of the denominators, we
+        // can do a single multiply to get the numerator
+        // of the common-denominator fraction
+        if gcd.abs_eq(&self.d) {
+            let n_adj = &self.n * gcd;
+            return abs_eq(&other.n, &n_adj);
+        }
+        if gcd.abs_eq(&other.d) {
+            let n_adj = &other.n * gcd;
+            return abs_eq(&self.n, &n_adj);
+        }
+
+        // Final case, we need to get the numerators for the
+        // fractions with a common denominator.
+
+        let self_n  = (&self.n * &other.d) / &gcd;
+        let other_n = (&other.n * &self.d) / gcd;
+
+        self_n.abs_eq(&other_n)
+    }
+}
+
+impl PartialEq<Int> for Rational {
+    #[inline]
+    fn eq(&self, other: &Int) -> bool {
+        if self.sign() != other.sign() {
+            return false;
+        }
+
+        // Denominator is 1
+        if self.d == 1 || self.d == -1 {
+            return self.n.abs_eq(&other);
+        }
+
+        let other = other * &self.d;
+
+        self.n.abs_eq(&other)
+    }
+}
+
+impl PartialEq<Rational> for Int {
+    #[inline]
+    fn eq(&self, other: &Rational) -> bool {
+        other.eq(self)
+    }
+}
+
+impl Eq for Rational { }
+
+impl Ord for Rational {
+    fn cmp(&self, other: &Rational) -> Ordering {
+        if self.sign() < other.sign() {
+            Ordering::Less
+        } else if self.sign() > other.sign() {
+            Ordering::Greater
+        } else { // Same sign
+            // Check for zero
+            if self.sign() == 0 {
+                return Ordering::Equal;
+            }
+
+            // Denominators are equal
+            if self.d == other.d {
+                return self.n.cmp(&other.n);
+            }
+
+            let gcd = self.d.gcd(&other.d);
+
+            let self_n  = (&self.n * &other.d) / &gcd;
+            let other_n = (&other.n * &self.d) / gcd;
+
+            let ord = self_n.abs_cmp(&other_n);
+            if self.sign() == 1 {
+                ord
+            } else {
+                ord.reverse()
+            }
+        }
+    }
+}
+
+impl PartialOrd<Rational> for Rational {
+    #[inline]
+    fn partial_cmp(&self, other: &Rational) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl PartialOrd<Int> for Rational {
+    fn partial_cmp(&self, other: &Int) -> Option<Ordering> {
+        if self.eq(other) {
+            return Some(Ordering::Equal);
+        }
+
+        if self.sign() < other.sign() {
+            Some(Ordering::Less)
+        } else if self.sign() > other.sign() {
+            Some(Ordering::Greater)
+        } else {
+            // Denominator is 1
+            if self.d == 1 || other.d == -1 {
+                let ord = self.n.abs_cmp(other);
+                return if self.sign() == 1 {
+                    Some(ord)
+                } else {
+                    Some(ord.reverse())
+                };
+            }
+
+            let other = other * &self.d;
+
+            let ord = self.n.abs_cmp(&other);
+            if self.sign() == 1 {
+                Some(ord)
+            } else {
+                Some(ord.reverse())
+            }
+        }
+    }
+}
+
+impl PartialOrd<Rational> for Int {
+    #[inline]
+    fn partial_cmp(&self, other: &Rational) -> Option<Ordering> {
+        other.partial_cmp(self).map(|o| o.reverse())
+    }
+}
+
+impl hash::Hash for Rational {
+    fn hash<H>(&self, state: &mut H) where H: hash::Hasher {
+        let gcd = self.n.gcd(&self.d);
+        let sign = self.sign();
+        sign.hash(state);
+        // GCD is one, so it's a normalized fraction
+        if gcd == 1 {
+            self.n.abs_hash(state);
+            self.d.abs_hash(state);
+        }
+
+        // Gets the normalized numerator and denominator
+        let n = &self.n / &gcd;
+        let d = &self.d / gcd;
+
+        n.hash(state);
+        d.hash(state);
+    }
+}
+
 fn make_common_denominator(a: &mut Rational, b: &mut Rational) {
     if a.d == b.d {
         return;
     }
 
-    let lcm = a.d.lcm(&b.d);
+    let gcd = a.d.gcd(&b.d);
+    let lcm = (&a.d * &b.d) / &gcd;
 
     if lcm != a.d {
-        let factor = &lcm / &a.d;
-        a.n *= factor;
-        a.d = lcm.clone();
+        a.n *= &b.d;
+        a.n /= &gcd;
     }
 
     if lcm != b.d {
-        let factor = &lcm / &b.d;
-        b.n *= factor;
+        b.n *= &a.d;
+        b.n /= gcd;
+    }
+
+    if lcm != a.d {
+        a.d = lcm.clone();
+    }
+    if lcm != b.d {
         b.d = lcm;
     }
 
