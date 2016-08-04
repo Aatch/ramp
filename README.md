@@ -20,7 +20,7 @@ fn factorial(n: usize) -> Int {
    let mut a = Int::from(1);
 
    for i in 2..n {
-       a = a * i;
+       a *= i;
    }
 
    return a * n;
@@ -67,8 +67,8 @@ for the base that Ramp works in. Since the base is equal to 2^word_size, these a
 ## Future Work
 
 Ramp is currently very rough and incomplete. Broadly, there are three types Ramp aims to provide:
-integers, rationals, and floats. Integers (`Int`) are present but incomplete, and the other two are
-not yet implemented.
+integers, rationals, and floats. Integers (`Int`) are present and mostly complete, Rationals are
+present and have a basic implementation. Floats are not yet implemented.
 
 In the low-level routines, there are a few operations, notably multiplication and division, that
 are currently implemented using the simplest working algorithm. While this is sufficient for
