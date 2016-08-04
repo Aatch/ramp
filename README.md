@@ -1,6 +1,7 @@
 # RAMP - Rust Arithmetic in Multiple Precision
 
 [![Build Status](https://travis-ci.org/Aatch/ramp.svg?branch=master)](https://travis-ci.org/Aatch/ramp)
+[![Version](http://meritbadge.herokuapp.com/ramp)](https://crates.io/crates/ramp)
 
 **[Documentation](https://aatch.github.io/ramp/ramp)**
 
