@@ -40,6 +40,8 @@ use ll::limb_ptr::{Limbs, LimbsMut};
 
 use alloc::raw_vec::RawVec;
 
+use traits::DivRem;
+
 /**
  * An arbitrary-precision signed integer.
  *
@@ -1784,6 +1786,26 @@ impl RemAssign<Limb> for Int {
     }
 }
 
+impl DivRem<Limb> for Int {
+    type Output = (Int, Limb);
+
+    fn divrem(mut self, other: Limb) -> Self::Output {
+        debug_assert!(self.well_formed());
+        if other == 0 {
+            ll::divide_by_zero();
+        }
+        // x % 1 == 0, 0 % n == 0
+        if other == 1 || self.sign() == 0 {
+            self.size = 0;
+            return (self, Limb(0));
+        }
+
+        let rem = unsafe { ll::divrem_1(self.limbs_mut(), 0, self.limbs(), self.abs_size(), other) };
+        self.normalize();
+        return (self, rem);
+    }
+}
+
 // TODO: There's probably too much cloning happening here, need to figure out
 // the best way of avoiding over-copying.
 
@@ -1829,6 +1851,15 @@ impl Rem<Int> for Int {
     #[inline]
     fn rem(self, other: Int) -> Int {
         (&self) % (&other)
+    }
+}
+
+impl<'a, 'b> DivRem<&'a Int> for &'b Int {
+    type Output = (Int, Int);
+
+    #[inline]
+    fn divrem(self, other: &'a Int) -> (Int, Int) {
+        self.divmod(other)
     }
 }
 
@@ -2566,6 +2597,36 @@ macro_rules! impl_arith_prim (
             }
         }
 
+        impl DivRem<$t> for Int {
+            type Output = (Int, $t);
+
+            #[inline]
+            fn divrem(mut self, other: $t) -> Self::Output {
+                if other == 0 {
+                    ll::divide_by_zero();
+                }
+                let sign = self.sign();
+                let (q, r) = {
+                    if other == 1 || sign == 0 {
+                        return (self, 0);
+                    } else if other == -1 {
+                        self.negate();
+                        return (self, 0);
+                    } else if other < 0 {
+                        self.negate();
+                        self.divrem(Limb(other.abs() as BaseInt))
+                    } else {
+                        self.divrem(Limb(other as BaseInt))
+                    }
+                };
+                let r = (r.0 as $t).checked_mul(sign).unwrap();
+                debug_assert!(sign > 0 || r <= 0);
+                debug_assert!(sign < 0 || r >= 0);
+                debug_assert!(r.abs() < other.abs());
+                (q, r)
+            }
+        }
+
         impl BitAndAssign<$t> for Int {
             #[inline]
             fn bitand_assign(&mut self, other: $t) {
@@ -2706,6 +2767,18 @@ macro_rules! impl_arith_prim (
             #[inline]
             fn rem_assign(&mut self, other: $t) {
                 *self %= Limb(other as BaseInt);
+            }
+        }
+
+        impl DivRem<$t> for Int {
+            type Output = (Int, $t);
+
+            #[inline]
+            fn divrem(self, other: $t) -> Self::Output {
+                let other = other as BaseInt;
+                let (q, r) = self.divrem(Limb(other));
+                debug_assert!(r < other);
+                (q, r.0 as $t)
             }
         }
 
@@ -3635,6 +3708,7 @@ mod test {
     use test::{self, Bencher};
     use super::*;
     use ll::limb::Limb;
+    use traits::DivRem;
     use std::str::FromStr;
     use std::num::Zero;
 
@@ -3927,6 +4001,27 @@ mod test {
 
             let val = &l % &r;
             assert_mp_eq!(val, a);
+        }
+    }
+
+    #[test]
+    fn divrem() {
+        let cases = [
+            ("20000000000000000000000000000000000000000000000400000000000000000000000000000000000000000000001",
+             "100000000000000000000000000000000000000000000001",
+             "200000000000000000000000000000000000000000000001",
+             "100000000000000000000000000000000000000000000000"),
+        ];
+
+        for t in cases.into_iter() {
+            let dividend: Int = t.0.parse().unwrap();
+            let divisor: Int = t.1.parse().unwrap();
+            let expected_quotient: Int = t.2.parse().unwrap();
+            let expected_remainder: Int = t.3.parse().unwrap();
+
+            let (actual_quotient, actual_remainder) = (&dividend).divrem(&divisor);
+            assert_mp_eq!(actual_quotient, expected_quotient);
+            assert_mp_eq!(actual_remainder, expected_remainder);
         }
     }
 
