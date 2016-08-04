@@ -240,6 +240,34 @@ impl Int {
     }
 
     /**
+     * Returns the equality of the absolute values of self and
+     * other.
+     */
+    pub fn abs_eq(&self, other: &Int) -> bool {
+        self.abs_cmp(other) == Ordering::Equal
+    }
+
+    /**
+     * Hashes the value without including the sign, useful for when the
+     * sign is handled elsewhere and making a copy just to change the sign
+     * is wasteful
+     */
+    pub fn abs_hash<H>(&self, state: &mut H) where H: hash::Hasher {
+        use std::hash::Hash;
+        let mut size = self.abs_size();
+        unsafe {
+            let mut ptr = self.limbs();
+            while size > 0 {
+                let l = *ptr;
+                l.hash(state);
+
+                ptr = ptr.offset(1);
+                size -= 1;
+            }
+        }
+    }
+
+    /**
      * Try to shrink the allocated data for this Int.
      */
     pub fn shrink_to_fit(&mut self) {
@@ -828,6 +856,34 @@ impl Int {
     pub fn lcm(&self, other: &Int) -> Int {
         (self * other).abs() / self.gcd(other)
     }
+
+    pub fn to_f64(&self) -> f64 {
+        let sz = self.abs_size();
+        if sz == 0 {
+            return 0.0;
+        }
+
+        let mut highest_limb = unsafe {
+            *self.limbs().offset((sz - 1) as isize)
+        };
+        let leading_zeros = highest_limb.leading_zeros();
+        let mut shifted = 0;
+        if leading_zeros > 11 && sz > 1 {
+            highest_limb = highest_limb << leading_zeros;
+            let next_limb = unsafe {
+                *self.limbs().offset((sz - 2) as isize)
+            };
+
+            highest_limb = highest_limb | (next_limb >> (Limb::BITS - leading_zeros as usize));
+            shifted = leading_zeros;
+        }
+
+        let exp = ((sz - 1) * Limb::BITS as i32) - shifted as i32;
+
+        let f = highest_limb.0 as f64;
+        let exp = (2.0f64).powi(exp);
+        f * exp
+    }
 }
 
 impl Clone for Int {
@@ -943,6 +999,7 @@ impl Ord for Int {
 }
 
 impl PartialOrd<Int> for Int {
+    #[inline]
     fn partial_cmp(&self, other: &Int) -> Option<Ordering> {
         Some(self.cmp(other))
     }
@@ -976,17 +1033,7 @@ impl hash::Hash for Int {
     fn hash<H>(&self, state: &mut H) where H: hash::Hasher {
         debug_assert!(self.well_formed());
         self.sign().hash(state);
-        let mut size = self.abs_size();
-        unsafe {
-            let mut ptr = self.limbs();
-            while size > 0 {
-                let l = *ptr;
-                l.hash(state);
-
-                ptr = ptr.offset(1);
-                size -= 1;
-            }
-        }
+        self.abs_hash(state);
     }
 }
 
@@ -3536,9 +3583,9 @@ impl<R: Rng> RandomInt for R {
             // the probability of generating a zero BigInt would be
             // double that of any other number.
             if self.gen() {
-             return self.gen_uint(bits);
+                return self.gen_uint(bits);
             } else {
-             i
+                i
             }
         } else if self.gen() {
             -i
@@ -4334,18 +4381,6 @@ mod test {
     }
 
 
-    fn bench_add(b: &mut Bencher, xs: usize, ys: usize) {
-        let mut rng = rand::thread_rng();
-
-        let x = rng.gen_int(xs * Limb::BITS);
-        let y = rng.gen_int(ys * Limb::BITS);
-
-        b.iter(|| {
-            let z = &x + &y;
-            test::black_box(z);
-        });
-    }
-
     #[test]
     fn gcd() {
         let cases = [
@@ -4406,6 +4441,18 @@ mod test {
             let val = l.lcm(&r);
             assert_mp_eq!(val.clone(), a.clone());
         }
+    }
+
+    fn bench_add(b: &mut Bencher, xs: usize, ys: usize) {
+        let mut rng = rand::thread_rng();
+
+        let x = rng.gen_int(xs * Limb::BITS);
+        let y = rng.gen_int(ys * Limb::BITS);
+
+        b.iter(|| {
+            let z = &x + &y;
+            test::black_box(z);
+        });
     }
 
     #[bench]

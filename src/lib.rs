@@ -30,6 +30,7 @@ pub mod ll;
 mod mem;
 
 pub mod int;
+pub mod rational;
 
 // Re-exports
 
