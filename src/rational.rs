@@ -835,7 +835,7 @@ impl<U: Into<Int>> From<U> for Rational {
 }
 
 macro_rules! impl_from_float {
-    ($fty:ty, $signif_bits:tt, $expt_bias: tt) => {
+    ($fty:ty, $signif_bits:tt) => {
         impl From<$fty> for Rational {
             fn from(val: $fty) -> Rational {
                 let (neg, exponent, significand) = val.decompose();
@@ -843,7 +843,7 @@ macro_rules! impl_from_float {
                 let mut coeff = Int::from(2).pow($signif_bits) + Int::from(significand);
                 if neg { coeff *= -1; }
 
-                let corrected_expt = (exponent as i32) - $signif_bits - $expt_bias;
+                let corrected_expt = (exponent as i32) - $signif_bits;
                 let pow2 = Int::from(2).pow(corrected_expt.abs() as usize);
 
                 if corrected_expt < 0 {
@@ -857,8 +857,8 @@ macro_rules! impl_from_float {
     }
 }
 
-impl_from_float!(f32, 23, 127);
-impl_from_float!(f64, 52, 1023);
+impl_from_float!(f32, 23);
+impl_from_float!(f64, 52);
 
 impl fmt::Debug for Rational {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
