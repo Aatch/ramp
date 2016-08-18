@@ -803,6 +803,12 @@ impl<'a> Div<&'a Rational> for &'a Int {
     }
 }
 
+impl<U: Into<Int>> From<U> for Rational {
+    fn from(val: U) -> Rational {
+        Rational::new(val.into(), Int::one())
+    }
+}
+
 impl fmt::Debug for Rational {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{:?}/{:?}", self.n, self.d)
@@ -953,6 +959,32 @@ mod test {
             let o = l.cmp(r);
             assert_eq!(o, a);
         }
+    }
+
+    #[test]
+    fn test_from_int_primitive() {
+        use std::usize; use std::isize;
+        use std::u64; use std::i64;
+        use std::u32; use std::i32;
+        use std::u16; use std::i16;
+        use std::u8; use std::i8;
+
+        let (a, b) = (usize::MAX, isize::MIN);
+        let (c, d) = (u64::MAX, i64::MIN);
+        let (e, f) = (u32::MAX, i32::MIN);
+        let (g, h) = (u16::MAX, i16::MIN);
+        let (i, j) = (u8::MAX, i8::MIN);
+
+        assert_eq!(Rational::from(a), Rational::new(a.into(), 1.into()));
+        assert_eq!(Rational::from(b), Rational::new(b.into(), 1.into()));
+        assert_eq!(Rational::from(c), Rational::new(c.into(), 1.into()));
+        assert_eq!(Rational::from(d), Rational::new(d.into(), 1.into()));
+        assert_eq!(Rational::from(e), Rational::new(e.into(), 1.into()));
+        assert_eq!(Rational::from(f), Rational::new(f.into(), 1.into()));
+        assert_eq!(Rational::from(g), Rational::new(g.into(), 1.into()));
+        assert_eq!(Rational::from(h), Rational::new(h.into(), 1.into()));
+        assert_eq!(Rational::from(i), Rational::new(i.into(), 1.into()));
+        assert_eq!(Rational::from(j), Rational::new(j.into(), 1.into()));
     }
 
     fn rand_rational(x: usize) -> Rational {
