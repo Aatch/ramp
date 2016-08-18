@@ -45,6 +45,21 @@ pub struct Rational {
 
 impl Rational {
 
+    /**
+     * Returns the absolute value of this Rational
+     */
+    pub fn abs(&self) -> Rational {
+        if self.sign() == 1 {
+            self.clone()
+        }
+        else {
+            Rational {
+                n: -1 * &self.n,
+                d: self.d.clone()
+            }
+        }
+    }
+
     pub fn new(n: Int, d: Int) -> Rational {
         assert!(d != 0, "Denominator is zero");
 
@@ -112,6 +127,14 @@ impl Rational {
                 d: self.n
             }
         }
+    }
+
+    /**
+     * Returns this Rational to the nearest Int
+     */
+    pub fn round(&self) -> Int {
+        let r = self + Rational::new(self.sign().into(), 2.into());
+        r.n / r.d
     }
 
     /**
@@ -986,6 +1009,55 @@ mod test {
         for &(ref l, ref r, a) in cases.iter() {
             let o = l.cmp(r);
             assert_eq!(o, a);
+        }
+    }
+
+    #[test]
+    fn abs() {
+        macro_rules! abs_cases {
+            ($(($ln:tt/$ld:tt, $rn:tt/$rd:tt)),+) => (
+                [$((Rational::new(cases!(@e $ln).parse().unwrap(),
+                                  cases!(@e $ld).parse().unwrap()),
+                    Rational::new(cases!(@e $rn).parse().unwrap(),
+                                  cases!(@e $rd).parse().unwrap()))),+]
+            );
+            (@e $e:expr) => ($e)
+        }
+
+        let cases = abs_cases! {
+            ("-1"/"1", "1"/"1"),
+            ("-100"/"-100", "-100"/"-100"),
+            ("1337"/"-1337", "-1337"/"-1337")
+        };
+
+        for &(ref r, ref l) in cases.iter() {
+            assert_eq!(&r.abs(), l);
+        }
+    }
+
+    #[test]
+    fn round() {
+        use int::Int;
+        macro_rules! round_cases {
+            ($(($n:tt/$d:tt, $int:tt)),+) => (
+                [$((Rational::new(cases!(@e $n).parse().unwrap(),
+                                  cases!(@e $d).parse().unwrap()),
+                    Int::from($int))),+]
+            );
+            (@e $e:expr) => ($e)
+        }
+
+        let cases = round_cases! {
+            ("100"/"67", 1),
+            ("100"/"66", 2),
+            ("100"/"41", 2),
+            ("100"/"40", 3),
+            ("100"/"29", 3),
+            ("100"/"28", 4)
+        };
+
+        for &(ref q, ref i) in cases.iter() {
+            assert_eq!(&q.round(), i);
         }
     }
 
