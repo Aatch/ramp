@@ -23,6 +23,7 @@
 #[cfg(test)] extern crate test;
 
 extern crate alloc;
+extern crate ieee754;
 extern crate rand;
 extern crate hamming;
 

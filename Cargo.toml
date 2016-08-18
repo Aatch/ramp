@@ -22,6 +22,7 @@ asm = []
 full-quickcheck = []
 
 [dependencies]
+ieee754 = "0.1"
 rand = "0.3"
 hamming = "0.1"
 

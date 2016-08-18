@@ -30,6 +30,8 @@ use ll;
 
 use int::Int;
 
+use ieee754::Ieee754;
+
 /**
  * An arbitrary-precision rational number.
  *
@@ -809,6 +811,32 @@ impl<U: Into<Int>> From<U> for Rational {
     }
 }
 
+macro_rules! impl_from_float {
+    ($fty:ty, $signif_bits:tt, $expt_bias: tt) => {
+        impl From<$fty> for Rational {
+            fn from(val: $fty) -> Rational {
+                let (neg, exponent, significand) = val.decompose();
+
+                let mut coeff = Int::from(2).pow($signif_bits) + Int::from(significand);
+                if neg { coeff *= -1; }
+
+                let corrected_expt = (exponent as i32) - $signif_bits - $expt_bias;
+                let pow2 = Int::from(2).pow(corrected_expt.abs() as usize);
+
+                if corrected_expt < 0 {
+                    Rational::new(coeff, pow2)
+                }
+                else {
+                    Rational::new(coeff * pow2, Int::one())
+                }
+            }
+        }
+    }
+}
+
+impl_from_float!(f32, 23, 127);
+impl_from_float!(f64, 52, 1023);
+
 impl fmt::Debug for Rational {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{:?}/{:?}", self.n, self.d)
@@ -962,7 +990,7 @@ mod test {
     }
 
     #[test]
-    fn test_from_int_primitive() {
+    fn from_int_primitive() {
         use std::usize; use std::isize;
         use std::u64; use std::i64;
         use std::u32; use std::i32;
@@ -985,6 +1013,22 @@ mod test {
         assert_eq!(Rational::from(h), Rational::new(h.into(), 1.into()));
         assert_eq!(Rational::from(i), Rational::new(i.into(), 1.into()));
         assert_eq!(Rational::from(j), Rational::new(j.into(), 1.into()));
+    }
+
+    #[test]
+    fn from_float() {
+        let numerators: &[isize] = &[234877, -9834223, 4096 * 3];
+        let denominators: &[isize] = &[1, -1, 4096];
+
+        for &n in numerators {
+            for &d in denominators {
+                let f = (n as f64) / (d as f64);
+
+                let expected = Rational::new(n.into(), d.into());
+                assert_eq!(&Rational::from(f), &expected);
+                assert_eq!(&Rational::from(f as f32), &expected);
+            }
+        }
     }
 
     fn rand_rational(x: usize) -> Rational {
