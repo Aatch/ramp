@@ -48,16 +48,11 @@ impl Rational {
     /**
      * Returns the absolute value of this Rational
      */
-    pub fn abs(self) -> Rational {
-        if self.sign() == 1 {
-            self
+    pub fn abs(mut self) -> Rational {
+        if self.sign() == -1 {
+            self.n *= -1;
         }
-        else {
-            Rational {
-                n: -1 * self.n,
-                d: self.d
-            }
-        }
+        self
     }
 
     pub fn new(n: Int, d: Int) -> Rational {
@@ -132,9 +127,18 @@ impl Rational {
     /**
      * Returns this Rational to the nearest Int
      */
-    pub fn round(self) -> Int {
-        let r = Rational::new(self.sign().into(), 2.into()) + self;
-        r.n / r.d
+    pub fn round(mut self) -> Int {
+        let sign = self.sign();
+        if sign == 0 {
+            Int::zero()
+        }
+        else {
+            // Calculate floor(n/d + sign * 1/2) = floor((2n ± d) / 2d)
+            self.n *= 2;
+            self.n += sign * &self.d;
+            self.d *= 2;
+            self.n / self.d
+         }
     }
 
     /**
@@ -1025,6 +1029,7 @@ mod test {
         }
 
         let cases = abs_cases! {
+            ("0"/"1", "0"/"1"),
             ("-1"/"1", "1"/"1"),
             ("-100"/"-100", "-100"/"-100"),
             ("1337"/"-1337", "-1337"/"-1337")
@@ -1048,6 +1053,9 @@ mod test {
         }
 
         let cases = round_cases! {
+            ("0"/"1", 0),
+            ("100"/"201", 0),
+            ("100"/"200", 1),
             ("100"/"67", 1),
             ("100"/"66", 2),
             ("100"/"41", 2),
