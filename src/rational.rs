@@ -48,14 +48,14 @@ impl Rational {
     /**
      * Returns the absolute value of this Rational
      */
-    pub fn abs(&self) -> Rational {
+    pub fn abs(self) -> Rational {
         if self.sign() == 1 {
-            self.clone()
+            self
         }
         else {
             Rational {
-                n: -1 * &self.n,
-                d: self.d.clone()
+                n: -1 * self.n,
+                d: self.d
             }
         }
     }
@@ -1030,8 +1030,8 @@ mod test {
             ("1337"/"-1337", "-1337"/"-1337")
         };
 
-        for &(ref r, ref l) in cases.iter() {
-            assert_eq!(&r.abs(), l);
+        for &(ref r, ref l) in cases.into_iter() {
+            assert_eq!(&r.clone().abs(), l);
         }
     }
 
