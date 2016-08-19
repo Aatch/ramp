@@ -30,6 +30,8 @@ use ll;
 
 use int::Int;
 
+use ieee754::Ieee754;
+
 /**
  * An arbitrary-precision rational number.
  *
@@ -42,6 +44,16 @@ pub struct Rational {
 }
 
 impl Rational {
+
+    /**
+     * Returns the absolute value of this Rational
+     */
+    pub fn abs(mut self) -> Rational {
+        if self.sign() == -1 {
+            self.n *= -1;
+        }
+        self
+    }
 
     pub fn new(n: Int, d: Int) -> Rational {
         assert!(d != 0, "Denominator is zero");
@@ -110,6 +122,23 @@ impl Rational {
                 d: self.n
             }
         }
+    }
+
+    /**
+     * Returns this Rational to the nearest Int
+     */
+    pub fn round(mut self) -> Int {
+        let sign = self.sign();
+        if sign == 0 {
+            Int::zero()
+        }
+        else {
+            // Calculate floor(n/d + sign * 1/2) = floor((2n ± d) / 2d)
+            self.n *= 2;
+            self.n += sign * &self.d;
+            self.d *= 2;
+            self.n / self.d
+         }
     }
 
     /**
@@ -803,6 +832,38 @@ impl<'a> Div<&'a Rational> for &'a Int {
     }
 }
 
+impl<U: Into<Int>> From<U> for Rational {
+    fn from(val: U) -> Rational {
+        Rational::new(val.into(), Int::one())
+    }
+}
+
+macro_rules! impl_from_float {
+    ($fty:ty, $signif_bits:expr) => {
+        impl From<$fty> for Rational {
+            fn from(val: $fty) -> Rational {
+                let (neg, exponent, significand) = val.decompose();
+
+                let mut coeff = Int::from(2).pow($signif_bits) + Int::from(significand);
+                if neg { coeff *= -1; }
+
+                let corrected_expt = (exponent as i32) - $signif_bits;
+                let pow2 = Int::from(2).pow(corrected_expt.abs() as usize);
+
+                if corrected_expt < 0 {
+                    Rational::new(coeff, pow2)
+                }
+                else {
+                    Rational::new(coeff * pow2, Int::one())
+                }
+            }
+        }
+    }
+}
+
+impl_from_float!(f32, 23);
+impl_from_float!(f64, 52);
+
 impl fmt::Debug for Rational {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{:?}/{:?}", self.n, self.d)
@@ -952,6 +1013,101 @@ mod test {
         for &(ref l, ref r, a) in cases.iter() {
             let o = l.cmp(r);
             assert_eq!(o, a);
+        }
+    }
+
+    #[test]
+    fn abs() {
+        macro_rules! abs_cases {
+            ($(($ln:tt/$ld:tt, $rn:tt/$rd:tt)),+) => (
+                [$((Rational::new(cases!(@e $ln).parse().unwrap(),
+                                  cases!(@e $ld).parse().unwrap()),
+                    Rational::new(cases!(@e $rn).parse().unwrap(),
+                                  cases!(@e $rd).parse().unwrap()))),+]
+            );
+            (@e $e:expr) => ($e)
+        }
+
+        let cases = abs_cases! {
+            ("0"/"1", "0"/"1"),
+            ("-1"/"1", "1"/"1"),
+            ("-100"/"-100", "-100"/"-100"),
+            ("1337"/"-1337", "-1337"/"-1337")
+        };
+
+        for &(ref r, ref l) in cases.into_iter() {
+            assert_eq!(&r.clone().abs(), l);
+        }
+    }
+
+    #[test]
+    fn round() {
+        use int::Int;
+        macro_rules! round_cases {
+            ($(($n:tt/$d:tt, $int:expr)),+) => (
+                [$((Rational::new(cases!(@e $n).parse().unwrap(),
+                                  cases!(@e $d).parse().unwrap()),
+                    Int::from($int))),+]
+            );
+            (@e $e:expr) => ($e)
+        }
+
+        let cases = round_cases! {
+            ("0"/"1", 0),
+            ("100"/"201", 0),
+            ("100"/"200", 1),
+            ("100"/"67", 1),
+            ("100"/"66", 2),
+            ("100"/"41", 2),
+            ("100"/"40", 3),
+            ("100"/"29", 3),
+            ("100"/"28", 4)
+        };
+
+        for &(ref q, ref i) in cases.iter() {
+            assert_eq!(&q.clone().round(), i);
+        }
+    }
+
+    #[test]
+    fn from_int_primitive() {
+        use std::usize; use std::isize;
+        use std::u64; use std::i64;
+        use std::u32; use std::i32;
+        use std::u16; use std::i16;
+        use std::u8; use std::i8;
+
+        let (a, b) = (usize::MAX, isize::MIN);
+        let (c, d) = (u64::MAX, i64::MIN);
+        let (e, f) = (u32::MAX, i32::MIN);
+        let (g, h) = (u16::MAX, i16::MIN);
+        let (i, j) = (u8::MAX, i8::MIN);
+
+        assert_eq!(Rational::from(a), Rational::new(a.into(), 1.into()));
+        assert_eq!(Rational::from(b), Rational::new(b.into(), 1.into()));
+        assert_eq!(Rational::from(c), Rational::new(c.into(), 1.into()));
+        assert_eq!(Rational::from(d), Rational::new(d.into(), 1.into()));
+        assert_eq!(Rational::from(e), Rational::new(e.into(), 1.into()));
+        assert_eq!(Rational::from(f), Rational::new(f.into(), 1.into()));
+        assert_eq!(Rational::from(g), Rational::new(g.into(), 1.into()));
+        assert_eq!(Rational::from(h), Rational::new(h.into(), 1.into()));
+        assert_eq!(Rational::from(i), Rational::new(i.into(), 1.into()));
+        assert_eq!(Rational::from(j), Rational::new(j.into(), 1.into()));
+    }
+
+    #[test]
+    fn from_float() {
+        let numerators: &[isize] = &[234877, -9834223, 4096 * 3];
+        let denominators: &[isize] = &[1, -1, 4096];
+
+        for &n in numerators {
+            for &d in denominators {
+                let f = (n as f64) / (d as f64);
+
+                let expected = Rational::new(n.into(), d.into());
+                assert_eq!(&Rational::from(f), &expected);
+                assert_eq!(&Rational::from(f as f32), &expected);
+            }
         }
     }
 
