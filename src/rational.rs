@@ -132,8 +132,8 @@ impl Rational {
     /**
      * Returns this Rational to the nearest Int
      */
-    pub fn round(&self) -> Int {
-        let r = self + Rational::new(self.sign().into(), 2.into());
+    pub fn round(self) -> Int {
+        let r = Rational::new(self.sign().into(), 2.into()) + self;
         r.n / r.d
     }
 
@@ -1057,7 +1057,7 @@ mod test {
         };
 
         for &(ref q, ref i) in cases.iter() {
-            assert_eq!(&q.round(), i);
+            assert_eq!(&q.clone().round(), i);
         }
     }
 
