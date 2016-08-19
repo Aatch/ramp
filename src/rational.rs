@@ -839,7 +839,7 @@ impl<U: Into<Int>> From<U> for Rational {
 }
 
 macro_rules! impl_from_float {
-    ($fty:ty, $signif_bits:tt) => {
+    ($fty:ty, $signif_bits:expr) => {
         impl From<$fty> for Rational {
             fn from(val: $fty) -> Rational {
                 let (neg, exponent, significand) = val.decompose();
@@ -1044,7 +1044,7 @@ mod test {
     fn round() {
         use int::Int;
         macro_rules! round_cases {
-            ($(($n:tt/$d:tt, $int:tt)),+) => (
+            ($(($n:tt/$d:tt, $int:expr)),+) => (
                 [$((Rational::new(cases!(@e $n).parse().unwrap(),
                                   cases!(@e $d).parse().unwrap()),
                     Int::from($int))),+]
