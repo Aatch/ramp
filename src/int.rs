@@ -20,7 +20,6 @@ use std::cmp::{
 };
 use std::error::Error;
 use std::{io, mem, fmt, hash};
-use std::num::Zero;
 use std::ops::{
     Add, Sub, Mul, Div, Rem, Neg,
     AddAssign, SubAssign, MulAssign, DivAssign, RemAssign,
@@ -33,6 +32,7 @@ use rand::Rng;
 
 use hamming;
 use alloc;
+use num_traits::{Zero, One};
 
 use ll;
 use ll::limb::{BaseInt, Limb};
@@ -129,7 +129,7 @@ impl Int {
     }
 
     pub fn one() -> Int {
-        <Int as std::num::One>::one()
+        <Int as One>::one()
     }
 
     /// Creates a new Int from the given Limb.
@@ -3531,7 +3531,7 @@ macro_rules! impl_from_for_prim (
 impl_from_for_prim!(signed   i8, i16, i32, i64, isize);
 impl_from_for_prim!(unsigned u8, u16, u32, u64, usize);
 
-impl std::num::Zero for Int {
+impl Zero for Int {
     fn zero() -> Int {
         Int {
             ptr: unsafe { Unique::new(alloc::heap::EMPTY as *mut Limb) },
@@ -3539,9 +3539,13 @@ impl std::num::Zero for Int {
             cap: 0
         }
     }
+
+    fn is_zero(&self) -> bool {
+        self.sign() == 0
+    }
 }
 
-impl std::num::One for Int {
+impl One for Int {
     fn one() -> Int {
         Int::from(1)
     }
@@ -3710,7 +3714,6 @@ mod test {
     use ll::limb::Limb;
     use traits::DivRem;
     use std::str::FromStr;
-    use std::num::Zero;
 
     macro_rules! assert_mp_eq (
         ($l:expr, $r:expr) => (

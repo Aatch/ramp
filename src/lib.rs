@@ -16,7 +16,7 @@
 #![crate_name="ramp"]
 
 #![feature(core_intrinsics, asm, heap_api, associated_consts)]
-#![feature(zero_one, step_trait, unique, alloc)]
+#![feature(step_trait, unique, alloc)]
 
 #![cfg_attr(test, feature(test))]
 
@@ -26,6 +26,7 @@ extern crate alloc;
 extern crate ieee754;
 extern crate rand;
 extern crate hamming;
+extern crate num_traits;
 
 pub mod ll;
 mod mem;

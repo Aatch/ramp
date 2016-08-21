@@ -1,5 +1,3 @@
-#![feature(augmented_assignments)]
-
 #![feature(plugin)]
 #![plugin(quickcheck_macros)]
 

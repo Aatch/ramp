@@ -1,8 +1,6 @@
 // A ramp port of TeXitoi's Rust version on
 // http://benchmarksgame.alioth.debian.org/
 
-#![feature(augmented_assignments)]
-
 extern crate ramp;
 use ramp::Int;
 use ramp::ll::limb::Limb;

@@ -892,7 +892,7 @@ mod test {
     use super::*;
     use ll::limb::Limb;
     use std::str::FromStr;
-    use std::num::Zero;
+    use num_traits::Zero;
 
     use std::cmp::Ordering;
 
