@@ -555,7 +555,7 @@ impl<'a> Sub<Rational> for &'a Rational {
 
     fn sub(self, mut other: Rational) -> Rational {
         other -= self;
-        other
+        -other
     }
 }
 
@@ -564,6 +564,23 @@ impl<'a> Sub<&'a Rational> for &'a Rational {
 
     fn sub(self, other: &'a Rational) -> Rational {
         self.clone().sub(other)
+    }
+}
+
+impl Neg for Rational {
+    type Output = Rational;
+
+    fn neg(mut self) -> Rational {
+        self.n.negate();
+        self
+    }
+}
+
+impl<'a> Neg for &'a Rational {
+    type Output = Rational;
+
+    fn neg(self) -> Rational {
+        self.clone().neg()
     }
 }
 
@@ -911,21 +928,30 @@ mod test {
         )
     );
 
-    macro_rules! cases {
+    macro_rules! binop_cases {
         ($(($ln:tt/$ld:tt, $rn:tt/$rd:tt, $an:tt/$ad:tt)),+) => (
-            [$((Rational::new(cases!(@e $ln).parse().unwrap(),
-                              cases!(@e $ld).parse().unwrap()),
-                Rational::new(cases!(@e $rn).parse().unwrap(),
-                              cases!(@e $rd).parse().unwrap()),
-                Rational::new(cases!(@e $an).parse().unwrap(),
-                              cases!(@e $ad).parse().unwrap()))),+]
+            [$((Rational::new($ln.parse().unwrap(),
+                              $ld.parse().unwrap()),
+                Rational::new($rn.parse().unwrap(),
+                              $rd.parse().unwrap()),
+                Rational::new($an.parse().unwrap(),
+                              $ad.parse().unwrap()))),+]
         );
-        (@e $e:expr) => ($e)
     }
+
+    macro_rules! unop_cases {
+        ($(($ln:tt/$ld:tt, $rn:tt/$rd:tt)),+) => (
+            [$((Rational::new($ln.parse().unwrap(),
+                              $ld.parse().unwrap()),
+                Rational::new($rn.parse().unwrap(),
+                              $rd.parse().unwrap()))),+]
+        );
+    }
+
 
     #[test]
     fn add() {
-        let cases = cases! {
+        let cases = binop_cases! {
             ("0"/"1", "0"/"1", "0"/"1"),
             ("1"/"1", "1"/"1", "2"/"1"),
             ("1"/"2", "1"/"2", "1"/"1"),
@@ -943,7 +969,7 @@ mod test {
 
     #[test]
     fn sub() {
-        let cases = cases! {
+        let cases = binop_cases! {
             ("0"/"1", "0"/"1", "0"/"1"),
             ("1"/"1", "1"/"1", "0"/"1"),
             ("1"/"1", "1"/"2", "1"/"2"),
@@ -958,8 +984,27 @@ mod test {
     }
 
     #[test]
+    fn neg() {
+        let cases = unop_cases! {
+            ("0"/"1", "0"/"1"),
+            ("1"/"1", "-1"/"1"),
+            ("-1"/"1", "1"/"1"),
+            ("1"/"-1", "-1"/"-1"),
+            ("-1"/"-1", "1"/"-1")
+        };
+
+        for &(ref l, ref r) in cases.iter() {
+            assert_eq!(&(-l), r);
+        }
+
+        for &(ref l, ref r) in cases.iter() {
+            assert_eq!(-l.clone(), r.clone());
+        }
+    }
+
+    #[test]
     fn mul() {
-        let cases = cases! {
+        let cases = binop_cases! {
             ("0"/"1", "0"/"1", "0"/"1"),
             ("1"/"1", "0"/"1", "0"/"1"),
             ("1"/"1", "1"/"1", "1"/"1"),
@@ -975,7 +1020,7 @@ mod test {
 
     #[test]
     fn div() {
-        let cases = cases! {
+        let cases = binop_cases! {
             ("0"/"1", "1"/"1", "0"/"1"),
             ("1"/"1", "1"/"1", "1"/"1"),
             ("1"/"1", "1"/"2", "2"/"1"),
@@ -992,13 +1037,12 @@ mod test {
     fn ord() {
         macro_rules! ord_cases {
             ($(($ln:tt/$ld:tt, $rn:tt/$rd:tt, $ord:expr)),+) => (
-                [$((Rational::new(cases!(@e $ln).parse().unwrap(),
-                                  cases!(@e $ld).parse().unwrap()),
-                    Rational::new(cases!(@e $rn).parse().unwrap(),
-                                  cases!(@e $rd).parse().unwrap()),
+                [$((Rational::new($ln.parse().unwrap(),
+                                  $ld.parse().unwrap()),
+                    Rational::new($rn.parse().unwrap(),
+                                  $rd.parse().unwrap()),
                     $ord)),+]
             );
-            (@e $e:expr) => ($e)
         }
 
         let cases = ord_cases! {
@@ -1018,17 +1062,7 @@ mod test {
 
     #[test]
     fn abs() {
-        macro_rules! abs_cases {
-            ($(($ln:tt/$ld:tt, $rn:tt/$rd:tt)),+) => (
-                [$((Rational::new(cases!(@e $ln).parse().unwrap(),
-                                  cases!(@e $ld).parse().unwrap()),
-                    Rational::new(cases!(@e $rn).parse().unwrap(),
-                                  cases!(@e $rd).parse().unwrap()))),+]
-            );
-            (@e $e:expr) => ($e)
-        }
-
-        let cases = abs_cases! {
+        let cases = unop_cases! {
             ("0"/"1", "0"/"1"),
             ("-1"/"1", "1"/"1"),
             ("-100"/"-100", "-100"/"-100"),
@@ -1045,11 +1079,10 @@ mod test {
         use int::Int;
         macro_rules! round_cases {
             ($(($n:tt/$d:tt, $int:expr)),+) => (
-                [$((Rational::new(cases!(@e $n).parse().unwrap(),
-                                  cases!(@e $d).parse().unwrap()),
+                [$((Rational::new($n.parse().unwrap(),
+                                  $d.parse().unwrap()),
                     Int::from($int))),+]
             );
-            (@e $e:expr) => ($e)
         }
 
         let cases = round_cases! {
