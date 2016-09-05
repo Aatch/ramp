@@ -361,17 +361,19 @@ fn make_common_denominator(a: &mut Rational, b: &mut Rational) {
         return;
     }
 
-    let gcd = a.d.gcd(&b.d);
-    let lcm = (&a.d * &b.d) / &gcd;
+    // FIXME #73: GCD is currently very slow, so a simpler
+    // calculation that just multiplies the denominators together
+    // is faster. This is logically the same as having GCD = 1
+
+    //let gcd = a.d.gcd(&b.d);
+    let lcm = &a.d * &b.d;
 
     if lcm != a.d {
         a.n *= &b.d;
-        a.n /= &gcd;
     }
 
     if lcm != b.d {
         b.n *= &a.d;
-        b.n /= gcd;
     }
 
     if lcm != a.d {
@@ -1176,6 +1178,35 @@ mod test {
             let mut z = &x + &y;
             z.normalize();
             test::black_box(z);
+        });
+    }
+
+    #[bench]
+    fn bench_add_5(b: &mut Bencher) {
+        let r1 = rand_rational(20);
+        let r2 = rand_rational(20);
+        let r3 = rand_rational(20);
+        let r4 = rand_rational(20);
+        let r5 = rand_rational(20);
+
+        b.iter(|| {
+            let x = &r1 + &r2 + &r3 + &r4 + &r5;
+            test::black_box(x);
+        });
+    }
+
+    #[bench]
+    fn bench_add_5_normalize(b: &mut Bencher) {
+        let r1 = rand_rational(20);
+        let r2 = rand_rational(20);
+        let r3 = rand_rational(20);
+        let r4 = rand_rational(20);
+        let r5 = rand_rational(20);
+
+        b.iter(|| {
+            let mut x = &r1 + &r2 + &r3 + &r4 + &r5;
+            x.normalize();
+            test::black_box(x);
         });
     }
 
