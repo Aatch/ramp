@@ -429,7 +429,7 @@ impl fmt::Display for Limb {
 
 fn mul(u: Limb, v: Limb) -> (Limb, Limb) {
     if_cfg! {
-        #[cfg(target_arch="x86_64")]
+        #[cfg(all(not(feature="fallbacks"),target_arch="x86_64"))]
         #[inline(always)]
         fn mul_impl(u: Limb, v: Limb) -> (Limb, Limb) {
             let mut high: Limb = Limb(0);
@@ -443,7 +443,7 @@ fn mul(u: Limb, v: Limb) -> (Limb, Limb) {
             (high, low)
         }
 
-        #[cfg(target_arch="x86")]
+        #[cfg(all(not(feature="fallbacks"),target_arch="x86"))]
         #[inline(always)]
         fn mul_impl(u: Limb, v: Limb) -> (Limb, Limb) {
             let mut high: Limb = Limb(0);
@@ -488,7 +488,7 @@ fn mul(u: Limb, v: Limb) -> (Limb, Limb) {
 #[inline(always)]
 pub fn add_2(ah: Limb, al: Limb, bh: Limb, bl: Limb) -> (Limb, Limb) {
     if_cfg! {
-        #[cfg(target_arch="x86_64")]
+        #[cfg(all(not(feature="fallbacks"),target_arch="x86_64"))]
         #[inline(always)]
         fn add_2_impl(ah: Limb, al: Limb, bh: Limb, bl: Limb) -> (Limb, Limb) {
             let mut high: Limb = Limb(0);
@@ -503,7 +503,7 @@ pub fn add_2(ah: Limb, al: Limb, bh: Limb, bl: Limb) -> (Limb, Limb) {
             (high, low)
         }
 
-        #[cfg(target_arch="x86")]
+        #[cfg(all(not(feature="fallbacks"),target_arch="x86"))]
         #[inline(always)]
         fn add_2_impl(ah: Limb, al: Limb, bh: Limb, bl: Limb) -> (Limb, Limb) {
             let mut high: Limb = Limb(0);
@@ -536,7 +536,7 @@ pub fn add_2(ah: Limb, al: Limb, bh: Limb, bl: Limb) -> (Limb, Limb) {
 #[inline(always)]
 pub fn sub_2(ah: Limb, al: Limb, bh: Limb, bl: Limb) -> (Limb, Limb) {
     if_cfg! {
-        #[cfg(target_arch="x86_64")]
+        #[cfg(all(not(feature="fallbacks"),target_arch="x86_64"))]
         #[inline(always)]
         fn sub_2_impl(ah: Limb, al: Limb, bh: Limb, bl: Limb) -> (Limb, Limb) {
             let mut high: Limb = Limb(0);
@@ -551,7 +551,7 @@ pub fn sub_2(ah: Limb, al: Limb, bh: Limb, bl: Limb) -> (Limb, Limb) {
             (high, low)
         }
 
-        #[cfg(target_arch="x86")]
+        #[cfg(all(not(feature="fallbacks"),target_arch="x86"))]
         #[inline(always)]
         fn sub_2_impl(ah: Limb, al: Limb, bh: Limb, bl: Limb) -> (Limb, Limb) {
             let mut high: Limb = Limb(0);
@@ -591,7 +591,7 @@ pub fn sub_2(ah: Limb, al: Limb, bh: Limb, bl: Limb) -> (Limb, Limb) {
 pub fn div(nh: Limb, nl: Limb, d: Limb) -> (Limb, Limb) {
 
     if_cfg! {
-        #[cfg(target_arch="x86_64")]
+        #[cfg(all(not(feature="fallbacks"),target_arch="x86_64"))]
         #[inline(always)]
         fn div_impl(nh: Limb, nl: Limb, d: Limb) -> (Limb, Limb) {
             let mut q: Limb = Limb(0);
@@ -604,7 +604,7 @@ pub fn div(nh: Limb, nl: Limb, d: Limb) -> (Limb, Limb) {
             (q, r)
         }
 
-        #[cfg(target_arch="x86")]
+        #[cfg(all(not(feature="fallbacks"),target_arch="x86"))]
         #[inline(always)]
         fn div_impl(nh: Limb, nl: Limb, d: Limb) -> (Limb, Limb) {
             let mut q: Limb = Limb(0);

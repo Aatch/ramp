@@ -54,7 +54,7 @@ unsafe fn add_n_generic(mut wp: LimbsMut, mut xp: Limbs, mut yp: Limbs,
 #[cfg(asm)]
 pub unsafe fn add_n(mut wp: LimbsMut, xp: Limbs, yp: Limbs,
                     n: i32) -> Limb {
-    #[cfg(target_arch="x86_64")]
+    #[cfg(all(not(feature="fallbacks"),target_arch="x86_64"))]
     extern "C" { fn ramp_add_n(wp: *mut Limb, xp: *const Limb, yp: *const Limb,
                                n: i32) -> Limb; }
 
@@ -69,7 +69,7 @@ pub unsafe fn add_n(mut wp: LimbsMut, xp: Limbs, yp: Limbs,
  * Adds the `n` least signficant limbs of `xp` and `yp`, storing the result in {wp, n}.
  * If there was a carry, it is returned.
  */
-#[cfg(not(asm))]
+#[cfg(any(feature="fallbacks",not(asm)))]
 #[inline]
 pub unsafe fn add_n(wp: LimbsMut, xp: Limbs, yp: Limbs,
                     n: i32) -> Limb {
