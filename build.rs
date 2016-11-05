@@ -20,6 +20,7 @@ fn main() {
     if let Ok(_) = env::var("CARGO_FEATURE_ASM") {
         compile_asm();
     }
+    println!("cargo:rerun-if-changed=build.rs");
 }
 
 // Compile the asm implementations of operations. This is currently very dumb
