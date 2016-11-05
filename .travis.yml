@@ -48,6 +48,28 @@ matrix:
           packages:
           - libgmp-dev
     - env:
+      - TARGET=i686-unknown-linux-gnu
+        BITS=32
+        FEATURES='fallbacks'
+      addons:
+        apt:
+          packages:
+          - libc6:i386
+          - libstdc++6:i386
+          - zlib1g-dev:i386
+          - libssl-dev:i386
+          - pkg-config:i386
+          - gcc-multilib
+          - libgmp-dev:i386
+    - env:
+      - TARGET=x86_64-unknown-linux-gnu
+        BITS=64
+        FEATURES='fallbacks'
+      addons:
+        apt:
+          packages:
+          - libgmp-dev
+    - env:
       - TARGET=x86_64-unknown-linux-gnu
         BITS=64
         FEATURES='asm'
