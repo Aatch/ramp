@@ -188,7 +188,7 @@ fn divmod(a: BigIntStr, b: BigIntStr) -> TestResult {
 
 #[quickcheck]
 fn pow(a: BigIntStr, b: u32) -> TestResult {
-    if b > 100 {
+    if b > (RANGE_MULT as u32)/10 {
         return TestResult::discard();
     }
     let (ar, ag) = a.parse();
