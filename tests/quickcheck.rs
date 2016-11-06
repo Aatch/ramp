@@ -124,8 +124,7 @@ pub fn ramp_to_mpz(int:&Int) -> Mpz {
     let sign:i32 = (&int).sign();
     for i in 0..(1+positive.bit_length()/BITS as u32) {
         let offset:usize = BITS*i as usize;
-        let mut tmp = gmp::mpz::Mpz::zero();
-        tmp = tmp + ((&positive) >> offset).to_single_limb().0;
+        let tmp = Mpz::from(((&positive) >> offset).to_single_limb().0);
         rmp_as_mpz = rmp_as_mpz + (tmp << offset);
     }
     rmp_as_mpz*Mpz::from(sign)
