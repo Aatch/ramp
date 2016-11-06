@@ -34,5 +34,5 @@ gcc = "0.3"
 [dev-dependencies]
 rust-gmp = "0.2"
 num-bigint = "*"
-quickcheck = "0.2"
+quickcheck = "0.4"
 quickcheck_macros = "0.2"
