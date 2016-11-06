@@ -22,6 +22,10 @@ use std::fmt;
 
 use std::intrinsics::assume;
 
+use ::std::num::Wrapping;
+#[allow(dead_code)]
+type Word = Wrapping<usize>;
+
 macro_rules! if_cfg {
     ($(#[cfg($cfg:meta)] $it:item)+ fallback: $els:item) => (
         $(#[cfg($cfg)] $it)+
@@ -460,23 +464,36 @@ pub fn mul(u: Limb, v: Limb) -> (Limb, Limb) {
         fallback:
         #[inline(always)]
         fn mul_impl(u: Limb, v: Limb) -> (Limb, Limb) {
-            let ul = u.low_part();
-            let uh = u.high_part();
-            let vl = v.low_part();
-            let vh = v.high_part();
+            fn mul_2_usize_to_2_usize(u:Word, v: Word) -> (Word,Word) {
+                // see http://www.hackersdelight.org/hdcodetxt/muldwu.c.txt
+                const BITS:usize = Limb::BITS / 2;
+                const LO_MASK:Word = Wrapping((1usize << BITS) - 1);
 
-            let     x0 = ul * vl;
-            let mut x1 = ul * vh;
-            let     x2 = uh * vl;
-            let mut x3 = uh * vh;
+                let u0 = u >> BITS;
+                let u1 = u & LO_MASK;
+                let v0 = v >> BITS;
+                let v1 = v & LO_MASK;
 
-            x1 = x1 + x0.high_part();
-            let (x1, c) = x1.add_overflow(x2);
-            if c {
-                x3 = x1 + (1 << (Limb::BITS / 2));
+                let t = u1 * v1;
+                let w3 = t & LO_MASK;
+                let k = t >> BITS;
+
+                let t = u0*v1 + k;
+                let w2 = t & LO_MASK;
+                let w1 = t >> BITS;
+
+                let t = u1 * v0 + w2;
+                let k = t >> BITS;
+
+                (u0*v0+w1+k, (t<<BITS) + w3)
             }
 
-            (x3 + x1.high_part(), (x1 << (Limb::BITS/2)) + x0.low_part())
+            let (h,l) = mul_2_usize_to_2_usize(
+                Wrapping(u.0 as usize),
+                Wrapping(v.0 as usize));
+
+            (Limb(h.0 as BaseInt), Limb(l.0 as BaseInt))
+
         }
     }
     return mul_impl(u, v);
@@ -620,16 +637,13 @@ pub fn div(nh: Limb, nl: Limb, d: Limb) -> (Limb, Limb) {
         fallback:
         #[inline(always)]
         fn div_impl(nh: Limb, nl: Limb, d: Limb) -> (Limb, Limb) {
-            use ::std::num::Wrapping;
-            type W = ::std::num::Wrapping<usize>;
-
-            fn div_2_usize_by_usize(u1:W, u0: W, v: W) -> (W,W) {
+            fn div_2_usize_by_usize(u1:Word, u0: Word, v: Word) -> (Word,Word) {
                 // See http://www.hackersdelight.org/hdcodetxt/divlu.c.txt (last one)
                 // s == 0 in our case, d normalization is already done
                 const BITS:usize = Limb::BITS / 2;
-                const ONE:W = Wrapping(1usize);
-                const B:W = Wrapping(1usize << BITS);
-                const LO_MASK:W = Wrapping((1usize << BITS) - 1);
+                const ONE:Word = Wrapping(1usize);
+                const B:Word = Wrapping(1usize << BITS);
+                const LO_MASK:Word = Wrapping((1usize << BITS) - 1);
 
                 let vn1 = v >> BITS;
                 let vn0 = v & LO_MASK;
@@ -672,51 +686,6 @@ pub fn div(nh: Limb, nl: Limb, d: Limb) -> (Limb, Limb) {
 
             (Limb(q.0 as BaseInt), Limb(r.0 as BaseInt))
         }
-        /*
-        fallback:
-        #[inline(always)]
-        fn div_impl(nh: Limb, nl: Limb, d: Limb) -> (Limb, Limb) {
-
-            let dh = d.high_part();
-            let dl = d.low_part();
-
-            let mut qh = nh / dh;
-            let r1 = nh - qh * dh;
-            let m = qh * dl;
-
-            let mut r1 = r1 * (Limb::B | nl.high_part());
-            if r1 < m {
-                qh = qh - 1;
-                let (r, carry) = r1.add_overflow(d);
-                r1 = r;
-                if !carry && r1 < m {
-                    qh = qh - 1;
-                    r1 = r1 + d;
-                }
-            }
-
-            r1 = r1 - m;
-
-            let mut ql = r1 / dh;
-            let r0 = r1 - ql * dh;
-            let m = ql * dl;
-
-            let mut r0 = r0 * (Limb::B | nl.low_part());
-            if r0 < m {
-                ql = ql - 1;
-                let (r, carry) = r0.add_overflow(d);
-                r0 = r;
-                if !carry && r0 < m {
-                    ql = ql - 1;
-                    r0 = r0 + d;
-                }
-            }
-
-            r0 = r0 - m;
-
-            (qh * (Limb::B | ql), r0)
-        }
-        */
     }
 
     debug_assert!(d.high_bit_set());
@@ -752,7 +721,13 @@ pub fn div_preinv(nh: Limb, nl: Limb, d: Limb, dinv: Limb) -> (Limb, Limb) {
 }
 
 #[test]
-fn test_div() {
+fn test_bug_div_1() {
     let (q,r) = div(Limb(0), Limb(10), Limb((usize::max_value()/2+1) as BaseInt));
     assert_eq!((q.0, r.0), (0, 10));
+}
+
+#[test]
+fn test_bug_mul_1() {
+    let (h,l) = mul(Limb(18446744073709551615), Limb(7868907223611932671));
+    assert_eq!((h.0,l.0), (7868907223611932670, 10577836850097618945));
 }

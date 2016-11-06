@@ -117,10 +117,28 @@ impl Arbitrary for BigIntStr {
     }
 }
 
+pub fn ramp_to_mpz(int:&Int) -> Mpz {
+    const BITS:usize = ramp::ll::limb::Limb::BITS;
+    let mut rmp_as_mpz = gmp::mpz::Mpz::zero();
+    let positive = int.clone().abs();
+    let sign:i32 = (&int).sign();
+    for i in 0..(1+positive.bit_length()/BITS as u32) {
+        let offset:usize = BITS*i as usize;
+        let mut tmp = gmp::mpz::Mpz::zero();
+        tmp = tmp + ((&positive) >> offset).to_single_limb().0;
+        rmp_as_mpz = rmp_as_mpz + (tmp << offset);
+    }
+    rmp_as_mpz*Mpz::from(sign)
+}
+
 // compare a Ramp int and a GMP int via their string representations.
 macro_rules! eq {
     ($($r: expr, $g: expr);*) => {
-        ::quickcheck::TestResult::from_bool($($r.to_str_radix(16, false) == $g.to_str_radix(16))&&*)
+        ::quickcheck::TestResult::from_bool($( {
+            let ramp = $r.clone();
+            let mpz = $crate::ramp_to_mpz(&ramp);
+            mpz == $g
+        } )&&*)
     }
 }
 
@@ -353,9 +371,13 @@ macro_rules! test_binop {
             }
             #[quickcheck]
             fn int_intref(a: BigIntStr, b: BigIntStr) -> TestResult {
+                println!("");
                 let (ar, ag) = a.parse();
                 let (br, bg) = b.parse();
+                println!("ar:{} ag:{} br:{} bg:{}", ar, ag, br, bg);
                 if !$allow_zero && br == 0 { return TestResult::discard() }
+                println!("ar op br={}", &ar $op &br);
+                println!("ag op bg={}", &ag $op &bg);
 
                 eq!(ar $op &br, ag $op bg)
             }
@@ -842,3 +864,4 @@ mod format {
                    ag.to_str_radix(16).to_uppercase())
     }
 }
+
