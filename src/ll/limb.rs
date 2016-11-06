@@ -620,6 +620,62 @@ pub fn div(nh: Limb, nl: Limb, d: Limb) -> (Limb, Limb) {
         fallback:
         #[inline(always)]
         fn div_impl(nh: Limb, nl: Limb, d: Limb) -> (Limb, Limb) {
+            use ::std::num::Wrapping;
+            type W = ::std::num::Wrapping<usize>;
+
+            fn div_2_usize_by_usize(u1:W, u0: W, v: W) -> (W,W) {
+                // See http://www.hackersdelight.org/hdcodetxt/divlu.c.txt (last one)
+                // s == 0 in our case, d normalization is already done
+                const BITS:usize = Limb::BITS / 2;
+                const ONE:W = Wrapping(1usize);
+                const B:W = Wrapping(1usize << BITS);
+                const LO_MASK:W = Wrapping((1usize << BITS) - 1);
+
+                let vn1 = v >> BITS;
+                let vn0 = v & LO_MASK;
+
+                let un32 = u1;
+                let un10 = u0;
+
+                let un1 = un10 >> BITS;
+                let un0 = un10 & LO_MASK;
+
+                let mut q1 = un32 / vn1;
+                let mut rhat = un32 - q1*vn1;
+
+                while q1 >= B || q1*vn0 > B*rhat + un1 {
+                    q1 -= ONE;
+                    rhat += vn1;
+                    if rhat >= B {
+                        break;
+                    }
+                }
+
+                let un21 = un32*B +un1 - q1*v;
+
+                let mut q0 = un21 / vn1;
+                let mut rhat = un21 - q0*vn1;
+                while q0 >= B || q0*vn0 > B*rhat + un0 {
+                    q0 -= ONE;
+                    rhat += vn1;
+                    if rhat >= B {
+                        break;
+                    }
+                }
+                (q1*B + q0, un21*B + un0 - q0*v)
+            }
+
+            let (q,r) = div_2_usize_by_usize(
+                Wrapping(nh.0 as usize),
+                Wrapping(nl.0 as usize),
+                Wrapping(d.0 as usize));
+
+            (Limb(q.0 as BaseInt), Limb(r.0 as BaseInt))
+        }
+        /*
+        fallback:
+        #[inline(always)]
+        fn div_impl(nh: Limb, nl: Limb, d: Limb) -> (Limb, Limb) {
 
             let dh = d.high_part();
             let dl = d.low_part();
@@ -660,6 +716,7 @@ pub fn div(nh: Limb, nl: Limb, d: Limb) -> (Limb, Limb) {
 
             (qh * (Limb::B | ql), r0)
         }
+        */
     }
 
     debug_assert!(d.high_bit_set());
@@ -692,4 +749,10 @@ pub fn div_preinv(nh: Limb, nl: Limb, d: Limb, dinv: Limb) -> (Limb, Limb) {
     }
 
     (qh, r)
+}
+
+#[test]
+fn test_div() {
+    let (q,r) = div(Limb(0), Limb(10), Limb((usize::max_value()/2+1) as BaseInt));
+    assert_eq!((q.0, r.0), (0, 10));
 }
