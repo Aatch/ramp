@@ -353,13 +353,9 @@ macro_rules! test_binop {
             }
             #[quickcheck]
             fn int_intref(a: BigIntStr, b: BigIntStr) -> TestResult {
-                println!("");
                 let (ar, ag) = a.parse();
                 let (br, bg) = b.parse();
-                println!("ar:{} ag:{} br:{} bg:{}", ar, ag, br, bg);
                 if !$allow_zero && br == 0 { return TestResult::discard() }
-                println!("ar op br={}", &ar $op &br);
-                println!("ag op bg={}", &ag $op &bg);
 
                 eq!(ar $op &br, ag $op bg)
             }
