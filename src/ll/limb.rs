@@ -461,6 +461,15 @@ pub fn mul(u: Limb, v: Limb) -> (Limb, Limb) {
             (high, low)
         }
 
+        #[cfg(all(not(feature="fallbacks"),target_pointer_width="32"))]
+        #[inline(always)]
+        fn mul_impl(u: Limb, v: Limb) -> (Limb, Limb) {
+            let u = u.0 as u64;
+            let v = v.0 as u64;
+            let p = u*v;
+            (Limb((p>>32) as u32), Limb(p as u32))
+        }
+
         fallback:
         #[inline(always)]
         fn mul_impl(u: Limb, v: Limb) -> (Limb, Limb) {
@@ -535,6 +544,15 @@ pub fn add_2(ah: Limb, al: Limb, bh: Limb, bl: Limb) -> (Limb, Limb) {
             (high, low)
         }
 
+        #[cfg(all(not(feature="fallbacks"),target_pointer_width="32"))]
+        #[inline(always)]
+        fn add_2_impl(ah: Limb, al: Limb, bh: Limb, bl: Limb) -> (Limb, Limb) {
+            let a = ah.0 as u64 << 32 | al.0 as u64;
+            let b = bh.0 as u64 << 32 | bl.0 as u64;
+            let s = a+b
+            (Limb((s>>32) as u32), Limb(s as u32))
+        }
+
         fallback:
         #[inline(always)]
         fn add_2_impl(ah: Limb, al: Limb, bh: Limb, bl: Limb) -> (Limb, Limb) {
@@ -581,6 +599,15 @@ pub fn sub_2(ah: Limb, al: Limb, bh: Limb, bl: Limb) -> (Limb, Limb) {
             }
 
             (high, low)
+        }
+
+        #[cfg(all(not(feature="fallbacks"),target_pointer_width="32"))]
+        #[inline(always)]
+        fn sub_2_impl(ah: Limb, al: Limb, bh: Limb, bl: Limb) -> (Limb, Limb) {
+            let a = ah.0 as u64 << 32 | al.0 as u64;
+            let b = bh.0 as u64 << 32 | bl.0 as u64;
+            let s = a-b
+            (Limb((s>>32) as u32), Limb(s as u32))
         }
 
         fallback:
@@ -632,6 +659,14 @@ pub fn div(nh: Limb, nl: Limb, d: Limb) -> (Limb, Limb) {
                      : "0"(nh.0), "1"(nl.0), "r"(d.0));
             }
             (q, r)
+        }
+
+        fallback:
+        #[inline(always)]
+        fn div_impl(nh: Limb, nl: Limb, d: Limb) -> (Limb, Limb) {
+            let n = nh.0 as u64 << 32 | nl.0 as u64;
+            let d = d.0 as u64;
+            (Limb(n/d), Limb(n%d))
         }
 
         fallback:
