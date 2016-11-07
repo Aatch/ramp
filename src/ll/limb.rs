@@ -547,11 +547,11 @@ pub fn add_2(ah: Limb, al: Limb, bh: Limb, bl: Limb) -> (Limb, Limb) {
             (high, low)
         }
 
-        #[inline(always)]
         #[cfg(all(  not(feature="fallbacks"),
                     not(target_arch="x86"),
                     target_pointer_width="32",
             ))]
+        #[inline(always)]
         fn add_2_impl(ah: Limb, al: Limb, bh: Limb, bl: Limb) -> (Limb, Limb) {
             let a = ((ah.0 as u64) << 32) | al.0 as u64;
             let b = ((bh.0 as u64) << 32) | bl.0 as u64;
