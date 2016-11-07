@@ -117,27 +117,10 @@ impl Arbitrary for BigIntStr {
     }
 }
 
-pub fn ramp_to_mpz(int:&Int) -> Mpz {
-    const BITS:usize = ramp::ll::limb::Limb::BITS;
-    let mut rmp_as_mpz = gmp::mpz::Mpz::zero();
-    let positive = int.clone().abs();
-    let sign:i32 = (&int).sign();
-    for i in 0..(1+positive.bit_length()/BITS as u32) {
-        let offset:usize = BITS*i as usize;
-        let tmp = Mpz::from(((&positive) >> offset).to_single_limb().0);
-        rmp_as_mpz = rmp_as_mpz + (tmp << offset);
-    }
-    rmp_as_mpz*Mpz::from(sign)
-}
-
 // compare a Ramp int and a GMP int via their string representations.
 macro_rules! eq {
     ($($r: expr, $g: expr);*) => {
-        ::quickcheck::TestResult::from_bool($( {
-            let ramp = $r.clone();
-            let mpz = $crate::ramp_to_mpz(&ramp);
-            mpz == $g
-        } )&&*)
+        ::quickcheck::TestResult::from_bool($($r.to_str_radix(16, false) == $g.to_str_radix(16))&&*)
     }
 }
 
