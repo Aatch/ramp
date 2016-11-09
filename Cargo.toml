@@ -30,6 +30,8 @@ num-traits = "0.1.35"
 rust-gmp = { version = "0.2", optional = true }
 
 [build-dependencies]
+num-bigint = "*"
+rustc-cfg = "0.2"
 gcc = "0.3"
 
 [dev-dependencies]
