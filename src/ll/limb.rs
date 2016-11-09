@@ -22,6 +22,10 @@ use std::fmt;
 
 use std::intrinsics::assume;
 
+use ::std::num::Wrapping;
+#[allow(dead_code)]
+type Word = Wrapping<usize>;
+
 macro_rules! if_cfg {
     ($(#[cfg($cfg:meta)] $it:item)+ fallback: $els:item) => (
         $(#[cfg($cfg)] $it)+
@@ -427,9 +431,9 @@ impl fmt::Display for Limb {
     }
 }
 
-fn mul(u: Limb, v: Limb) -> (Limb, Limb) {
+pub fn mul(u: Limb, v: Limb) -> (Limb, Limb) {
     if_cfg! {
-        #[cfg(target_arch="x86_64")]
+        #[cfg(all(not(feature="fallbacks"),target_arch="x86_64"))]
         #[inline(always)]
         fn mul_impl(u: Limb, v: Limb) -> (Limb, Limb) {
             let mut high: Limb = Limb(0);
@@ -443,7 +447,7 @@ fn mul(u: Limb, v: Limb) -> (Limb, Limb) {
             (high, low)
         }
 
-        #[cfg(target_arch="x86")]
+        #[cfg(all(not(feature="fallbacks"),target_arch="x86"))]
         #[inline(always)]
         fn mul_impl(u: Limb, v: Limb) -> (Limb, Limb) {
             let mut high: Limb = Limb(0);
@@ -457,26 +461,51 @@ fn mul(u: Limb, v: Limb) -> (Limb, Limb) {
             (high, low)
         }
 
+        #[cfg(all(  not(feature="fallbacks"),
+                    not(target_arch="x86"),
+                    target_pointer_width="32",
+            ))]
+        #[inline(always)]
+        fn mul_impl(u: Limb, v: Limb) -> (Limb, Limb) {
+            let u = u.0 as u64;
+            let v = v.0 as u64;
+            let p = u*v;
+            (Limb((p>>32) as u32), Limb(p as u32))
+        }
+
         fallback:
         #[inline(always)]
         fn mul_impl(u: Limb, v: Limb) -> (Limb, Limb) {
-            let ul = u.low_part();
-            let uh = u.high_part();
-            let vl = v.low_part();
-            let vh = v.high_part();
+            fn mul_2_usize_to_2_usize(u:Word, v: Word) -> (Word,Word) {
+                // see http://www.hackersdelight.org/hdcodetxt/muldwu.c.txt
+                const BITS:usize = Limb::BITS / 2;
+                const LO_MASK:Word = Wrapping((1usize << BITS) - 1);
 
-            let     x0 = ul * vl;
-            let mut x1 = ul * vh;
-            let     x2 = uh * vl;
-            let mut x3 = uh * vh;
+                let u0 = u >> BITS;
+                let u1 = u & LO_MASK;
+                let v0 = v >> BITS;
+                let v1 = v & LO_MASK;
 
-            x1 = x1 + x0.high_part();
-            let (x1, c) = x1.add_overflow(x2);
-            if c {
-                x3 = x1 + (1 << (Limb::BITS / 2));
+                let t = u1 * v1;
+                let w3 = t & LO_MASK;
+                let k = t >> BITS;
+
+                let t = u0*v1 + k;
+                let w2 = t & LO_MASK;
+                let w1 = t >> BITS;
+
+                let t = u1 * v0 + w2;
+                let k = t >> BITS;
+
+                (u0*v0+w1+k, (t<<BITS) + w3)
             }
 
-            (x3 + x1.high_part(), (x1 << (Limb::BITS/2)) + x0.low_part())
+            let (h,l) = mul_2_usize_to_2_usize(
+                Wrapping(u.0 as usize),
+                Wrapping(v.0 as usize));
+
+            (Limb(h.0 as BaseInt), Limb(l.0 as BaseInt))
+
         }
     }
     return mul_impl(u, v);
@@ -488,7 +517,7 @@ fn mul(u: Limb, v: Limb) -> (Limb, Limb) {
 #[inline(always)]
 pub fn add_2(ah: Limb, al: Limb, bh: Limb, bl: Limb) -> (Limb, Limb) {
     if_cfg! {
-        #[cfg(target_arch="x86_64")]
+        #[cfg(all(not(feature="fallbacks"),target_arch="x86_64"))]
         #[inline(always)]
         fn add_2_impl(ah: Limb, al: Limb, bh: Limb, bl: Limb) -> (Limb, Limb) {
             let mut high: Limb = Limb(0);
@@ -503,7 +532,7 @@ pub fn add_2(ah: Limb, al: Limb, bh: Limb, bl: Limb) -> (Limb, Limb) {
             (high, low)
         }
 
-        #[cfg(target_arch="x86")]
+        #[cfg(all(not(feature="fallbacks"),target_arch="x86"))]
         #[inline(always)]
         fn add_2_impl(ah: Limb, al: Limb, bh: Limb, bl: Limb) -> (Limb, Limb) {
             let mut high: Limb = Limb(0);
@@ -516,6 +545,18 @@ pub fn add_2(ah: Limb, al: Limb, bh: Limb, bl: Limb) -> (Limb, Limb) {
             }
 
             (high, low)
+        }
+
+        #[cfg(all(  not(feature="fallbacks"),
+                    not(target_arch="x86"),
+                    target_pointer_width="32",
+            ))]
+        #[inline(always)]
+        fn add_2_impl(ah: Limb, al: Limb, bh: Limb, bl: Limb) -> (Limb, Limb) {
+            let a = ((ah.0 as u64) << 32) | al.0 as u64;
+            let b = ((bh.0 as u64) << 32) | bl.0 as u64;
+            let s = a.overflowing_add(b).0;
+            (Limb((s>>32) as u32), Limb(s as u32))
         }
 
         fallback:
@@ -536,7 +577,7 @@ pub fn add_2(ah: Limb, al: Limb, bh: Limb, bl: Limb) -> (Limb, Limb) {
 #[inline(always)]
 pub fn sub_2(ah: Limb, al: Limb, bh: Limb, bl: Limb) -> (Limb, Limb) {
     if_cfg! {
-        #[cfg(target_arch="x86_64")]
+        #[cfg(all(not(feature="fallbacks"),target_arch="x86_64"))]
         #[inline(always)]
         fn sub_2_impl(ah: Limb, al: Limb, bh: Limb, bl: Limb) -> (Limb, Limb) {
             let mut high: Limb = Limb(0);
@@ -551,7 +592,7 @@ pub fn sub_2(ah: Limb, al: Limb, bh: Limb, bl: Limb) -> (Limb, Limb) {
             (high, low)
         }
 
-        #[cfg(target_arch="x86")]
+        #[cfg(all(not(feature="fallbacks"),target_arch="x86"))]
         #[inline(always)]
         fn sub_2_impl(ah: Limb, al: Limb, bh: Limb, bl: Limb) -> (Limb, Limb) {
             let mut high: Limb = Limb(0);
@@ -564,6 +605,18 @@ pub fn sub_2(ah: Limb, al: Limb, bh: Limb, bl: Limb) -> (Limb, Limb) {
             }
 
             (high, low)
+        }
+
+        #[cfg(all(  not(feature="fallbacks"),
+                    not(target_arch="x86"),
+                    target_pointer_width="32",
+            ))]
+        #[inline(always)]
+        fn sub_2_impl(ah: Limb, al: Limb, bh: Limb, bl: Limb) -> (Limb, Limb) {
+            let a = ((ah.0 as u64) << 32) | al.0 as u64;
+            let b = ((bh.0 as u64) << 32) | bl.0 as u64;
+            let s = a.overflowing_sub(b).0;
+            (Limb((s>>32) as u32), Limb(s as u32))
         }
 
         fallback:
@@ -591,7 +644,7 @@ pub fn sub_2(ah: Limb, al: Limb, bh: Limb, bl: Limb) -> (Limb, Limb) {
 pub fn div(nh: Limb, nl: Limb, d: Limb) -> (Limb, Limb) {
 
     if_cfg! {
-        #[cfg(target_arch="x86_64")]
+        #[cfg(all(not(feature="fallbacks"),target_arch="x86_64"))]
         #[inline(always)]
         fn div_impl(nh: Limb, nl: Limb, d: Limb) -> (Limb, Limb) {
             let mut q: Limb = Limb(0);
@@ -604,7 +657,7 @@ pub fn div(nh: Limb, nl: Limb, d: Limb) -> (Limb, Limb) {
             (q, r)
         }
 
-        #[cfg(target_arch="x86")]
+        #[cfg(all(not(feature="fallbacks"),target_arch="x86"))]
         #[inline(always)]
         fn div_impl(nh: Limb, nl: Limb, d: Limb) -> (Limb, Limb) {
             let mut q: Limb = Limb(0);
@@ -617,48 +670,68 @@ pub fn div(nh: Limb, nl: Limb, d: Limb) -> (Limb, Limb) {
             (q, r)
         }
 
+        #[cfg(all(  not(feature="fallbacks"),
+                    not(target_arch="x86"),
+                    target_pointer_width="32",
+            ))]
+        #[inline(always)]
+        fn div_impl(nh: Limb, nl: Limb, d: Limb) -> (Limb, Limb) {
+            let n = (nh.0 as u64) << 32 | nl.0 as u64;
+            let d = d.0 as u64;
+            (Limb((n/d) as u32), Limb((n%d) as u32))
+        }
+
         fallback:
         #[inline(always)]
         fn div_impl(nh: Limb, nl: Limb, d: Limb) -> (Limb, Limb) {
+            fn div_2_usize_by_usize(u1:Word, u0: Word, v: Word) -> (Word,Word) {
+                // See http://www.hackersdelight.org/hdcodetxt/divlu.c.txt (last one)
+                // s == 0 in our case, d normalization is already done
+                const BITS:usize = Limb::BITS / 2;
+                const ONE:Word = Wrapping(1usize);
+                const B:Word = Wrapping(1usize << BITS);
+                const LO_MASK:Word = Wrapping((1usize << BITS) - 1);
 
-            let dh = d.high_part();
-            let dl = d.low_part();
+                let vn1 = v >> BITS;
+                let vn0 = v & LO_MASK;
 
-            let mut qh = nh / dh;
-            let r1 = nh - qh * dh;
-            let m = qh * dl;
+                let un32 = u1;
+                let un10 = u0;
 
-            let mut r1 = r1 * (Limb::B | nl.high_part());
-            if r1 < m {
-                qh = qh - 1;
-                let (r, carry) = r1.add_overflow(d);
-                r1 = r;
-                if !carry && r1 < m {
-                    qh = qh - 1;
-                    r1 = r1 + d;
+                let un1 = un10 >> BITS;
+                let un0 = un10 & LO_MASK;
+
+                let mut q1 = un32 / vn1;
+                let mut rhat = un32 - q1*vn1;
+
+                while q1 >= B || q1*vn0 > B*rhat + un1 {
+                    q1 -= ONE;
+                    rhat += vn1;
+                    if rhat >= B {
+                        break;
+                    }
                 }
+
+                let un21 = un32*B +un1 - q1*v;
+
+                let mut q0 = un21 / vn1;
+                let mut rhat = un21 - q0*vn1;
+                while q0 >= B || q0*vn0 > B*rhat + un0 {
+                    q0 -= ONE;
+                    rhat += vn1;
+                    if rhat >= B {
+                        break;
+                    }
+                }
+                (q1*B + q0, un21*B + un0 - q0*v)
             }
 
-            r1 = r1 - m;
+            let (q,r) = div_2_usize_by_usize(
+                Wrapping(nh.0 as usize),
+                Wrapping(nl.0 as usize),
+                Wrapping(d.0 as usize));
 
-            let mut ql = r1 / dh;
-            let r0 = r1 - ql * dh;
-            let m = ql * dl;
-
-            let mut r0 = r0 * (Limb::B | nl.low_part());
-            if r0 < m {
-                ql = ql - 1;
-                let (r, carry) = r0.add_overflow(d);
-                r0 = r;
-                if !carry && r0 < m {
-                    ql = ql - 1;
-                    r0 = r0 + d;
-                }
-            }
-
-            r0 = r0 - m;
-
-            (qh * (Limb::B | ql), r0)
+            (Limb(q.0 as BaseInt), Limb(r.0 as BaseInt))
         }
     }
 
@@ -692,4 +765,17 @@ pub fn div_preinv(nh: Limb, nl: Limb, d: Limb, dinv: Limb) -> (Limb, Limb) {
     }
 
     (qh, r)
+}
+
+#[test]
+fn test_bug_div_1() {
+    let (q,r) = div(Limb(0), Limb(10), Limb((usize::max_value()/2+1) as BaseInt));
+    assert_eq!((q.0, r.0), (0, 10));
+}
+
+#[cfg(target_pointer_width = "64")]
+#[test]
+fn test_bug_mul_1() {
+    let (h,l) = mul(Limb(18446744073709551615), Limb(7868907223611932671));
+    assert_eq!((h.0,l.0), (7868907223611932670, 10577836850097618945));
 }

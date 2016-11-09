@@ -3329,7 +3329,6 @@ impl PartialOrd<Int> for i64 {
 macro_rules! impl_from_prim (
     (signed $($t:ty),*) => {
         $(impl ::std::convert::From<$t> for Int {
-            #[allow(exceeding_bitshifts)] // False positives for the larger-than BaseInt case
             fn from(val: $t) -> Int {
                 if val == 0 {
                     return Int::zero();
@@ -3344,7 +3343,7 @@ macro_rules! impl_from_prim (
                     let vabs = val.abs();
                     let mask : BaseInt = !0;
                     let vlow = vabs & (mask as $t);
-                    let vhigh = vabs >> Limb::BITS;
+                    let vhigh = vabs.overflowing_shr(Limb::BITS as u32).0;
 
                     let low_limb = Limb(vlow as BaseInt);
                     let high_limb = Limb(vhigh as BaseInt);
@@ -3372,7 +3371,6 @@ macro_rules! impl_from_prim (
     };
     (unsigned $($t:ty),*) => {
         $(impl ::std::convert::From<$t> for Int {
-            #[allow(exceeding_bitshifts)] // False positives for the larger-than BaseInt case
             fn from(val: $t) -> Int {
                 if val == 0 {
                     return Int::zero();
@@ -3381,7 +3379,7 @@ macro_rules! impl_from_prim (
                 if std::mem::size_of::<$t>() > std::mem::size_of::<BaseInt>() {
                     let mask : BaseInt = !0;
                     let vlow = val & (mask as $t);
-                    let vhigh = val >> Limb::BITS;
+                    let vhigh = val.overflowing_shr(Limb::BITS as u32).0;
 
                     let low_limb = Limb(vlow as BaseInt);
                     let high_limb = Limb(vhigh as BaseInt);
@@ -3474,7 +3472,6 @@ impl FromStr for Int {
 macro_rules! impl_from_for_prim (
     (signed $($t:ty),*) => (
         $(impl<'a> ::std::convert::From<&'a Int> for $t {
-            #[allow(exceeding_bitshifts)] // False positives for the larger-than BaseInt case
             fn from(i: &'a Int) -> $t {
                 let sign = i.sign() as $t;
                 if sign == 0 {
@@ -3487,7 +3484,7 @@ macro_rules! impl_from_for_prim (
                         let higher = unsafe { (*i.ptr.offset(1)).0 } as $t;
 
                         // Combine the two
-                        let n : $t = lower | (higher << Limb::BITS);
+                        let n : $t = lower | higher.overflowing_shl(Limb::BITS as u32).0;
 
                         // Apply the sign
                         return n.wrapping_mul(sign);
@@ -3502,7 +3499,6 @@ macro_rules! impl_from_for_prim (
     );
     (unsigned $($t:ty),*) => (
         $(impl<'a> ::std::convert::From<&'a Int> for $t {
-            #[allow(exceeding_bitshifts)] // False positives for the larger-than BaseInt case
             fn from(i: &'a Int) -> $t {
                 // This does the conversion ignoring the sign
 
@@ -3516,7 +3512,7 @@ macro_rules! impl_from_for_prim (
                         let higher = unsafe { (*i.ptr.offset(1)).0 } as $t;
 
                         // Combine the two
-                        let n : $t = lower | (higher << Limb::BITS);
+                        let n : $t = lower | higher.overflowing_shl(Limb::BITS as u32).0;
 
                         return n;
                     }
@@ -4382,11 +4378,11 @@ mod test {
 
             assert!(x1 == x2);
 
-            let mut hasher = std::hash::SipHasher::new();
+            let mut hasher = std::hash::SipHasher::default();
             x1.hash(&mut hasher);
             let x1_hash = hasher.finish();
 
-            let mut hasher = std::hash::SipHasher::new();
+            let mut hasher = std::hash::SipHasher::default();
             x2.hash(&mut hasher);
             let x2_hash = hasher.finish();
 
