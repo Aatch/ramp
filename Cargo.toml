@@ -17,6 +17,7 @@ path = "src/lib.rs"
 
 [features]
 unstable = [] # To keep travis-cargo happy
+fallbacks = []
 asm = []
 
 full-quickcheck = []
