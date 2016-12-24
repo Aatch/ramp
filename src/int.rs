@@ -32,6 +32,7 @@ use rand::Rng;
 
 use hamming;
 use alloc;
+use num_integer::Integer;
 use num_traits::{Num, Zero, One};
 
 use ll;
@@ -3557,6 +3558,53 @@ impl Num for Int {
     #[inline]
     fn from_str_radix(src: &str, radix: u32) -> Result<Int, ParseIntError> {
         Int::from_str_radix(src, radix as u8)
+    }
+}
+
+impl Integer for Int {
+    #[inline]
+    fn div_floor(&self, other: &Int) -> Int {
+        self / other
+    }
+
+    #[inline]
+    fn mod_floor(&self, other: &Int) -> Int {
+        self % other
+    }
+
+    #[inline]
+    fn gcd(&self, other: &Int) -> Int {
+        self.gcd(other)
+    }
+
+    #[inline]
+    fn lcm(&self, other: &Int) -> Int {
+        self.lcm(other)
+    }
+
+    #[inline]
+    fn divides(&self, other: &Int) -> bool {
+        other.is_multiple_of(self)
+    }
+
+    #[inline]
+    fn is_multiple_of(&self, other: &Int) -> bool {
+        (self % other).is_zero()
+    }
+
+    #[inline]
+    fn is_even(&self) -> bool {
+        self.is_even()
+    }
+
+    #[inline]
+    fn is_odd(&self) -> bool {
+        !self.is_even()
+    }
+
+    #[inline]
+    fn div_rem(&self, other: &Int) -> (Int, Int) {
+        self.divrem(other)
     }
 }
 
