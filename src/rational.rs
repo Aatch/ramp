@@ -443,7 +443,7 @@ impl<'a> Add<Rational> for &'a Rational {
     }
 }
 
-impl<'a> Add<&'a Rational> for &'a Rational {
+impl<'a, 'b> Add<&'a Rational> for &'b Rational {
     type Output = Rational;
 
     fn add(self, other: &'a Rational) -> Rational {
@@ -477,7 +477,7 @@ impl<'a> Add<Int> for &'a Rational {
     }
 }
 
-impl<'a> Add<&'a Int> for &'a Rational {
+impl<'a, 'b> Add<&'a Int> for &'b Rational {
     type Output = Rational;
 
     fn add(self, other: &'a Int) -> Rational {
@@ -509,7 +509,7 @@ impl<'a> Add<Rational> for &'a Int {
     }
 }
 
-impl<'a> Add<&'a Rational> for &'a Int {
+impl<'a, 'b> Add<&'a Rational> for &'b Int {
     type Output = Rational;
 
     fn add(self, other: &'a Rational) -> Rational {
@@ -561,7 +561,7 @@ impl<'a> Sub<Rational> for &'a Rational {
     }
 }
 
-impl<'a> Sub<&'a Rational> for &'a Rational {
+impl<'a, 'b> Sub<&'a Rational> for &'b Rational {
     type Output = Rational;
 
     fn sub(self, other: &'a Rational) -> Rational {
@@ -638,7 +638,7 @@ impl<'a> Mul<Rational> for &'a Rational {
     }
 }
 
-impl<'a> Mul<&'a Rational> for &'a Rational {
+impl<'a, 'b> Mul<&'a Rational> for &'b Rational {
     type Output = Rational;
 
     fn mul(self, other: &'a Rational) -> Rational {
@@ -672,7 +672,7 @@ impl<'a> Mul<Int> for &'a Rational {
     }
 }
 
-impl<'a> Mul<&'a Int> for &'a Rational {
+impl<'a, 'b> Mul<&'a Int> for &'b Rational {
     type Output = Rational;
 
     fn mul(self, other: &'a Int) -> Rational {
@@ -704,7 +704,7 @@ impl<'a> Mul<Rational> for &'a Int {
     }
 }
 
-impl<'a> Mul<&'a Rational> for &'a Int {
+impl<'a, 'b> Mul<&'a Rational> for &'b Int {
     type Output = Rational;
 
     fn mul(self, other: &'a Rational) -> Rational {
@@ -777,7 +777,7 @@ impl<'a> Div<Rational> for &'a Rational {
     }
 }
 
-impl<'a> Div<&'a Rational> for &'a Rational {
+impl<'a, 'b> Div<&'a Rational> for &'b Rational {
     type Output = Rational;
 
     fn div(self, other: &'a Rational) -> Rational {
@@ -811,7 +811,7 @@ impl<'a> Div<Int> for &'a Rational {
     }
 }
 
-impl<'a> Div<&'a Int> for &'a Rational {
+impl<'a, 'b> Div<&'a Int> for &'b Rational {
     type Output = Rational;
 
     fn div(self, other: &'a Int) -> Rational {
@@ -843,7 +843,7 @@ impl<'a> Div<Rational> for &'a Int {
     }
 }
 
-impl<'a> Div<&'a Rational> for &'a Int {
+impl<'a, 'b> Div<&'a Rational> for &'b Int {
     type Output = Rational;
 
     fn div(self, other: &'a Rational) -> Rational {
