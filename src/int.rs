@@ -32,7 +32,7 @@ use rand::Rng;
 
 use hamming;
 use alloc;
-use num_traits::{Zero, One};
+use num_traits::{Num, Zero, One};
 
 use ll;
 use ll::limb::{BaseInt, Limb};
@@ -3548,6 +3548,15 @@ impl Zero for Int {
 impl One for Int {
     fn one() -> Int {
         Int::from(1)
+    }
+}
+
+impl Num for Int {
+    type FromStrRadixErr = ParseIntError;
+
+    #[inline]
+    fn from_str_radix(src: &str, radix: u32) -> Result<Int, ParseIntError> {
+        Int::from_str_radix(src, radix as u8)
     }
 }
 
