@@ -28,7 +28,7 @@ use std::ops::{
 
 use ll;
 
-use int::Int;
+use int::{Int, ParseIntError};
 
 use ieee754::Ieee754;
 
@@ -882,6 +882,38 @@ macro_rules! impl_from_float {
 
 impl_from_float!(f32, 23);
 impl_from_float!(f64, 52);
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct ParseRationalError(ParseIntError);
+
+impl std::error::Error for ParseRationalError {
+    fn description<'a>(&'a self) -> &'a str {
+        self.0.description()
+    }
+}
+
+impl fmt::Display for ParseRationalError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        self.0.fmt(f)
+    }
+}
+
+impl From<ParseIntError> for ParseRationalError {
+    fn from(e: ParseIntError) -> ParseRationalError {
+        ParseRationalError(e)
+    }
+}
+
+impl std::str::FromStr for Rational {
+    type Err = ParseRationalError;
+
+    fn from_str(s: &str) -> Result<Rational, ParseRationalError> {
+        match s.find('/') {
+            Some(i) => Ok(Rational::new(Int::from_str(&s[..i])?, Int::from_str(&s[i + 1..])?)),
+            None => Ok(Rational::new(Int::from_str(s)?, Int::one())),
+        }
+    }
+}
 
 impl fmt::Debug for Rational {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
