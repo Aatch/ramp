@@ -26,6 +26,7 @@ extern crate alloc;
 extern crate ieee754;
 extern crate rand;
 extern crate hamming;
+extern crate num_integer;
 extern crate num_traits;
 
 pub mod ll;

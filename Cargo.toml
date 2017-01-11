@@ -27,6 +27,7 @@ ieee754 = "0.2"
 rand = "0.3"
 hamming = "0.1"
 num-traits = "0.1.35"
+num-integer = "0.1.32"
 rust-gmp = { version = "0.2", optional = true }
 
 [build-dependencies]
@@ -36,6 +37,5 @@ gcc = "0.3"
 
 [dev-dependencies]
 num-bigint = "*"
-num-integer = "*"
 quickcheck = "0.4.1"
 quickcheck_macros = "0.4.1"
