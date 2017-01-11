@@ -25,6 +25,7 @@ use std::ops::{
     Add, Sub, Mul, Div, Rem, Neg,
     AddAssign, SubAssign, MulAssign, DivAssign,
 };
+use num_traits::{Zero, One};
 
 use ll;
 
@@ -898,6 +899,25 @@ impl fmt::Display for Rational {
         } else {
             write!(f, "{}/{}", self.n, self.d)
         }
+    }
+}
+
+impl Zero for Rational {
+    #[inline]
+    fn zero() -> Rational {
+        Rational::new(Int::zero(), Int::one())
+    }
+
+    #[inline]
+    fn is_zero(&self) -> bool {
+        self.n.is_zero()
+    }
+}
+
+impl One for Rational {
+    #[inline]
+    fn one() -> Rational {
+        Rational::new(Int::one(), Int::one())
     }
 }
 
