@@ -1,3 +1,5 @@
+//! This module only holds `DivRem` currently.
+
 // Copyright 2015 The Ramp Developers
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
@@ -12,6 +14,7 @@
 //    See the License for the specific language governing permissions and
 //    limitations under the License.
 
+/// A trait for types which can compute division and remainder in one step.
 pub trait DivRem<RHS = Self> {
     // Default to (Self, RHS) when associated type defaults are more stable.
     type Output;

@@ -1,3 +1,5 @@
+//! This module holds `Rational` and related types.
+
 // Copyright 2016 The Ramp Developers
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
@@ -33,22 +35,19 @@ use int::{Int, ParseIntError};
 
 use ieee754::Ieee754;
 
-/**
- * An arbitrary-precision rational number.
- *
- * This type is used to represent numbers in the form `a / b` where `a` and `b`
- * are integers and `b` is non-zero.
- */
+/// An arbitrary-precision rational number.
+///
+/// This type is used to represent numbers in the form `a / b` where `a` and `b`
+/// are [`Int`] and `b` is non-zero.
+///
+/// [`Int`]: ../int/struct.Int.html
 pub struct Rational {
     n: Int,
     d: Int
 }
 
 impl Rational {
-
-    /**
-     * Returns the absolute value of this Rational
-     */
+    /// Consumes this `Rational`, returning its absolute value.
     pub fn abs(mut self) -> Rational {
         if self.sign() == -1 {
             self.n *= -1;
@@ -56,6 +55,13 @@ impl Rational {
         self
     }
 
+    /// Creates a new `Rational` from a numerator `n` and denominator `d`.
+    ///
+    /// This method normalizes the `Rational`.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `d` is zero.
     pub fn new(n: Int, d: Int) -> Rational {
         assert!(d != 0, "Denominator is zero");
 
@@ -76,25 +82,23 @@ impl Rational {
         rat
     }
 
-    /**
-     * Returns whether or not this rational is normalized or not
-     */
+    /// Returns whether or not this `Rational` is [normalized].
+    ///
+    /// [normalized]: #method.normalize
     pub fn normalized(&self) -> bool {
         let gcd = self.n.gcd(&self.d);
         gcd == 1
     }
 
-    /**
-     * Normalize this Rational.
-     *
-     * This method will cause the value to be represented in the
-     * form `a/b` where `a` and `b` are relatively prime. It also
-     * ensures that the denominator is positive.
-     *
-     * Normalizing rationals will result in faster calculations as
-     * it ensures that the numerator and denominator are as small as
-     * they can be.
-     */
+    /// Normalize this `Rational` in place.
+    ///
+    /// This method ensures that the `Rational` is represented in lowest forms, i.e. as `a/b` such
+    /// that `a` and `b` share no common factors. It also ensures that the denominator is positive.
+    ///
+    /// Normalizing rationals results in faster calculations, ensuring that the numerator and
+    /// denominator are as small as possible.
+    ///
+    /// Most of the time, this method is called automatically.
     pub fn normalize(&mut self) {
         let gcd = self.n.gcd(&self.d);
 
@@ -108,9 +112,7 @@ impl Rational {
         }
     }
 
-    /**
-     * Returns the reciprocal of this Rational
-     */
+    /// Consumes this `Rational`, returning its reciprocal.
     pub fn invert(self) -> Rational {
         if self.sign() == -1 {
             Rational {
@@ -125,9 +127,9 @@ impl Rational {
         }
     }
 
-    /**
-     * Returns this Rational to the nearest Int
-     */
+    /// Consumes this `Rational`, rounding it to the nearest `Int`.
+    ///
+    /// This method will round half values away from zero, similarly to `f64::round`.
     pub fn round(mut self) -> Int {
         let sign = self.sign();
         if sign == 0 {
@@ -142,10 +144,8 @@ impl Rational {
          }
     }
 
-    /**
-     * Returns the sign of the Int as either -1, 0 or 1 for self being negative, zero
-     * or positive, respectively.
-     */
+    /// Returns the sign of this `Rational` as either -1, 0 or 1 depending on whether it is
+    /// negative, zero, or positive, respectively.
     pub fn sign(&self) -> i32 {
         if self.n.sign() == 0 {
             0
@@ -156,9 +156,13 @@ impl Rational {
         }
     }
 
-    /**
-     * Converts this Rational to an `f64` value.
-     */
+    /// Converts this `Rational` into an `f64`.
+    ///
+    /// This is not an exact conversion, because this `Rational` may be more precise than an `f64`
+    /// can account for.
+    ///
+    /// Currently, this conversion is naïve, simply converting the numerator and denominator into
+    /// `f64`s and dividing them.
     pub fn to_f64(&self) -> f64 {
         let mut normalized = self.clone();
         normalized.normalize();
@@ -184,9 +188,7 @@ impl Clone for Rational {
 impl std::default::Default for Rational {
     #[inline]
     fn default() -> Rational {
-        Rational::new(
-            Int::zero(),
-            Int::one())
+        Rational::new(Int::zero(), Int::one())
     }
 }
 
@@ -884,6 +886,9 @@ macro_rules! impl_from_float {
 impl_from_float!(f32, 23);
 impl_from_float!(f64, 52);
 
+/// Error that arises when parsing a [`Rational`].
+///
+/// [`Rational`]: struct.Rational.html
 #[derive(Debug, Clone, PartialEq)]
 pub struct ParseRationalError(ParseIntError);
 
