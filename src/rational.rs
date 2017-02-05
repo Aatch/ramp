@@ -39,6 +39,7 @@ use ieee754::Ieee754;
  * This type is used to represent numbers in the form `a / b` where `a` and `b`
  * are integers and `b` is non-zero.
  */
+#[derive(Clone)]
 pub struct Rational {
     n: Int,
     d: Int
@@ -126,7 +127,7 @@ impl Rational {
     }
 
     /**
-     * Returns this Rational to the nearest Int
+     * Returns this Rational to the nearest Int, rounding away from zero
      */
     pub fn round(mut self) -> Int {
         let sign = self.sign();
@@ -163,21 +164,6 @@ impl Rational {
         let mut normalized = self.clone();
         normalized.normalize();
         normalized.n.to_f64() / normalized.d.to_f64()
-    }
-}
-
-impl Clone for Rational {
-    fn clone(&self) -> Rational {
-        Rational {
-            n: self.n.clone(),
-            d: self.d.clone()
-        }
-    }
-
-    fn clone_from(&mut self, other: &Rational)  {
-        self.n.clone_from(&other.n);
-        self.d.clone_from(&other.d);
-
     }
 }
 
