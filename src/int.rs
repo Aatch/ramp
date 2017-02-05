@@ -4439,11 +4439,11 @@ mod test {
 
             assert!(x1 == x2);
 
-            let mut hasher = std::hash::SipHasher::new();
+            let mut hasher = std::collections::hash_map::DefaultHasher::new();
             x1.hash(&mut hasher);
             let x1_hash = hasher.finish();
 
-            let mut hasher = std::hash::SipHasher::new();
+            let mut hasher = std::collections::hash_map::DefaultHasher::new();
             x2.hash(&mut hasher);
             let x2_hash = hasher.finish();
 
