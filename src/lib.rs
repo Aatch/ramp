@@ -18,6 +18,9 @@
 #![feature(core_intrinsics, asm, heap_api, associated_consts)]
 #![feature(step_trait, unique, alloc)]
 
+#![cfg_attr(nightly, feature(unique))]
+#![cfg(nightly)]
+
 #![cfg_attr(test, feature(test))]
 
 #[cfg(test)] extern crate test;
