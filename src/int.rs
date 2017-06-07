@@ -263,7 +263,7 @@ impl Int {
                 let l = *ptr;
                 l.hash(state);
 
-                ptr = ptr.offset(2);
+                ptr = ptr.offset(1);
                 size -= 1;
             }
         }
