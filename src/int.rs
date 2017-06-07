@@ -1034,8 +1034,13 @@ impl PartialOrd<Int> for Limb {
 impl hash::Hash for Int {
     fn hash<H>(&self, state: &mut H) where H: hash::Hasher {
         debug_assert!(self.well_formed());
-        self.sign().hash(state);
-        self.abs_hash(state);
+
+        // Normalize the Int so we get consistent hashing (since there are multiple limb
+        // representations for the same numeric value)
+        let mut n = self.clone();
+        n.normalize();
+        n.sign().hash(state);
+        n.abs_hash(state);
     }
 }
 
@@ -3816,7 +3821,7 @@ mod test {
 
         for &(s, n) in cases.iter() {
             let i : Int = Int::from_str_radix(s, 16).unwrap();
-            assert!(i == n, "Assertion failed: {:#x} != {:#x}", i, n);
+            assert_eq!(i, n, "Assertion failed: {:#x} != {:#x}", i, n);
         }
     }
 
@@ -4436,17 +4441,21 @@ mod test {
             let x1 = rng.gen_int(640);
             let x2 = x1.clone();
 
-            assert!(x1 == x2);
+            assert_eq!(x1, x2);
 
-            let mut hasher = std::collections::hash_map::DefaultHasher::new();
-            x1.hash(&mut hasher);
-            let x1_hash = hasher.finish();
+            let x1_hash = {
+                let mut hasher = std::collections::hash_map::DefaultHasher::new();
+                x1.hash(&mut hasher);
+                hasher.finish()
+            };
 
-            let mut hasher = std::collections::hash_map::DefaultHasher::new();
-            x2.hash(&mut hasher);
-            let x2_hash = hasher.finish();
+            let x2_hash = {
+                let mut hasher = std::collections::hash_map::DefaultHasher::new();
+                x2.hash(&mut hasher);
+                hasher.finish()
+            };
 
-            assert!(x1_hash == x2_hash);
+            assert_eq!(x1_hash, x2_hash);
         }
     }
 
