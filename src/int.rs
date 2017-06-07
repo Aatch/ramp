@@ -3334,7 +3334,6 @@ impl PartialOrd<Int> for i64 {
 macro_rules! impl_from_prim (
     (signed $($t:ty),*) => {
         $(impl ::std::convert::From<$t> for Int {
-            #[allow(exceeding_bitshifts)] // False positives for the larger-than BaseInt case
             fn from(val: $t) -> Int {
                 if val == 0 {
                     return Int::zero();
@@ -3349,7 +3348,8 @@ macro_rules! impl_from_prim (
                     let vabs = val.abs();
                     let mask : BaseInt = !0;
                     let vlow = vabs & (mask as $t);
-                    let vhigh = vabs >> Limb::BITS;
+                    // This won't actually wrap, since $t is bigger than BaseInt
+                    let vhigh = vabs.wrapping_shr(Limb::BITS as u32);
 
                     let low_limb = Limb(vlow as BaseInt);
                     let high_limb = Limb(vhigh as BaseInt);
@@ -3377,7 +3377,6 @@ macro_rules! impl_from_prim (
     };
     (unsigned $($t:ty),*) => {
         $(impl ::std::convert::From<$t> for Int {
-            #[allow(exceeding_bitshifts)] // False positives for the larger-than BaseInt case
             fn from(val: $t) -> Int {
                 if val == 0 {
                     return Int::zero();
@@ -3386,7 +3385,8 @@ macro_rules! impl_from_prim (
                 if std::mem::size_of::<$t>() > std::mem::size_of::<BaseInt>() {
                     let mask : BaseInt = !0;
                     let vlow = val & (mask as $t);
-                    let vhigh = val >> Limb::BITS;
+                    // This won't actually wrap, since $t is bigger than BaseInt
+                    let vhigh = val.wrapping_shr(Limb::BITS as u32);
 
                     let low_limb = Limb(vlow as BaseInt);
                     let high_limb = Limb(vhigh as BaseInt);
@@ -3479,7 +3479,6 @@ impl FromStr for Int {
 macro_rules! impl_from_for_prim (
     (signed $($t:ty),*) => (
         $(impl<'a> ::std::convert::From<&'a Int> for $t {
-            #[allow(exceeding_bitshifts)] // False positives for the larger-than BaseInt case
             fn from(i: &'a Int) -> $t {
                 let sign = i.sign() as $t;
                 if sign == 0 {
@@ -3491,8 +3490,9 @@ macro_rules! impl_from_for_prim (
                         let lower = i.to_single_limb().0 as $t;
                         let higher = unsafe { (*i.ptr.as_ptr().offset(1)).0 } as $t;
 
-                        // Combine the two
-                        let n : $t = lower | (higher << Limb::BITS);
+                        // Combine the two. This won't actually wrap, since $t is
+                        // bigger than BaseInt
+                        let n : $t = lower | higher.wrapping_shl(Limb::BITS as u32);
 
                         // Apply the sign
                         return n.wrapping_mul(sign);
@@ -3507,7 +3507,6 @@ macro_rules! impl_from_for_prim (
     );
     (unsigned $($t:ty),*) => (
         $(impl<'a> ::std::convert::From<&'a Int> for $t {
-            #[allow(exceeding_bitshifts)] // False positives for the larger-than BaseInt case
             fn from(i: &'a Int) -> $t {
                 // This does the conversion ignoring the sign
 
@@ -3520,8 +3519,9 @@ macro_rules! impl_from_for_prim (
                         let lower = i.to_single_limb().0 as $t;
                         let higher = unsafe { (*i.ptr.as_ptr().offset(1)).0 } as $t;
 
-                        // Combine the two
-                        let n : $t = lower | (higher << Limb::BITS);
+                        // Combine the two. This won't actually wrap, since $t is
+                        // bigger than BaseInt
+                        let n : $t = lower | higher.wrapping_shl(Limb::BITS as u32);
 
                         return n;
                     }
