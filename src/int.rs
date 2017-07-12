@@ -3613,16 +3613,8 @@ impl Integer for Int {
 }
 
 impl std::iter::Step for Int {
-    fn step(&self, by: &Int) -> Option<Int> {
-        Some(self + by)
-    }
-
-    fn steps_between(start: &Int, end: &Int, by: &Int) -> Option<usize> {
-        if by.le(&0) { return None; }
-        let mut diff = (start - end).abs();
-        if by.ne(&1) {
-            diff = diff / by;
-        }
+    fn steps_between(start: &Int, end: &Int) -> Option<usize> {
+        let diff = (start - end).abs();
 
         // Check to see if result fits in a usize
         if diff > !0usize {
@@ -3630,14 +3622,6 @@ impl std::iter::Step for Int {
         } else {
             Some(usize::from(&diff))
         }
-    }
-
-    fn steps_between_by_one(start: &Self, end: &Self) -> Option<usize> {
-        Self::steps_between(start, end, &Self::one())
-    }
-
-    fn is_negative(&self) -> bool {
-        self.sign() < 0
     }
 
     fn replace_one(&mut self) -> Self {
@@ -3654,6 +3638,10 @@ impl std::iter::Step for Int {
 
     fn sub_one(&self) -> Self {
         self - 1
+    }
+
+    fn add_usize(&self, n: usize) -> Option<Self> {
+        Some(self + Int::from(n))
     }
 }
 
@@ -4343,6 +4331,20 @@ mod test {
 
         let i = Int::from(::std::usize::MAX);
         assert_eq!(usize::from(&i), ::std::usize::MAX);
+    }
+
+    #[test]
+    fn step() {
+        use std::iter::Step;
+
+        let a = Int::from(897235032);
+        let b = Int::from(98345);
+
+        assert_eq!(Int::steps_between(&a, &b), Some(897136687));
+        assert_eq!(Int::steps_between(&a, &b), Int::steps_between(&b, &a));
+        assert_eq!(a.add_one(), Int::from(897235033));
+        assert_eq!(a.sub_one(), Int::from(897235031));
+        assert_eq!(a.add_usize(232184), Some(Int::from(897467216)));
     }
 
     const RAND_ITER : usize = 1000;
