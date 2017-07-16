@@ -1066,7 +1066,7 @@ impl AddAssign<Limb> for Int {
         unsafe {
             let sign = self.sign();
             let size = self.abs_size();
-            let ptr = self.limbs_mut();
+            let mut ptr = self.limbs_mut();
 
             // Self is positive, just add `other`
             if sign == 1 {
@@ -1079,7 +1079,11 @@ impl AddAssign<Limb> for Int {
                 // -(-self - other) == self + other
                 let borrow = ll::sub_1(ptr, ptr.as_const(), size, other);
                 if borrow != 0 {
-                    // There was a borrow, ignore it but flip the sign on self
+                    // There was a borrow, this means that abs(other) > abs(self), i.e., we are a
+                    // single limb and self - other has overflowed. So flip the result across MAX
+                    // and keep it positive. Example: Int(-14) += Limb(15) becomes -(Int(14) - 15).
+                    // But the -1 overflows. So make the -1 into +1 and return.
+                    *ptr = BaseInt::max_value() - *ptr + 1;
                     self.size = self.abs_size();
                 }
                 self.normalize();
@@ -4543,6 +4547,13 @@ mod test {
             let n: Int = rng.gen_uint_below(&bound);
             assert!(n < bound);
         }
+    }
+
+    #[test]
+    fn add_larger_limb() {
+        let a = Int::from(-14);
+        let b = Limb(15u64);
+        assert_eq!(a + b, Int::one());
     }
 
 
