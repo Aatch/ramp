@@ -4552,7 +4552,7 @@ mod test {
     #[test]
     fn add_larger_limb() {
         let a = Int::from(-14);
-        let b = Limb(15u64);
+        let b = Limb(15 as BaseInt);
         assert_eq!(a + b, Int::one());
     }
 
