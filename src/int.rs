@@ -31,7 +31,6 @@ use std::str::FromStr;
 use rand::Rng;
 
 use hamming;
-use alloc;
 use num_integer::Integer;
 use num_traits::{Num, Zero, One};
 
@@ -137,7 +136,7 @@ impl Int {
     pub fn from_single_limb(limb: Limb) -> Int {
         let mut i = Int::with_capacity(1);
         unsafe {
-            *i.ptr.get_mut() = limb;
+            *i.ptr.as_mut() = limb;
         }
         i.size = 1;
 
@@ -151,7 +150,7 @@ impl Int {
     fn with_raw_vec<F: FnOnce(&mut RawVec<Limb>)>(&mut self, f: F) {
         unsafe {
             let old_cap = self.cap as usize;
-            let mut vec = RawVec::from_raw_parts(self.ptr.get_mut(), old_cap);
+            let mut vec = RawVec::from_raw_parts(self.ptr.as_mut(), old_cap);
             // if `f` panics, let `vec` do the cleaning up, not self.
             self.cap = 0;
 
@@ -217,7 +216,7 @@ impl Int {
         if self.sign() == 0 {
             return Limb(0);
         } else {
-            return unsafe { *self.ptr.get() };
+            return unsafe { *self.ptr.as_ref() };
         }
     }
 
@@ -624,7 +623,7 @@ impl Int {
             std::usize::MAX
         } else {
             let bytes = unsafe {
-                std::slice::from_raw_parts(self.ptr.get() as *const _ as *const u8,
+                std::slice::from_raw_parts(self.ptr.as_ref() as *const _ as *const u8,
                                            self.abs_size() as usize * std::mem::size_of::<Limb>())
             };
             hamming::weight(bytes) as usize
@@ -733,18 +732,18 @@ impl Int {
     // get a Limbs to all limbs currently initialised/in use
     fn limbs(&self) -> Limbs {
         unsafe {
-            Limbs::new(self.ptr.get(), 0, self.abs_size())
+            Limbs::new(self.ptr.as_ref(), 0, self.abs_size())
         }
     }
     // get a LimbsMut to all limbs currently initialised/in use
     fn limbs_mut(&mut self) -> LimbsMut {
         unsafe {
-            LimbsMut::new(self.ptr.get_mut(), 0, self.abs_size())
+            LimbsMut::new(self.ptr.as_mut(), 0, self.abs_size())
         }
     }
     // get a LimbsMut to all allocated limbs
     unsafe fn limbs_uninit(&mut self) -> LimbsMut {
-        LimbsMut::new(self.ptr.get_mut(), 0, self.cap as i32)
+        LimbsMut::new(self.ptr.as_mut(), 0, self.cap as i32)
     }
 
     fn ensure_capacity(&mut self, cap: u32) {
@@ -780,7 +779,7 @@ impl Int {
         let sign = self.sign();
         unsafe {
             while self.size != 0 &&
-                *self.ptr.offset((self.abs_size() - 1) as isize) == 0 {
+                *self.ptr.as_ptr().offset((self.abs_size() - 1) as isize) == 0 {
 
                 self.size -= sign;
             }
@@ -800,7 +799,7 @@ impl Int {
         }
 
         let high_limb = unsafe {
-            *self.ptr.offset((self.abs_size() - 1) as isize)
+            *self.ptr.as_ptr().offset((self.abs_size() - 1) as isize)
         };
 
         return high_limb != 0;
@@ -932,7 +931,7 @@ impl Drop for Int {
     fn drop(&mut self) {
         if self.cap > 0 {
             unsafe {
-                drop(RawVec::from_raw_parts(self.ptr.get_mut(),
+                drop(RawVec::from_raw_parts(self.ptr.as_mut(),
                                             self.cap as usize));
             }
             self.cap = 0;
@@ -1035,8 +1034,13 @@ impl PartialOrd<Int> for Limb {
 impl hash::Hash for Int {
     fn hash<H>(&self, state: &mut H) where H: hash::Hasher {
         debug_assert!(self.well_formed());
-        self.sign().hash(state);
-        self.abs_hash(state);
+
+        // Normalize the Int so we get consistent hashing (since there are multiple limb
+        // representations for the same numeric value)
+        let mut n = self.clone();
+        n.normalize();
+        n.sign().hash(state);
+        n.abs_hash(state);
     }
 }
 
@@ -1062,7 +1066,7 @@ impl AddAssign<Limb> for Int {
         unsafe {
             let sign = self.sign();
             let size = self.abs_size();
-            let ptr = self.limbs_mut();
+            let mut ptr = self.limbs_mut();
 
             // Self is positive, just add `other`
             if sign == 1 {
@@ -1075,7 +1079,11 @@ impl AddAssign<Limb> for Int {
                 // -(-self - other) == self + other
                 let borrow = ll::sub_1(ptr, ptr.as_const(), size, other);
                 if borrow != 0 {
-                    // There was a borrow, ignore it but flip the sign on self
+                    // There was a borrow, this means that abs(other) > abs(self), i.e., we are a
+                    // single limb and self - other has overflowed. So flip the result across MAX
+                    // and keep it positive. Example: Int(-14) += Limb(15) becomes -(Int(14) - 15).
+                    // But the -1 overflows. So make the -1 into +1 and return.
+                    *ptr = BaseInt::max_value() - *ptr + 1;
                     self.size = self.abs_size();
                 }
                 self.normalize();
@@ -3330,7 +3338,6 @@ impl PartialOrd<Int> for i64 {
 macro_rules! impl_from_prim (
     (signed $($t:ty),*) => {
         $(impl ::std::convert::From<$t> for Int {
-            #[allow(exceeding_bitshifts)] // False positives for the larger-than BaseInt case
             fn from(val: $t) -> Int {
                 if val == 0 {
                     return Int::zero();
@@ -3345,7 +3352,8 @@ macro_rules! impl_from_prim (
                     let vabs = val.abs();
                     let mask : BaseInt = !0;
                     let vlow = vabs & (mask as $t);
-                    let vhigh = vabs >> Limb::BITS;
+                    // This won't actually wrap, since $t is bigger than BaseInt
+                    let vhigh = vabs.wrapping_shr(Limb::BITS as u32);
 
                     let low_limb = Limb(vlow as BaseInt);
                     let high_limb = Limb(vhigh as BaseInt);
@@ -3373,7 +3381,6 @@ macro_rules! impl_from_prim (
     };
     (unsigned $($t:ty),*) => {
         $(impl ::std::convert::From<$t> for Int {
-            #[allow(exceeding_bitshifts)] // False positives for the larger-than BaseInt case
             fn from(val: $t) -> Int {
                 if val == 0 {
                     return Int::zero();
@@ -3382,7 +3389,8 @@ macro_rules! impl_from_prim (
                 if std::mem::size_of::<$t>() > std::mem::size_of::<BaseInt>() {
                     let mask : BaseInt = !0;
                     let vlow = val & (mask as $t);
-                    let vhigh = val >> Limb::BITS;
+                    // This won't actually wrap, since $t is bigger than BaseInt
+                    let vhigh = val.wrapping_shr(Limb::BITS as u32);
 
                     let low_limb = Limb(vlow as BaseInt);
                     let high_limb = Limb(vhigh as BaseInt);
@@ -3475,7 +3483,6 @@ impl FromStr for Int {
 macro_rules! impl_from_for_prim (
     (signed $($t:ty),*) => (
         $(impl<'a> ::std::convert::From<&'a Int> for $t {
-            #[allow(exceeding_bitshifts)] // False positives for the larger-than BaseInt case
             fn from(i: &'a Int) -> $t {
                 let sign = i.sign() as $t;
                 if sign == 0 {
@@ -3485,10 +3492,11 @@ macro_rules! impl_from_for_prim (
                     // Handle conversion where BaseInt = u32 and $t = i64
                     if i.abs_size() >= 2 { // Fallthrough if there's only one limb
                         let lower = i.to_single_limb().0 as $t;
-                        let higher = unsafe { (*i.ptr.offset(1)).0 } as $t;
+                        let higher = unsafe { (*i.ptr.as_ptr().offset(1)).0 } as $t;
 
-                        // Combine the two
-                        let n : $t = lower | (higher << Limb::BITS);
+                        // Combine the two. This won't actually wrap, since $t is
+                        // bigger than BaseInt
+                        let n : $t = lower | higher.wrapping_shl(Limb::BITS as u32);
 
                         // Apply the sign
                         return n.wrapping_mul(sign);
@@ -3503,7 +3511,6 @@ macro_rules! impl_from_for_prim (
     );
     (unsigned $($t:ty),*) => (
         $(impl<'a> ::std::convert::From<&'a Int> for $t {
-            #[allow(exceeding_bitshifts)] // False positives for the larger-than BaseInt case
             fn from(i: &'a Int) -> $t {
                 // This does the conversion ignoring the sign
 
@@ -3514,10 +3521,11 @@ macro_rules! impl_from_for_prim (
                     // Handle conversion where BaseInt = u32 and $t = u64
                     if i.abs_size() >= 2 { // Fallthrough if there's only one limb
                         let lower = i.to_single_limb().0 as $t;
-                        let higher = unsafe { (*i.ptr.offset(1)).0 } as $t;
+                        let higher = unsafe { (*i.ptr.as_ptr().offset(1)).0 } as $t;
 
-                        // Combine the two
-                        let n : $t = lower | (higher << Limb::BITS);
+                        // Combine the two. This won't actually wrap, since $t is
+                        // bigger than BaseInt
+                        let n : $t = lower | higher.wrapping_shl(Limb::BITS as u32);
 
                         return n;
                     }
@@ -3535,7 +3543,7 @@ impl_from_for_prim!(unsigned u8, u16, u32, u64, usize);
 impl Zero for Int {
     fn zero() -> Int {
         Int {
-            ptr: unsafe { Unique::new(alloc::heap::EMPTY as *mut Limb) },
+            ptr: Unique::empty(),
             size: 0,
             cap: 0
         }
@@ -3609,16 +3617,8 @@ impl Integer for Int {
 }
 
 impl std::iter::Step for Int {
-    fn step(&self, by: &Int) -> Option<Int> {
-        Some(self + by)
-    }
-
-    fn steps_between(start: &Int, end: &Int, by: &Int) -> Option<usize> {
-        if by.le(&0) { return None; }
-        let mut diff = (start - end).abs();
-        if by.ne(&1) {
-            diff = diff / by;
-        }
+    fn steps_between(start: &Int, end: &Int) -> Option<usize> {
+        let diff = (start - end).abs();
 
         // Check to see if result fits in a usize
         if diff > !0usize {
@@ -3626,14 +3626,6 @@ impl std::iter::Step for Int {
         } else {
             Some(usize::from(&diff))
         }
-    }
-
-    fn steps_between_by_one(start: &Self, end: &Self) -> Option<usize> {
-        Self::steps_between(start, end, &Self::one())
-    }
-
-    fn is_negative(&self) -> bool {
-        self.sign() < 0
     }
 
     fn replace_one(&mut self) -> Self {
@@ -3650,6 +3642,10 @@ impl std::iter::Step for Int {
 
     fn sub_one(&self) -> Self {
         self - 1
+    }
+
+    fn add_usize(&self, n: usize) -> Option<Self> {
+        Some(self + Int::from(n))
     }
 }
 
@@ -3817,7 +3813,7 @@ mod test {
 
         for &(s, n) in cases.iter() {
             let i : Int = Int::from_str_radix(s, 16).unwrap();
-            assert!(i == n, "Assertion failed: {:#x} != {:#x}", i, n);
+            assert_eq!(i, n, "Assertion failed: {:#x} != {:#x}", i, n);
         }
     }
 
@@ -4341,6 +4337,20 @@ mod test {
         assert_eq!(usize::from(&i), ::std::usize::MAX);
     }
 
+    #[test]
+    fn step() {
+        use std::iter::Step;
+
+        let a = Int::from(897235032);
+        let b = Int::from(98345);
+
+        assert_eq!(Int::steps_between(&a, &b), Some(897136687));
+        assert_eq!(Int::steps_between(&a, &b), Int::steps_between(&b, &a));
+        assert_eq!(a.add_one(), Int::from(897235033));
+        assert_eq!(a.sub_one(), Int::from(897235031));
+        assert_eq!(a.add_usize(232184), Some(Int::from(897467216)));
+    }
+
     const RAND_ITER : usize = 1000;
 
     #[test]
@@ -4437,17 +4447,21 @@ mod test {
             let x1 = rng.gen_int(640);
             let x2 = x1.clone();
 
-            assert!(x1 == x2);
+            assert_eq!(x1, x2);
 
-            let mut hasher = std::collections::hash_map::DefaultHasher::new();
-            x1.hash(&mut hasher);
-            let x1_hash = hasher.finish();
+            let x1_hash = {
+                let mut hasher = std::collections::hash_map::DefaultHasher::new();
+                x1.hash(&mut hasher);
+                hasher.finish()
+            };
 
-            let mut hasher = std::collections::hash_map::DefaultHasher::new();
-            x2.hash(&mut hasher);
-            let x2_hash = hasher.finish();
+            let x2_hash = {
+                let mut hasher = std::collections::hash_map::DefaultHasher::new();
+                x2.hash(&mut hasher);
+                hasher.finish()
+            };
 
-            assert!(x1_hash == x2_hash);
+            assert_eq!(x1_hash, x2_hash);
         }
     }
 
@@ -4533,6 +4547,13 @@ mod test {
             let n: Int = rng.gen_uint_below(&bound);
             assert!(n < bound);
         }
+    }
+
+    #[test]
+    fn add_larger_limb() {
+        let a = Int::from(-14);
+        let b = Limb(15 as BaseInt);
+        assert_eq!(a + b, Int::one());
     }
 
 
