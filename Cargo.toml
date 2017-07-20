@@ -31,11 +31,11 @@ num-integer = "0.1.32"
 rust-gmp = { version = "0.2", optional = true }
 
 [build-dependencies]
-num-bigint = "*"
+num-bigint = "0.1"
 rustc-cfg = "0.2"
 gcc = "0.3"
 
 [dev-dependencies]
-num-bigint = "*"
+num-bigint = "0.1"
 quickcheck = "0.4.1"
 quickcheck_macros = "0.4.1"
