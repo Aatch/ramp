@@ -157,7 +157,7 @@ impl Int {
             f(&mut vec);
 
             // update `self` for any changes that happened
-            self.ptr = Unique::new(vec.ptr());
+            self.ptr = Unique::new(vec.ptr()).unwrap();
             let new_cap = vec.cap();
             assert!(new_cap <= std::u32::MAX as usize);
             self.cap = new_cap as u32;
