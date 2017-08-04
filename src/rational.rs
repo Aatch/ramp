@@ -13,6 +13,8 @@
 //    limitations under the License.
 
 #![allow(dead_code, unused_imports)]
+#![cfg_attr(nightly, feature(unique))]
+#![cfg(nightly)]
 
 use std;
 use std::cmp::{
