@@ -1,5 +1,3 @@
-//! This module holds `Rational` and related types.
-
 // Copyright 2016 The Ramp Developers
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,6 +11,8 @@
 //    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 //    See the License for the specific language governing permissions and
 //    limitations under the License.
+
+//! This module holds `Rational` and related types.
 
 #![allow(dead_code, unused_imports)]
 
@@ -38,7 +38,7 @@ use ieee754::Ieee754;
 /// An arbitrary-precision rational number.
 ///
 /// This type is used to represent numbers in the form `a / b` where `a` and `b`
-/// are [`Int`] and `b` is non-zero.
+/// are [`Int`]s and `b` is non-zero.
 ///
 /// [`Int`]: ../int/struct.Int.html
 pub struct Rational {
