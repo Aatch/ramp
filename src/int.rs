@@ -508,8 +508,8 @@ impl Int {
         }
     }
 
-    /// Computes the square root `s` of this number and its remainder `r` as `Some((s, r))`, or
-    /// `None` if this `Int` is negative.
+    /// Computes the nearest square root `s` of this number and its remainder `r` as
+    /// `Some((s, r))`, or `None` if this `Int` is negative.
     ///
     /// `s` and `r` are both positive and satisfy `self = s * s + r`.
     pub fn sqrt_rem(mut self) -> Option<(Int, Int)> {
@@ -648,7 +648,7 @@ impl Int {
         }
     }
 
-    /// Set the `bit`th bit of this number to `bit_val`, treating negative numbers as if they're
+    /// Sets the `bit`th bit of this number to `bit_val`, treating negative numbers as if they're
     /// stored in two's complement.
     pub fn set_bit(&mut self, bit: u32, bit_val: bool) {
         debug_assert!(self.well_formed());
@@ -744,7 +744,7 @@ impl Int {
         }
     }
 
-    /// Adjust the size field so that the most-significant `Limb` is non-zero.
+    /// Adjusts the size field so that the most-significant `Limb` is non-zero.
     fn normalize(&mut self) {
         if self.size == 0 { return }
         let sign = self.sign();
@@ -786,7 +786,7 @@ impl Int {
         self.size = -self.size;
     }
 
-    /// Computes the greates common divisor (GCD) of this `Int` and another.
+    /// Computes the greates common divisor (GCD) of this `Int` and `other`.
     ///
     /// The result is always positive.
     #[inline]
@@ -819,7 +819,7 @@ impl Int {
         }
     }
 
-    /// Computes the lowest common multiple (LCM) of this `Int` and another.
+    /// Computes the lowest common multiple (LCM) of this `Int` and `other`.
     #[inline]
     pub fn lcm(&self, other: &Int) -> Int {
         (self * other).abs() / self.gcd(other)
@@ -901,7 +901,8 @@ impl Drop for Int {
     fn drop(&mut self) {
         if self.cap > 0 {
             unsafe {
-                drop(RawVec::from_raw_parts(self.ptr.get_mut(), self.cap as usize));
+                drop(RawVec::from_raw_parts(self.ptr.as_mut(),
+                                            self.cap as usize));
             }
             self.cap = 0;
             self.size = 0;
