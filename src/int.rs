@@ -12,6 +12,8 @@
 //    See the License for the specific language governing permissions and
 //    limitations under the License.
 
+//! This module holds `Int` and related types.
+
 use std;
 use std::cmp::{
     Ordering,
@@ -42,81 +44,79 @@ use alloc::raw_vec::RawVec;
 
 use traits::DivRem;
 
-/**
- * An arbitrary-precision signed integer.
- *
- * This type grows to the size it needs to in order to store the result of any operation.
- *
- * ## Creation
- *
- * An `Int` can be constructed in a number of ways:
- *
- * - `Int::zero` and `Int::one` construct a zero- and one-valued `Int` respectively.
- *
- * - `Int::from` will convert from any primitive integer type to an `Int` of the same value
- *
- *   ```
- *   # use ramp::Int;
- *   let four = Int::from(4);
- *   ```
- *
- * - `Int::from_str` (or `str::parse`) will attempt to convert from a string to an `Int`
- *
- *   ```
- *   # use ramp::Int;
- *   # use std::str::FromStr;
- *   let i = Int::from_str("123456789").unwrap();
- *   ```
- *
- * ## Output
- *
- * `Int` supports all the formatting traits, allowing it to be used just like a regular integer
- * when used in `format!` and similar macros. `Int` also supports conversion to primitive integer
- * types, truncating if the `Int` cannot fit into the target type. Conversion to primtive integers
- * is done with the `From` trait:
- *
- *   ```
- *   # use ramp::Int;
- *   let big_i   = Int::from(123456789);
- *   let i = i32::from(&big_i);
- *   assert_eq!(123456789, i);
- *   ```
- *
- * ## Usage
- *
- * `Int` has a number of operator overloads to make working with them as painless as possible.
- *
- * The most basic usage is simply `a + b` or similar. Assuming `a` and `b` are of type `Int`, this
- * operation will consume both operands, reusing the storage from one of them. If you do not wish
- * your operands to be moved, one or both of them can be references: `&a + &b` works as well, but
- * requires an entire new `Int` to be allocated for the return value.
- *
- * There are also a overloads for a small number of primitive integer types, namely `i32` and
- * `usize`. While automatic type widening isn't done in Rust in general, many operations are much
- * more efficient when working with a single integer. This means you can do `a + 1` knowing that it
- * will be performed as efficiently as possible. Comparison with these integer types is also
- * possible, allowing checks for small constant values to be done easily:
- *
- *   ```
- *   # use ramp::Int;
- *   let big_i   = Int::from(123456789);
- *   assert!(big_i == 123456789);
- *   ```
- *
- * ### Semantics
- *
- * Addition, subtraction and multiplication follow the expected rules for integers. Division of two
- * integers, `N / D` is defined as producing two values: a quotient, `Q`, and a remainder, `R`,
- * such that the following equation holds: `N = Q*D + R`. The division operator itself returns `Q`
- * while the remainder/modulo operator returns `R`. The sign of `R` is the same as the sign of `Q`.
- *
- * The "bit-shift" operations are defined as being multiplication and division by a power-of-two for
- * shift-left and shift-right respectively. The sign of the number is unaffected.
- *
- * The remaining bitwise operands act as if the numbers are stored in two's complement format and as
- * if the two inputs have the same number of bits.
- *
- */
+///
+/// An arbitrary-precision signed integer.
+///
+/// This type grows to the size it needs to in order to store the result of any operation.
+///
+/// ## Creation
+///
+/// An `Int` can be constructed in a number of ways:
+///
+/// - `Int::zero` and `Int::one` construct a zero- and one-valued `Int` respectively.
+///
+/// - `Int::from` will convert from any primitive integer type to an `Int` of the same value
+///
+///   ```
+///   # use ramp::Int;
+///   let four = Int::from(4);
+///   ```
+///
+/// - `Int::from_str` (or `str::parse`) will attempt to convert from a string to an `Int`
+///
+///   ```
+///   # use ramp::Int;
+///   # use std::str::FromStr;
+///   let i = Int::from_str("123456789").unwrap();
+///   ```
+///
+/// ## Output
+///
+/// `Int` supports all the formatting traits, allowing it to be used just like a regular integer
+/// when used in `format!` and similar macros. `Int` also supports conversion to primitive integer
+/// types, truncating if the `Int` cannot fit into the target type. Conversion to primtive integers
+/// is done with the `From` trait:
+///
+///   ```
+///   # use ramp::Int;
+///   let big_i   = Int::from(123456789);
+///   let i = i32::from(&big_i);
+///   assert_eq!(123456789, i);
+///   ```
+///
+/// ## Usage
+///
+/// `Int` has a number of operator overloads to make working with them as painless as possible.
+///
+/// The most basic usage is simply `a + b` or similar. Assuming `a` and `b` are of type `Int`, this
+/// operation will consume both operands, reusing the storage from one of them. If you do not wish
+/// your operands to be moved, one or both of them can be references: `&a + &b` works as well, but
+/// requires an entire new `Int` to be allocated for the return value.
+///
+/// There are also a overloads for a small number of primitive integer types, namely `i32` and
+/// `usize`. While automatic type widening isn't done in Rust in general, many operations are much
+/// more efficient when working with a single integer. This means you can do `a + 1` knowing that it
+/// will be performed as efficiently as possible. Comparison with these integer types is also
+/// possible, allowing checks for small constant values to be done easily:
+///
+///   ```
+///   # use ramp::Int;
+///   let big_i   = Int::from(123456789);
+///   assert!(big_i == 123456789);
+///   ```
+///
+/// ### Semantics
+///
+/// Addition, subtraction and multiplication follow the expected rules for integers. Division of two
+/// integers, `N / D` is defined as producing two values: a quotient, `Q`, and a remainder, `R`,
+/// such that the following equation holds: `N = Q*D + R`. The division operator itself returns `Q`
+/// while the remainder/modulo operator returns `R`. The sign of `R` is the same as the sign of `Q`.
+///
+/// The "bit-shift" operations are defined as being multiplication and division by a power-of-two for
+/// shift-left and shift-right respectively. The sign of the number is unaffected.
+///
+/// The remaining bitwise operands act as if the numbers are stored in two's complement format and as
+/// if the two inputs have the same number of bits.
 pub struct Int {
     ptr: Unique<Limb>,
     size: i32,
@@ -124,15 +124,19 @@ pub struct Int {
 }
 
 impl Int {
+    /// Creates the `Int` that represents zero.
     pub fn zero() -> Int {
         <Int as Zero>::zero()
     }
 
+    /// Creates the `Int` that represents one.
     pub fn one() -> Int {
         <Int as One>::one()
     }
 
-    /// Creates a new Int from the given Limb.
+    /// Creates an `Int` from a single [`Limb`]
+    ///
+    /// [`Limb`]: ../ll/limb/struct.Limb.html
     pub fn from_single_limb(limb: Limb) -> Int {
         let mut i = Int::with_capacity(1);
         unsafe {
@@ -143,10 +147,8 @@ impl Int {
         i
     }
 
-    /**
-     * Views the internal memory as a `RawVec`, which can be
-     * manipulated to change `self`'s allocation.
-     */
+    /// Passes a `RawVec` version of this `Int`, which can be manipulated to alter this `Int`'s
+    /// allocation.
     fn with_raw_vec<F: FnOnce(&mut RawVec<Limb>)>(&mut self, f: F) {
         unsafe {
             let old_cap = self.cap as usize;
@@ -177,6 +179,7 @@ impl Int {
         }
     }
 
+    /// Creates an `Int` with the given capacity.
     fn with_capacity(cap: u32) -> Int {
         let mut ret = Int::zero();
         if cap != 0 {
@@ -185,10 +188,8 @@ impl Int {
         ret
     }
 
-    /**
-     * Returns the sign of the Int as either -1, 0 or 1 for self being negative, zero
-     * or positive, respectively.
-     */
+    /// Returns the sign of this `Int` as either -1, 0 or 1 depending on whether it is negative,
+    /// zero, or positive, respectively.
     #[inline(always)]
     pub fn sign(&self) -> i32 {
         if self.size == 0 {
@@ -200,18 +201,16 @@ impl Int {
         }
     }
 
-    /**
-     * Consumes self and returns the absolute value
-     */
+    /// Consumes this `Int` and returns its absolute value.
     #[inline]
     pub fn abs(mut self) -> Int {
         self.size = self.size.abs();
         self
     }
 
-    /**
-     * Returns the least-significant limb of self.
-     */
+    /// Returns the least-significant [`Limb`] of this `Int`.
+    ///
+    /// [`Limb`]: ../ll/limb/struct.Limb.html
     #[inline]
     pub fn to_single_limb(&self) -> Limb {
         if self.sign() == 0 {
@@ -221,15 +220,13 @@ impl Int {
         }
     }
 
+    /// Gets the absolute value of this `Int`'s size.
     #[inline(always)]
     fn abs_size(&self) -> i32 {
         self.size.abs()
     }
 
-    /**
-     * Compare the absolute value of self to the absolute value of other,
-     * returning an Ordering with the result.
-     */
+    /// Compares the absolute value of this `Int` with the absolute value of another.
     pub fn abs_cmp(&self, other: &Int) -> Ordering {
         if self.abs_size() > other.abs_size() {
             Ordering::Greater
@@ -242,19 +239,15 @@ impl Int {
         }
     }
 
-    /**
-     * Returns the equality of the absolute values of self and
-     * other.
-     */
+    /// Returns whether this `Int` has the same absolute value as another.
     pub fn abs_eq(&self, other: &Int) -> bool {
         self.abs_cmp(other) == Ordering::Equal
     }
 
-    /**
-     * Hashes the value without including the sign, useful for when the
-     * sign is handled elsewhere and making a copy just to change the sign
-     * is wasteful
-     */
+    /// Hashes the value without including the sign.
+    ///
+    /// This is useful for when the sign is handled elsewhere and making a copy just to change the
+    /// sign is wasteful.
     pub fn abs_hash<H>(&self, state: &mut H) where H: hash::Hasher {
         use std::hash::Hash;
         let mut size = self.abs_size();
@@ -270,9 +263,7 @@ impl Int {
         }
     }
 
-    /**
-     * Try to shrink the allocated data for this Int.
-     */
+    /// Shrinks the allocated data for this `Int`, attempting to remove excess capacity.
     pub fn shrink_to_fit(&mut self) {
         let mut size = self.abs_size() as usize;
 
@@ -285,12 +276,14 @@ impl Int {
         })
     }
 
-    /**
-     * Returns a string containing the value of self in base `base`. For bases greater than
-     * ten, if `upper` is true, upper-case letters are used, otherwise lower-case ones are used.
-     *
-     * Panics if `base` is less than two or greater than 36.
-     */
+    /// Creates a string containing the value of this `Int` in base `base`.
+    ///
+    /// For bases greater than ten, if `upper` is true, upper-case letters are used; otherwise,
+    /// lower-case letters are used.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `base` is less than two or greater than 36.
     pub fn to_str_radix(&self, base: u8, upper: bool) -> String {
         if self.size == 0 {
             return "0".to_string();
@@ -316,6 +309,7 @@ impl Int {
         unsafe { String::from_utf8_unchecked(buf) }
     }
 
+    /// Similar to `to_str_radix`, writing to something that implements `io::Write` instead.
     pub fn write_radix<W: io::Write>(&self, w: &mut W, base: u8, upper: bool) -> io::Result<()> {
         debug_assert!(self.well_formed());
 
@@ -339,9 +333,7 @@ impl Int {
         Ok(())
     }
 
-    /**
-     * Creates a new Int from the given string in base `base`.
-     */
+    /// Creates a new Int from the given string in base `base`.
     pub fn from_str_radix(mut src: &str, base: u8) -> Result<Int, ParseIntError> {
         if base < 2 || base > 36 {
             panic!("Invalid base: {}", base);
@@ -390,14 +382,13 @@ impl Int {
         Ok(i)
     }
 
-    /**
-     * Divide self by other, returning the quotient, Q, and remainder, R as (Q, R).
-     *
-     * With N = self, D = other, Q and R satisfy: `N = QD + R`.
-     * The sign of `Q` and `R` are the same.
-     *
-     * This will panic if `other` is zero.
-     */
+    /// Divides this `Int` by `other`, returning the quotient `q` and the remainder `r` as `(q, r)`.
+    ///
+    /// This satisfies `self = q * other + r`, ensuring that `q` and `r` have the same sign.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `other` is zero.
     pub fn divmod(&self, other: &Int) -> (Int, Int) {
         debug_assert!(self.well_formed());
         debug_assert!(other.well_formed());
@@ -433,9 +424,7 @@ impl Int {
         (q, r)
     }
 
-    /**
-     * Raises self to the power of exp
-     */
+    /// Raises this `Int` to the power of `exp`.
     pub fn pow(&self, exp: usize) -> Int {
         debug_assert!(self.well_formed());
         match exp {
@@ -468,9 +457,7 @@ impl Int {
         }
     }
 
-    /**
-     * Returns the square of `self`.
-     */
+    /// Squares this `Int`.
     pub fn square(&self) -> Int {
         debug_assert!(self.well_formed());
         let s = self.sign();
@@ -498,7 +485,9 @@ impl Int {
         }
     }
 
-    // DESTRUCTIVE square. Is there a more idiomatic way of doing this?
+    /// Consumes this `Int` and returns its square.
+    ///
+    /// TODO: Is there a more idiomatic way of doing this?
     pub fn dsquare(mut self) -> Int {
         debug_assert!(self.well_formed());
         let s = self.sign();
@@ -519,13 +508,10 @@ impl Int {
         }
     }
 
-    /**
-     * Compute the sqrt of this number, returning its floor, S,  and the
-     * remainder, R, as Some((S, R)), or None if this number is negative.
-     *
-     * The numbers S, R are both positive and satisfy `self = S * S +
-     * R`.
-     */
+    /// Computes the nearest square root `s` of this number and its remainder `r` as
+    /// `Some((s, r))`, or `None` if this `Int` is negative.
+    ///
+    /// `s` and `r` are both positive and satisfy `self = s * s + r`.
     pub fn sqrt_rem(mut self) -> Option<(Int, Int)> {
         debug_assert!(self.well_formed());
 
@@ -577,29 +563,19 @@ impl Int {
         }
     }
 
-    /**
-     * Negates `self` in-place
-     */
+    /// Negates this `Int` in place.
     pub fn negate(&mut self) {
         self.size *= -1;
     }
 
-    /**
-     * Returns whether or not this number is even.
-     *
-     * Returns 0 if `self == 0`
-     */
+    /// Returns whether this `Int` is even.
     #[inline]
     pub fn is_even(&self) -> bool {
         debug_assert!(self.well_formed());
         (self.to_single_limb().0 & 1) == 0
     }
 
-    /**
-     * Returns the number of trailing zero bits in this number
-     *
-     * Returns 0 if `self == 0`
-     */
+    /// Returns the number of trailing zero bits for this `Int`, or zero if this `Int` is zero.
     #[inline]
     pub fn trailing_zeros(&self) -> u32 {
         debug_assert!(self.well_formed());
@@ -612,12 +588,10 @@ impl Int {
         }
     }
 
-    /**
-     * Returns the number of ones (the population count) in this number
-     *
-     * If this number is negative, it has infinitely many ones (in
-     * two's complement), so this returns usize::MAX.
-     */
+    /// Returns the number of trailing one bits (i.e. the population count) for this `Int`
+    ///
+    /// If this number is negative, it has infinitely many ones (in two's complement). Therefore,
+    /// this method returns `usize::MAX` for negative numbers.
     pub fn count_ones(&self) -> usize {
         debug_assert!(self.well_formed());
         if self.sign() < 0 {
@@ -631,12 +605,10 @@ impl Int {
         }
     }
 
-    /**
-     * Returns the number of bits required to represent (the absolute
-     * value of) this number, that is, `floor(log2(abs(self))) + 1`.
-     *
-     * Returns 1 if `self == 0`.
-     */
+    /// Returns the number of bits required to represent the absolute value of this `Int`, i.e.,
+    /// `floor(log2(abs(self))) + 1`.
+    ///
+    /// Returns one if this number is zero.
     #[inline]
     pub fn bit_length(&self) -> u32 {
         if *self == 0 {
@@ -648,10 +620,8 @@ impl Int {
         }
     }
 
-    /**
-     * Returns the value of the `bit`th bit in this number, as if it
-     * were represented in two's complement.
-     */
+    /// Returns the value of the `bit`th bit in this `Int`, as if it were represented in two's
+    /// complement.
     #[inline]
     pub fn bit(&self, bit: u32) -> bool {
         let word = (bit / Limb::BITS as u32) as isize;
@@ -678,10 +648,8 @@ impl Int {
         }
     }
 
-    /**
-     * Set the `bit`th bit of this number to `bit_val`, treating
-     * negative numbers as if they're stored in two's complement.
-     */
+    /// Sets the `bit`th bit of this number to `bit_val`, treating negative numbers as if they're
+    /// stored in two's complement.
     pub fn set_bit(&mut self, bit: u32, bit_val: bool) {
         debug_assert!(self.well_formed());
         let word = bit / Limb::BITS as u32;
@@ -730,23 +698,26 @@ impl Int {
         self.normalize()
     }
 
-    // get a Limbs to all limbs currently initialised/in use
+    /// Gets the `Limbs` currently initialised or in use.
     fn limbs(&self) -> Limbs {
         unsafe {
             Limbs::new(self.ptr.as_ref(), 0, self.abs_size())
         }
     }
-    // get a LimbsMut to all limbs currently initialised/in use
+
+    /// Gets the `LimbsMut` currently initialised or in use.
     fn limbs_mut(&mut self) -> LimbsMut {
         unsafe {
             LimbsMut::new(self.ptr.as_mut(), 0, self.abs_size())
         }
     }
-    // get a LimbsMut to all allocated limbs
+
+    /// Gets the `LimbsMut` to all allocated limbs.
     unsafe fn limbs_uninit(&mut self) -> LimbsMut {
         LimbsMut::new(self.ptr.as_mut(), 0, self.cap as i32)
     }
 
+    /// Ensures that the `Int` has at least the given capacity.
     fn ensure_capacity(&mut self, cap: u32) {
         if cap > self.cap {
             let old_cap = self.cap as usize;
@@ -756,6 +727,7 @@ impl Int {
         }
     }
 
+    /// Pushes a `Limb` onto this `Int`.
     fn push(&mut self, limb: Limb) {
         let new_size = (self.abs_size() + 1) as u32;
         self.ensure_capacity(new_size);
@@ -772,9 +744,7 @@ impl Int {
         }
     }
 
-    /**
-     * Adjust the size field so the most significant limb is non-zero
-     */
+    /// Adjusts the size field so that the most-significant `Limb` is non-zero.
     fn normalize(&mut self) {
         if self.size == 0 { return }
         let sign = self.sign();
@@ -788,10 +758,8 @@ impl Int {
         debug_assert!(self.well_formed());
     }
 
-    /**
-     * Make sure the Int is "well-formed", i.e. that the size doesn't exceed the
-     * the capacity and that the most significant limb is non-zero
-     */
+    /// Returns whether the `Int` is well-formed, i.e. that the size doesn't exceed the capacity and
+    /// that the most significant `Limb` is non-zero.
     fn well_formed(&self) -> bool {
         if self.size == 0 { return true; }
 
@@ -806,10 +774,7 @@ impl Int {
         return high_limb != 0;
     }
 
-    /**
-     * convert self into two's complement format (i.e. *self =
-     * (!*self) + 1)
-     */
+    /// Negates this `Int` using two's complement, i.e. `!self + 1`.
     fn negate_twos_complement(&mut self) {
         unsafe {
             let self_ptr = self.limbs_mut();
@@ -821,7 +786,7 @@ impl Int {
         self.size = -self.size;
     }
 
-    /// Calculates the Greatest Common Divisor (GCD) of the number and `other`.
+    /// Computes the greates common divisor (GCD) of this `Int` and `other`.
     ///
     /// The result is always positive.
     #[inline]
@@ -854,12 +819,16 @@ impl Int {
         }
     }
 
-    /// Calculates the Lowest Common Multiple (LCM) of the number and `other`.
+    /// Computes the lowest common multiple (LCM) of this `Int` and `other`.
     #[inline]
     pub fn lcm(&self, other: &Int) -> Int {
         (self * other).abs() / self.gcd(other)
     }
 
+    /// Converts this `Int` into an `f64`.
+    ///
+    /// This is not an exact conversion, because this `Int` may be more precise than an `f64` can
+    /// account for.
     pub fn to_f64(&self) -> f64 {
         let sz = self.abs_size();
         if sz == 0 {
@@ -3445,8 +3414,9 @@ impl_fmt!(fmt::Debug,    10, "");
 impl_fmt!(fmt::LowerHex, 16, false, "0x");
 impl_fmt!(fmt::UpperHex, 16, true, "0x");
 
-// String parsing
-
+/// Error that arises when parsing an [`Int`].
+///
+/// [`Int`]: struct.Int.html
 #[derive(Debug, Clone, PartialEq)]
 pub struct ParseIntError { kind: ErrorKind }
 
@@ -3650,7 +3620,7 @@ impl std::iter::Step for Int {
     }
 }
 
-/// Trait for generating random `Int`.
+/// Trait for generating random `Int`s.
 ///
 /// # Example
 ///
@@ -3670,11 +3640,14 @@ impl std::iter::Step for Int {
 pub trait RandomInt {
     /// Generate a random unsigned `Int` of given bit size.
     fn gen_uint(&mut self, bits: usize) -> Int;
+
     /// Generate a random `Int` of given bit size.
     fn gen_int(&mut self, bits: usize) -> Int;
+
     /// Generate a random unsigned `Int` less than the given bound.
     /// Fails when the bound is zero or negative.
     fn gen_uint_below(&mut self, bound: &Int) -> Int;
+
     /// Generate a random `Int` within the given range.
     /// The lower bound is inclusive; the upper bound is exclusive.
     /// Fails when the upper bound is not greater than the lower bound.
