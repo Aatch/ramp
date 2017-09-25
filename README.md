@@ -2,8 +2,7 @@
 
 [![Build Status](https://travis-ci.org/Aatch/ramp.svg?branch=master)](https://travis-ci.org/Aatch/ramp)
 [![Version](http://meritbadge.herokuapp.com/ramp)](https://crates.io/crates/ramp)
-
-**[Documentation](https://aatch.github.io/ramp/ramp)**
+[![Docs](https://docs.rs/ramp/badge.svg)](https://docs.rs/ramp)
 
 Ramp is a high-performance mulitple-precision (aka "BigNum") library for working with numbers
 bigger than can normally be handled. Usage is very easy, you can almost use them as regular
