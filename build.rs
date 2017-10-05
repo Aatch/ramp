@@ -1,6 +1,6 @@
 #![allow(unused_must_use)]
 
-extern crate gcc;
+extern crate cc;
 extern crate rustc_cfg;
 extern crate num_bigint;
 
@@ -34,13 +34,12 @@ fn compile_asm() {
             // Currently only supported for 64-bit linux
             if (target.contains("x86-64") || target.contains("x86_64")) && target.contains("linux")  {
 
-                let asm_srcs = &[
-                    "src/ll/asm/addsub_n.S",
-                    "src/ll/asm/mul_1.S",
-                    "src/ll/asm/addmul_1.S",
-                ];
+                cc::Build::new()
+                    .file("src/ll/asm/addsub_n.S")
+                    .file("src/ll/asm/mul_1.S")
+                    .file("src/ll/asm/addmul_1.S")
+                    .compile("libasm");
 
-                gcc::compile_library("libasm.a", asm_srcs);
                 // Use a cfg param so turning the feature on when we don't have
                 // asm impls available doesn't cause compile errors
                 println!("cargo:rustc-cfg=asm");
