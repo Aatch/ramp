@@ -8,9 +8,9 @@ use ramp::ll::limb::Limb;
 use num_bigint::BigUint;
 
 #[cfg(feature = "full-quickcheck")]
-const QUICKCHECK_THOROUGNESS: usize = 100;
+const QUICKCHECK_THOROUGNESS: u64 = 100;
 #[cfg(not(feature = "full-quickcheck"))]
-const QUICKCHECK_THOROUGNESS: usize = 1;
+const QUICKCHECK_THOROUGNESS: u64 = 1;
 
 macro_rules! quickcheck {
     (@as_items $($i:item)*) => ($($i)*);
