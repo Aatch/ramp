@@ -86,6 +86,6 @@ env:
 notifications:
   email:
     recipients:
-      - 42micro@gmail.com
+      - micro@fastmail.com
     on_success: change
     on_failure: change
