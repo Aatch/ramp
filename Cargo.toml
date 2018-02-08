@@ -33,7 +33,7 @@ rust-gmp = { version = "0.2", optional = true }
 [build-dependencies]
 num-bigint = "0.1"
 rustc-cfg = "0.2"
-gcc = "0.3"
+cc = "1.0.0"
 
 [dev-dependencies]
 num-bigint = "0.1"
