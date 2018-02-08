@@ -12,7 +12,7 @@
 //    See the License for the specific language governing permissions and
 //    limitations under the License.
 
-//! This module holds `Rational` and related types.
+//! This module holds various traits.
 
 /// A trait for types which can compute division and remainder in one step.
 pub trait DivRem<RHS = Self> {
@@ -21,3 +21,6 @@ pub trait DivRem<RHS = Self> {
 
     fn divrem(self, rhs: RHS) -> Self::Output;
 }
+
+/// We re-export num_integer::Integer for convenience.
+pub use num_integer::Integer;
