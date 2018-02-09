@@ -4,7 +4,7 @@
 [![Version](http://meritbadge.herokuapp.com/ramp)](https://crates.io/crates/ramp)
 [![Docs](https://docs.rs/ramp/badge.svg)](https://docs.rs/ramp)
 
-Ramp is a high-performance mulitple-precision (aka "BigNum") library for working with numbers
+Ramp is a high-performance multiple-precision (aka "BigNum") library for working with numbers
 bigger than can normally be handled. Usage is very easy, you can almost use them as regular
 numbers.
 
@@ -43,7 +43,7 @@ a nightly build of `rustc`.
 ## Why another library?
 
 The `num` crate provides some bignum types that can be used, so why use Ramp? Well, Ramp is
-specifically focussed on multiple-precision arithmetic, while `num` is a general-purpose numerics
+specifically focused on multiple-precision arithmetic, while `num` is a general-purpose numerics
 library that happens to provide some multiple-precision arithmetic.
 
 You should `num` if you aren't able to use unstable Rust features or just want a small amount of
