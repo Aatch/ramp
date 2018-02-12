@@ -4,7 +4,7 @@
 [![Version](http://meritbadge.herokuapp.com/ramp)](https://crates.io/crates/ramp)
 [![Docs](https://docs.rs/ramp/badge.svg)](https://docs.rs/ramp)
 
-Ramp is a high-performance mulitple-precision (aka "BigNum") library for working with numbers
+Ramp is a high-performance multiple-precision (aka "BigNum") library for working with numbers
 bigger than can normally be handled. Usage is very easy, you can almost use them as regular
 numbers.
 
@@ -54,7 +54,7 @@ functionality. Ramp should be used when you need high-performance and extra func
 Ramp is split into two main parts: high-level code and low-level code. The high-level code is what
 you should be using, however the low-level code is where the real work is done.
 
-The low-level routines (in `ll`) are predominately unsafe functions that work with raw pointers,
+The low-level routines (in `ll`) are predominantly unsafe functions that work with raw pointers,
 and some of the routines are implemented using inline assembly to gain access to processor-specific
 functionality.
 
