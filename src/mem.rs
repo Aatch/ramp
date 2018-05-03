@@ -15,22 +15,21 @@
 //! Memory management functions. The base functions align to a pointer-width, so they shouldn't
 //! be used for anything that requires an alignment greater than that.
 
-use alloc::allocator::{self, Alloc};
-use alloc::heap;
+use std::alloc::{self, Alloc};
 use std::mem;
 use std::intrinsics::abort;
 use std::io::{self, Write};
-use std::ptr;
+use std::ptr::{self, NonNull};
 
 use ll::limb::Limb;
 use ll::limb_ptr::LimbsMut;
 
 /// Returns a Layout with the given size and pointer-width (i.e., usize) alignment. Panics if
 /// unable to create the Layout.
-unsafe fn get_usize_align_layout(size: usize) -> allocator::Layout {
+unsafe fn get_usize_align_layout(size: usize) -> alloc::Layout {
     let alignment = mem::align_of::<usize>();
 
-    if let Some(l) = allocator::Layout::from_size_align(size, alignment) {
+    if let Ok(l) = alloc::Layout::from_size_align(size, alignment) {
         l
     }
     else {
@@ -44,8 +43,8 @@ unsafe fn get_usize_align_layout(size: usize) -> allocator::Layout {
 
 pub unsafe fn allocate_bytes(size: usize) -> *mut u8 {
     let layout = get_usize_align_layout(size);
-    let ret = match heap::Heap.alloc(layout.clone()) {
-        Ok(p) => p,
+    let ret = match alloc::Global.alloc(layout.clone()) {
+        Ok(p) => p.as_ptr() as *mut u8,
         Err(e) => {
             writeln!(io::stderr(),
                      "Failed to allocate memory (layout={:?}).\nError: {:?}",
@@ -61,7 +60,8 @@ pub unsafe fn allocate_bytes(size: usize) -> *mut u8 {
 
 pub unsafe fn deallocate_bytes(ptr: *mut u8, size: usize) {
     let layout = get_usize_align_layout(size);
-    heap::Heap.dealloc(ptr, layout);
+    let ptr = NonNull::new_unchecked(ptr as *mut _);
+    alloc::Global.dealloc(ptr, layout);
 }
 
 /// Allocate for temporary storage. Ensures that the allocations are
