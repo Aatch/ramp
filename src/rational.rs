@@ -47,6 +47,21 @@ pub struct Rational {
 }
 
 impl Rational {
+    /// return the numenator of the rational
+    pub fn numenator(&self) -> &Int {
+        &self.n
+    }
+    
+    /// return the denominator of the rational
+    pub fn denominator(&self) -> &Int {
+        &self.d
+    }
+    
+    /// return the (numenator, denominator) tuple of the rational
+    pub fn fraction(self) -> (Int, Int) {
+        (self.n, self.d)
+    }
+
     /// Consumes this `Rational`, returning its absolute value.
     pub fn abs(mut self) -> Rational {
         if self.sign() == -1 {
