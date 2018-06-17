@@ -15,8 +15,7 @@
 //! Memory management functions. The base functions align to a pointer-width, so they shouldn't
 //! be used for anything that requires an alignment greater than that.
 
-use alloc::allocator::{self, Alloc};
-use alloc::heap;
+use std::alloc::{self, Alloc};
 use std::mem;
 use std::intrinsics::abort;
 use std::io::{self, Write};
@@ -27,25 +26,26 @@ use ll::limb_ptr::LimbsMut;
 
 /// Returns a Layout with the given size and pointer-width (i.e., usize) alignment. Panics if
 /// unable to create the Layout.
-unsafe fn get_usize_align_layout(size: usize) -> allocator::Layout {
+unsafe fn get_usize_align_layout(size: usize) -> alloc::Layout {
     let alignment = mem::align_of::<usize>();
 
-    if let Some(l) = allocator::Layout::from_size_align(size, alignment) {
-        l
-    }
-    else {
-        writeln!(io::stderr(),
-                 "Failed to construct mem layout (size={}, alignment={})",
-                 size,
-                 alignment).unwrap();
-        abort();
+    match alloc::Layout::from_size_align(size, alignment) {
+        Ok(l) => l,
+        Err(layout_err) => {
+            let _ = writeln!(io::stderr(),
+                             "Failed to construct mem layout (size={}, alignment={}): {}",
+                             size,
+                             alignment,
+                             layout_err);
+            abort();
+        }
     }
 }
 
 pub unsafe fn allocate_bytes(size: usize) -> *mut u8 {
     let layout = get_usize_align_layout(size);
-    let ret = match heap::Heap.alloc(layout.clone()) {
-        Ok(p) => p,
+    let ret = match alloc::Global.alloc(layout.clone()) {
+        Ok(p) => p.as_ptr(),
         Err(e) => {
             writeln!(io::stderr(),
                      "Failed to allocate memory (layout={:?}).\nError: {:?}",
@@ -59,9 +59,9 @@ pub unsafe fn allocate_bytes(size: usize) -> *mut u8 {
     ret
 }
 
-pub unsafe fn deallocate_bytes(ptr: *mut u8, size: usize) {
+pub unsafe fn deallocate_bytes(ptr: ptr::NonNull<u8>, size: usize) {
     let layout = get_usize_align_layout(size);
-    heap::Heap.dealloc(ptr, layout);
+    alloc::Global.dealloc(ptr, layout);
 }
 
 /// Allocate for temporary storage. Ensures that the allocations are
@@ -115,10 +115,11 @@ impl Drop for TmpAllocator {
         unsafe {
             let mut next;
             let mut mark = self.mark;
-            while !mark.is_null() {
-                next = (*mark).next;
-                let size = (*mark).size;
-                deallocate_bytes(mark as *mut u8, size);
+            // Iterate the list until we hit a null ptr
+            while let Some(checked_mark) = ptr::NonNull::new(mark) {
+                next = checked_mark.as_ref().next;
+                let size = checked_mark.as_ref().size;
+                deallocate_bytes(checked_mark.cast(), size);
                 mark = next;
             }
         }
