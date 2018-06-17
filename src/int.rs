@@ -353,9 +353,17 @@ impl Int {
             return Err(ParseIntError { kind: ErrorKind::Empty });
         }
 
-        let mut buf = Vec::with_capacity(src.len());
+        let src = src.as_bytes();
+        let zeros = src.iter()
+            .take_while(|&&digit| digit == b'0')
+            .count();
 
-        for c in src.bytes() {
+        if zeros == src.len() {
+            return Ok(Int::zero());
+        }
+
+        let mut buf = Vec::with_capacity(src.len() - zeros);
+        for &c in &src[zeros..] {
             let b = match c {
                 b'0'...b'9' => c - b'0',
                 b'A'...b'Z' => (c - b'A') + 10,
@@ -3818,6 +3826,7 @@ mod test {
             ("12AB34cd", 0x12ab34cd),
             ("-ABC",    -0xabc),
             ("-0def",   -0xdef),
+            ("00000000000000000", 0)
         ];
 
         for &(s, n) in cases.iter() {
