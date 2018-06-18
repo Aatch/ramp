@@ -82,6 +82,12 @@ impl Rational {
         rat
     }
 
+    /// Returns the (numerator, denominator) of this `Rational` in normalized form.
+    pub fn into_parts(mut self) -> (Int, Int) {
+        self.normalize();
+        (self.n, self.d)
+    }
+
     /// Returns whether or not this `Rational` is [normalized].
     ///
     /// [normalized]: #method.normalize
@@ -1198,6 +1204,34 @@ mod test {
                 let expected = Rational::new(n.into(), d.into());
                 assert_eq!(&Rational::from(f), &expected);
                 assert_eq!(&Rational::from(f as f32), &expected);
+            }
+        }
+    }
+
+    #[test]
+    fn into_parts() {
+        let numerators = &[3576760, 7827126, 3572102, 7339243, 949496];
+        let denominators = &[9198310, 7916462, 8389604, 2380279, 9080365];
+
+        // Some of these pairs have gcd == 1 and some have a much larger gcd. This should work for
+        // all of them.
+        for &n in numerators {
+            for &d in denominators {
+                let n = Int::from(n);
+                let d = Int::from(d);
+                let gcd = n.gcd(&d);
+
+                // The reduced form
+                let (n_expected, d_expected) = (&n/&gcd, &d/&gcd);
+
+                let r = Rational::new(n, d);
+                let (n_received, d_received) = r.into_parts();
+
+                // Test that into_parts∘new = id up to cancellation
+                assert_eq!(n_received.sign()*d_received.sign(),
+                           n_expected.sign()*d_expected.sign());
+                assert_eq!(n_received.abs(), n_expected.abs());
+                assert_eq!(d_received.abs(), d_expected.abs());
             }
         }
     }
