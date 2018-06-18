@@ -1,8 +1,8 @@
 [package]
 name = "ramp"
 description = "A high-performance multiple-precision arithmetic library"
-version = "0.3.13"
-authors = ["James Miller <james@aatch.net>"]
+version = "0.4.0"
+authors = ["James Miller <james@aatch.net>", "Michael Rosenberg <micro@fastmail.com>"]
 build = "build.rs"
 license = "Apache-2.0"
 readme = "README.md"
