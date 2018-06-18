@@ -113,7 +113,14 @@ impl Rational {
     }
 
     /// Consumes this `Rational`, returning its reciprocal.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the `Rational` is zero. This can be checked with the [is_zero] method.
+    ///
+    /// [is_zero]: #method.is_zero
     pub fn invert(self) -> Rational {
+        assert!(self.n != 0, "Divide by zero");
         if self.sign() == -1 {
             Rational {
                 n: -self.d,
