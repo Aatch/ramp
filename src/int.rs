@@ -339,10 +339,6 @@ impl Int {
             panic!("Invalid base: {}", base);
         }
 
-        if src.len() == 0 {
-            return Err(ParseIntError { kind: ErrorKind::Empty });
-        }
-
         let mut sign = 1;
         if src.starts_with('-') {
             sign = -1;
@@ -353,17 +349,15 @@ impl Int {
             return Err(ParseIntError { kind: ErrorKind::Empty });
         }
 
-        let src = src.as_bytes();
-        let zeros = src.iter()
-            .take_while(|&&digit| digit == b'0')
-            .count();
-
-        if zeros == src.len() {
+        // Strip leading zeros
+        let zeros = src.chars().take_while(|&digit| digit == '0').count();
+        src = &src[zeros..];
+        if src.len() == 0 {
             return Ok(Int::zero());
         }
 
-        let mut buf = Vec::with_capacity(src.len() - zeros);
-        for &c in &src[zeros..] {
+        let mut buf = Vec::with_capacity(src.len());
+        for c in src.bytes() {
             let b = match c {
                 b'0'...b'9' => c - b'0',
                 b'A'...b'Z' => (c - b'A') + 10,
