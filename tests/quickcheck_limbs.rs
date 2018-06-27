@@ -12,6 +12,7 @@ const QUICKCHECK_THOROUGNESS: u64 = 100;
 #[cfg(not(feature = "full-quickcheck"))]
 const QUICKCHECK_THOROUGNESS: u64 = 1;
 
+// Copy of quickcheck macro, but with custom tests and max_tests values
 macro_rules! quickcheck {
     (@as_items $($i:item)*) => ($($i)*);
     {
@@ -56,9 +57,7 @@ quickcheck!{
 
         TestResult::from_bool(num_sum == ramp_sum)
     }
-}
 
-quickcheck!{
     fn check_sub(ha: usize, la: usize, hb: usize, lb: usize) -> TestResult {
         let a = b!(ha,la);
         let b = b!(hb,lb);
@@ -72,9 +71,7 @@ quickcheck!{
 
         TestResult::from_bool(num_diff == ramp_diff)
     }
-}
 
-quickcheck!{
     fn check_mul(a: usize, b: usize) -> TestResult {
         let num_prod = b!(a) * b!(b);
 
@@ -83,9 +80,7 @@ quickcheck!{
 
         TestResult::from_bool(ramp_prod == num_prod)
     }
-}
 
-quickcheck!{
     fn check_div(hn: usize, ln: usize, d: usize) -> TestResult {
         let d = (1 + usize::max_value() / 2).saturating_add(d / 2);
         if hn >= d {
