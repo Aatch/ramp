@@ -24,7 +24,7 @@ full-quickcheck = []
 
 [dependencies]
 ieee754 = "0.2"
-rand = "0.3"
+rand = "0.5"
 hamming = "0.1"
 num-traits = "0.1.35"
 num-integer = "0.1.32"
