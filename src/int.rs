@@ -3416,8 +3416,8 @@ macro_rules! impl_from_prim (
     }
 );
 
-impl_from_prim!(signed   i8, i16, i32, i64, isize);
-impl_from_prim!(unsigned u8, u16, u32, u64, usize);
+impl_from_prim!(signed   i8, i16, i32, i64, i128, isize);
+impl_from_prim!(unsigned u8, u16, u32, u64, u128, usize);
 
 // Number formatting - There's not much difference between the impls,
 // hence the macro
@@ -3545,8 +3545,8 @@ macro_rules! impl_from_for_prim (
     )
 );
 
-impl_from_for_prim!(signed   i8, i16, i32, i64, isize);
-impl_from_for_prim!(unsigned u8, u16, u32, u64, usize);
+impl_from_for_prim!(signed   i8, i16, i32, i64, i128, isize);
+impl_from_for_prim!(unsigned u8, u16, u32, u64, u128, usize);
 
 impl Zero for Int {
     fn zero() -> Int {
@@ -4500,6 +4500,12 @@ mod test {
 
         let i = Int::from(::std::i32::MIN);
         assert_eq!(i32::from(&i), ::std::i32::MIN);
+
+        let i = Int::from(::std::i128::MIN);
+        assert_eq!(i128::from(&i), ::std::i128::MIN);
+
+        let i = Int::from(::std::u128::MAX);
+        assert_eq!(u128::from(&i), ::std::u128::MAX);
 
         let i = Int::from(::std::usize::MAX);
         assert_eq!(usize::from(&i), ::std::usize::MAX);
