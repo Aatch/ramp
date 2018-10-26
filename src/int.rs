@@ -3490,24 +3490,34 @@ impl FromStr for Int {
 
 macro_rules! impl_from_for_prim (
     (signed $($t:ty),*) => (
-        $(impl<'a> ::std::convert::From<&'a Int> for $t {
+        $(impl<'a> std::convert::From<&'a Int> for $t {
             fn from(i: &'a Int) -> $t {
                 let sign = i.sign() as $t;
                 if sign == 0 {
                     return 0;
                 }
-                if ::std::mem::size_of::<BaseInt>() < ::std::mem::size_of::<$t>() {
-                    // Handle conversion where BaseInt = u32 and $t = i64
-                    if i.abs_size() >= 2 { // Fallthrough if there's only one limb
-                        let lower = i.to_single_limb().0 as $t;
-                        let higher = unsafe { (*i.ptr.as_ptr().offset(1)).0 } as $t;
 
-                        // Combine the two. This won't actually wrap, since $t is
-                        // bigger than BaseInt
-                        let n : $t = lower | higher.wrapping_shl(Limb::BITS as u32);
+                let sizeof_t = std::mem::size_of::<$t>();
+                let sizeof_baseint = std::mem::size_of::<BaseInt>();
+                // Handle conversion where BaseInt is smaller than $t
+                if sizeof_baseint < sizeof_t {
+                    // Fallthrough if there's only one limb
+                    if i.abs_size() >= 2 {
+                        // The number of limbs that fit in $t
+                        let size_factor = sizeof_t / sizeof_baseint;
+                        // We can't copy more limbs than we have
+                        let num_limbs_to_copy = std::cmp::min(size_factor, i.abs_size() as usize);
+
+                        // Accumulate the limbs into $t
+                        let limb_size = Limb::BITS as u32;
+                        let mut acc: $t = 0;
+                        for j in 0..num_limbs_to_copy {
+                            let limb = unsafe { (*i.ptr.as_ptr().offset(j as isize)).0 } as $t;
+                            acc |= limb.wrapping_shl(limb_size * (j as u32))
+                        }
 
                         // Apply the sign
-                        return n.wrapping_mul(sign);
+                        return acc.wrapping_mul(sign);
                     }
                 }
                 let n = i.to_single_limb().0;
@@ -3518,24 +3528,33 @@ macro_rules! impl_from_for_prim (
         })*
     );
     (unsigned $($t:ty),*) => (
-        $(impl<'a> ::std::convert::From<&'a Int> for $t {
+        $(impl<'a> std::convert::From<&'a Int> for $t {
             fn from(i: &'a Int) -> $t {
-                // This does the conversion ignoring the sign
-
-                if i.sign() == 0 {
+                let sign = i.sign() as $t;
+                if sign == 0 {
                     return 0;
                 }
-                if ::std::mem::size_of::<BaseInt>() < ::std::mem::size_of::<$t>() {
-                    // Handle conversion where BaseInt = u32 and $t = u64
-                    if i.abs_size() >= 2 { // Fallthrough if there's only one limb
-                        let lower = i.to_single_limb().0 as $t;
-                        let higher = unsafe { (*i.ptr.as_ptr().offset(1)).0 } as $t;
 
-                        // Combine the two. This won't actually wrap, since $t is
-                        // bigger than BaseInt
-                        let n : $t = lower | higher.wrapping_shl(Limb::BITS as u32);
+                let sizeof_t = std::mem::size_of::<$t>();
+                let sizeof_baseint = std::mem::size_of::<BaseInt>();
+                // Handle conversion where BaseInt is smaller than $t
+                if sizeof_baseint < sizeof_t {
+                    // Fallthrough if there's only one limb
+                    if i.abs_size() >= 2 {
+                        // The number of limbs that fit in $t
+                        let size_factor = sizeof_t / sizeof_baseint;
+                        // We can't copy more limbs than we have
+                        let num_limbs_to_copy = std::cmp::min(size_factor, i.abs_size() as usize);
 
-                        return n;
+                        // Accumulate the limbs into $t
+                        let limb_size = Limb::BITS as u32;
+                        let mut acc: $t = 0;
+                        for j in 0..num_limbs_to_copy {
+                            let limb = unsafe { (*i.ptr.as_ptr().offset(j as isize)).0 } as $t;
+                            acc |= limb.wrapping_shl(limb_size * (j as u32))
+                        }
+
+                        return acc;
                     }
                 }
                 let n = i.to_single_limb().0;
