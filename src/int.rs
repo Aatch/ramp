@@ -4062,7 +4062,6 @@ mod test {
                     let m: Int = m.parse().unwrap();
 
                     let a = b.pow_mod(&e, &m);
-                    println!("0^0 == {}", Int::zero().pow(0));
                     assert_mp_eq!(a, b.pow(i as usize) % m)
                 }
             }
