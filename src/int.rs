@@ -3375,6 +3375,7 @@ macro_rules! impl_from_prim (
                         i.size *= -1;
                     }
 
+                    i.normalize();
                     return i;
                 } else {
                     let limb = Limb(val.abs() as BaseInt);
@@ -3410,6 +3411,7 @@ macro_rules! impl_from_prim (
                         let vlimb = val.wrapping_shr(limb_bits * (j as u32)) & (mask as $t);
                         i.push(Limb(vlimb as BaseInt));
                     }
+                    i.normalize();
                     return i;
                 } else {
                     let limb = Limb(val as BaseInt);
