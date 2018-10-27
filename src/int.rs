@@ -3354,19 +3354,21 @@ macro_rules! impl_from_prim (
                     i = i << shift;
                     return -i;
                 }
-                // Handle i64/u64 on 32-bit platforms.
-                if std::mem::size_of::<$t>() > std::mem::size_of::<BaseInt>() {
-                    let vabs = val.abs();
-                    let mask : BaseInt = !0;
-                    let vlow = vabs & (mask as $t);
-                    // This won't actually wrap, since $t is bigger than BaseInt
-                    let vhigh = vabs.wrapping_shr(Limb::BITS as u32);
 
-                    let low_limb = Limb(vlow as BaseInt);
-                    let high_limb = Limb(vhigh as BaseInt);
-                    let mut i = Int::from_single_limb(low_limb);
-                    if high_limb != 0 {
-                        i.push(high_limb);
+                let sizeof_t = std::mem::size_of::<$t>();
+                let sizeof_baseint = std::mem::size_of::<BaseInt>();
+
+                // Handle conversion where BaseInt is smaller than $t
+                if sizeof_baseint < sizeof_t {
+                    let mask : BaseInt = !0;
+                    let size_factor = sizeof_t / sizeof_baseint;
+                    let limb_bits = Limb::BITS as u32;
+
+                    let mut i = Int::zero();
+                    for j in 0..size_factor {
+                        // This won't wrap, since sizeof($t) = size_factor * sizeof(BaseInt)
+                        let vlimb = val.wrapping_shr(limb_bits * (j as u32)) & (mask as $t);
+                        i.push(Limb(vlimb as BaseInt));
                     }
 
                     if val < 0 {
@@ -3392,20 +3394,22 @@ macro_rules! impl_from_prim (
                 if val == 0 {
                     return Int::zero();
                 }
-                // Handle i64/u64 on 32-bit platforms.
-                if std::mem::size_of::<$t>() > std::mem::size_of::<BaseInt>() {
+
+                let sizeof_t = std::mem::size_of::<$t>();
+                let sizeof_baseint = std::mem::size_of::<BaseInt>();
+
+                // Handle conversion where BaseInt is smaller than $t
+                if sizeof_baseint < sizeof_t {
                     let mask : BaseInt = !0;
-                    let vlow = val & (mask as $t);
-                    // This won't actually wrap, since $t is bigger than BaseInt
-                    let vhigh = val.wrapping_shr(Limb::BITS as u32);
+                    let size_factor = sizeof_t / sizeof_baseint;
+                    let limb_bits = Limb::BITS as u32;
 
-                    let low_limb = Limb(vlow as BaseInt);
-                    let high_limb = Limb(vhigh as BaseInt);
-                    let mut i = Int::from_single_limb(low_limb);
-                    if high_limb != 0 {
-                        i.push(high_limb);
+                    let mut i = Int::zero();
+                    for j in 0..size_factor {
+                        // This won't wrap, since sizeof($t) = size_factor * sizeof(BaseInt)
+                        let vlimb = val.wrapping_shr(limb_bits * (j as u32)) & (mask as $t);
+                        i.push(Limb(vlimb as BaseInt));
                     }
-
                     return i;
                 } else {
                     let limb = Limb(val as BaseInt);
@@ -3499,6 +3503,7 @@ macro_rules! impl_from_for_prim (
 
                 let sizeof_t = std::mem::size_of::<$t>();
                 let sizeof_baseint = std::mem::size_of::<BaseInt>();
+
                 // Handle conversion where BaseInt is smaller than $t
                 if sizeof_baseint < sizeof_t {
                     // Fallthrough if there's only one limb
@@ -3513,7 +3518,7 @@ macro_rules! impl_from_for_prim (
                         let mut acc: $t = 0;
                         for j in 0..num_limbs_to_copy {
                             let limb = unsafe { (*i.ptr.as_ptr().offset(j as isize)).0 } as $t;
-                            acc |= limb.wrapping_shl(limb_size * (j as u32))
+                            acc |= limb.wrapping_shl(limb_size * (j as u32));
                         }
 
                         // Apply the sign
@@ -3530,13 +3535,13 @@ macro_rules! impl_from_for_prim (
     (unsigned $($t:ty),*) => (
         $(impl<'a> std::convert::From<&'a Int> for $t {
             fn from(i: &'a Int) -> $t {
-                let sign = i.sign() as $t;
-                if sign == 0 {
+                if i.sign() == 0 {
                     return 0;
                 }
 
                 let sizeof_t = std::mem::size_of::<$t>();
                 let sizeof_baseint = std::mem::size_of::<BaseInt>();
+
                 // Handle conversion where BaseInt is smaller than $t
                 if sizeof_baseint < sizeof_t {
                     // Fallthrough if there's only one limb
@@ -3551,12 +3556,13 @@ macro_rules! impl_from_for_prim (
                         let mut acc: $t = 0;
                         for j in 0..num_limbs_to_copy {
                             let limb = unsafe { (*i.ptr.as_ptr().offset(j as isize)).0 } as $t;
-                            acc |= limb.wrapping_shl(limb_size * (j as u32))
+                            acc |= limb.wrapping_shl(limb_size * (j as u32));
                         }
 
                         return acc;
                     }
                 }
+
                 let n = i.to_single_limb().0;
                 return n as $t;
             }
