@@ -3360,6 +3360,7 @@ macro_rules! impl_from_prim (
 
                 // Handle conversion where BaseInt is smaller than $t
                 if sizeof_baseint < sizeof_t {
+                    let val_abs = val.abs();
                     let mask : BaseInt = !0;
                     let size_factor = sizeof_t / sizeof_baseint;
                     let limb_bits = Limb::BITS as u32;
@@ -3367,7 +3368,7 @@ macro_rules! impl_from_prim (
                     let mut i = Int::zero();
                     for j in 0..size_factor {
                         // This won't wrap, since sizeof($t) = size_factor * sizeof(BaseInt)
-                        let vlimb = val.wrapping_shr(limb_bits * (j as u32)) & (mask as $t);
+                        let vlimb = val_abs.wrapping_shr(limb_bits * (j as u32)) & (mask as $t);
                         i.push(Limb(vlimb as BaseInt));
                     }
 
