@@ -76,10 +76,8 @@ impl Limb {
      */
     #[inline(always)]
     pub fn add_overflow(self, other: Limb) -> (Limb, bool) {
-        unsafe {
-            let (val, c) = std::intrinsics::add_with_overflow(self.0, other.0);
-            (Limb(val), c)
-        }
+        let (val, c) = std::intrinsics::add_with_overflow(self.0, other.0);
+        (Limb(val), c)
     }
 
     /**
@@ -87,10 +85,8 @@ impl Limb {
      */
     #[inline(always)]
     pub fn sub_overflow(self, other: Limb) -> (Limb, bool) {
-        unsafe {
-            let (val, c) = std::intrinsics::sub_with_overflow(self.0, other.0);
-            (Limb(val), c)
-        }
+        let (val, c) = std::intrinsics::sub_with_overflow(self.0, other.0);
+        (Limb(val), c)
     }
 
     /**
@@ -773,6 +769,7 @@ fn test_bug_div_1() {
     assert_eq!((q.0, r.0), (0, 10));
 }
 
+#[cfg(target_pointer_width = "64")]
 #[test]
 fn test_bug_mul_1() {
     let (h,l) = mul(Limb(18446744073709551615), Limb(7868907223611932671));
