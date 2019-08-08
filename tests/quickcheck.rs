@@ -70,7 +70,6 @@ impl<'a> From<&'a BigIntStr> for (Int,RefImpl) {
 #[cfg(not(feature="rust-gmp"))]
 impl<'a> From<&'a BigIntStr> for (Int,RefImplU) {
     fn from(s: &'a BigIntStr) -> (Int, RefImplU) {
-        use num_traits::Signed;
         (Int::from_str_radix(&s.0, 16).unwrap().abs(),
         ref_from_hex(&s.0).abs().to_biguint().unwrap())
     }
@@ -139,7 +138,7 @@ impl Arbitrary for BigIntStr {
         BigIntStr(string)
     }
 
-    fn shrink(&self) -> Box<Iterator<Item = Self>> {
+    fn shrink(&self) -> Box<dyn Iterator<Item = Self>> {
         // shrink the "number" by just truncating the string from the
         // end.
         let mut string = self.clone();
@@ -148,9 +147,9 @@ impl Arbitrary for BigIntStr {
                 // small numbers strink slowly.
                 let rate = match string.0.len() {
                     0 => 0,
-                    1...10 => 1,
-                    11...100 => 5,
-                    100...1000 => 25,
+                    1 ..= 10 => 1,
+                    11 ..= 100 => 5,
+                    100 ..= 1000 => 25,
                     _ => 125
                 };
                 for _ in 0..rate {

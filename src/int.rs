@@ -161,7 +161,7 @@ impl Int {
             // update `self` for any changes that happened
             // vec.ptr() can't be null, so we can safely unwrap
             self.ptr = Unique::new(vec.ptr()).unwrap();
-            let new_cap = vec.cap();
+            let new_cap = vec.capacity();
             assert!(new_cap <= std::u32::MAX as usize);
             self.cap = new_cap as u32;
             // ownership has transferred back into `self`, so make
@@ -359,9 +359,9 @@ impl Int {
         let mut buf = Vec::with_capacity(src.len());
         for c in src.bytes() {
             let b = match c {
-                b'0'...b'9' => c - b'0',
-                b'A'...b'Z' => (c - b'A') + 10,
-                b'a'...b'z' => (c - b'a') + 10,
+                b'0' ..= b'9' => c - b'0',
+                b'A' ..= b'Z' => (c - b'A') + 10,
+                b'a' ..= b'z' => (c - b'a') + 10,
                 _ => {
                     return Err(ParseIntError { kind: ErrorKind::InvalidDigit });
                 }

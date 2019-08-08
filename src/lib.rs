@@ -16,11 +16,12 @@
 #![crate_name="ramp"]
 
 #![feature(core_intrinsics, asm, allocator_api)]
-#![feature(step_trait, ptr_internals, alloc, raw_vec_internals)]
+#![feature(step_trait, ptr_internals, raw_vec_internals)]
 
 #![cfg_attr(test, feature(test))]
 
-#[cfg(test)] extern crate test;
+#[cfg(test)]
+extern crate test;
 
 extern crate alloc;
 extern crate ieee754;
