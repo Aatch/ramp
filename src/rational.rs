@@ -1134,7 +1134,7 @@ mod test {
             ("1337/-1337", "-1337/-1337")
         };
 
-        for &(ref r, ref l) in cases.into_iter() {
+        for &(ref r, ref l) in cases.iter() {
             assert_eq!(&r.clone().abs(), l);
         }
     }
