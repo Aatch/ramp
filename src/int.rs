@@ -4264,7 +4264,7 @@ mod test {
              "100000000000000000000000000000000000000000000000"),
         ];
 
-        for t in cases.into_iter() {
+        for t in cases.iter() {
             let dividend: Int = t.0.parse().unwrap();
             let divisor: Int = t.1.parse().unwrap();
             let expected_quotient: Int = t.2.parse().unwrap();
