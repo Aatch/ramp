@@ -314,7 +314,7 @@ impl Int {
         debug_assert!(self.well_formed());
 
         if self.sign() == -1 {
-            try!(w.write_all(b"-"));
+            w.write_all(b"-")?;
         }
 
         let letter = if upper { b'A' } else { b'a' };
@@ -3516,20 +3516,16 @@ enum ErrorKind {
     InvalidDigit,
 }
 
-impl Error for ParseIntError {
-    fn description<'a>(&'a self) -> &'a str {
+impl fmt::Display for ParseIntError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self.kind {
-            ErrorKind::Empty => "cannot parse empty string",
-            ErrorKind::InvalidDigit => "invalid digit found in string",
+            ErrorKind::Empty => f.write_str("cannot parse empty string"),
+            ErrorKind::InvalidDigit => f.write_str("invalid digit found in string"),
         }
     }
 }
 
-impl fmt::Display for ParseIntError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        self.description().fmt(f)
-    }
-}
+impl Error for ParseIntError {}
 
 impl FromStr for Int {
     type Err = ParseIntError;

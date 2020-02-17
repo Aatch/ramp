@@ -898,17 +898,13 @@ impl_from_float!(f64, 52);
 #[derive(Debug, Clone, PartialEq)]
 pub struct ParseRationalError(ParseIntError);
 
-impl std::error::Error for ParseRationalError {
-    fn description<'a>(&'a self) -> &'a str {
-        self.0.description()
-    }
-}
-
 impl fmt::Display for ParseRationalError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         self.0.fmt(f)
     }
 }
+
+impl std::error::Error for ParseRationalError {}
 
 impl From<ParseIntError> for ParseRationalError {
     fn from(e: ParseIntError) -> ParseRationalError {
