@@ -16,18 +16,11 @@
 
 #![allow(dead_code, unused_imports)]
 
+use num_traits::{One, Zero};
 use std;
-use std::cmp::{
-    Ordering,
-    Ord, Eq,
-    PartialOrd, PartialEq
-};
+use std::cmp::{Eq, Ord, Ordering, PartialEq, PartialOrd};
+use std::ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Rem, Sub, SubAssign};
 use std::{fmt, hash};
-use std::ops::{
-    Add, Sub, Mul, Div, Rem, Neg,
-    AddAssign, SubAssign, MulAssign, DivAssign,
-};
-use num_traits::{Zero, One};
 
 use ll;
 
@@ -43,7 +36,7 @@ use ieee754::Ieee754;
 /// [`Int`]: ../int/struct.Int.html
 pub struct Rational {
     n: Int,
-    d: Int
+    d: Int,
 }
 
 impl Rational {
@@ -68,14 +61,11 @@ impl Rational {
         if n == 0 {
             return Rational {
                 n: n,
-                d: Int::one()
-            }
+                d: Int::one(),
+            };
         }
 
-        let mut rat = Rational {
-            n: n,
-            d: d
-        };
+        let mut rat = Rational { n: n, d: d };
 
         rat.normalize();
 
@@ -130,12 +120,12 @@ impl Rational {
         if self.sign() == -1 {
             Rational {
                 n: -self.d,
-                d: -self.n
+                d: -self.n,
             }
         } else {
             Rational {
                 n: self.d,
-                d: self.n
+                d: self.n,
             }
         }
     }
@@ -147,14 +137,13 @@ impl Rational {
         let sign = self.sign();
         if sign == 0 {
             Int::zero()
-        }
-        else {
+        } else {
             // Calculate floor(n/d + sign * 1/2) = floor((2n ± d) / 2d)
             self.n *= 2;
             self.n += sign * &self.d;
             self.d *= 2;
             self.n / self.d
-         }
+        }
     }
 
     /// Returns the sign of this `Rational` as either -1, 0 or 1 depending on whether it is
@@ -187,14 +176,13 @@ impl Clone for Rational {
     fn clone(&self) -> Rational {
         Rational {
             n: self.n.clone(),
-            d: self.d.clone()
+            d: self.d.clone(),
         }
     }
 
-    fn clone_from(&mut self, other: &Rational)  {
+    fn clone_from(&mut self, other: &Rational) {
         self.n.clone_from(&other.n);
         self.d.clone_from(&other.d);
-
     }
 }
 
@@ -239,7 +227,7 @@ impl PartialEq<Rational> for Rational {
 
         // Final case, we need to get the numerators for the
         // fractions with a common denominator.
-        let self_n  = (&self.n * &other.d) / &gcd;
+        let self_n = (&self.n * &other.d) / &gcd;
         let other_n = (&other.n * &self.d) / gcd;
 
         self_n.abs_eq(&other_n)
@@ -271,7 +259,7 @@ impl PartialEq<Rational> for Int {
     }
 }
 
-impl Eq for Rational { }
+impl Eq for Rational {}
 
 impl Ord for Rational {
     fn cmp(&self, other: &Rational) -> Ordering {
@@ -279,7 +267,8 @@ impl Ord for Rational {
             Ordering::Less
         } else if self.sign() > other.sign() {
             Ordering::Greater
-        } else { // Same sign
+        } else {
+            // Same sign
             // Check for zero
             if self.sign() == 0 {
                 return Ordering::Equal;
@@ -292,7 +281,7 @@ impl Ord for Rational {
 
             let gcd = self.d.gcd(&other.d);
 
-            let self_n  = (&self.n * &other.d) / &gcd;
+            let self_n = (&self.n * &other.d) / &gcd;
             let other_n = (&other.n * &self.d) / gcd;
 
             let ord = self_n.abs_cmp(&other_n);
@@ -353,7 +342,10 @@ impl PartialOrd<Rational> for Int {
 }
 
 impl hash::Hash for Rational {
-    fn hash<H>(&self, state: &mut H) where H: hash::Hasher {
+    fn hash<H>(&self, state: &mut H)
+    where
+        H: hash::Hasher,
+    {
         let gcd = self.n.gcd(&self.d);
         let sign = self.sign();
         sign.hash(state);
@@ -880,20 +872,21 @@ macro_rules! impl_from_float {
                 let (neg, exponent, significand) = val.decompose();
 
                 let mut coeff = Int::from(2).pow($signif_bits) + Int::from(significand);
-                if neg { coeff *= -1; }
+                if neg {
+                    coeff *= -1;
+                }
 
                 let corrected_expt = (exponent as i32) - $signif_bits;
                 let pow2 = Int::from(2).pow(corrected_expt.abs() as usize);
 
                 if corrected_expt < 0 {
                     Rational::new(coeff, pow2)
-                }
-                else {
+                } else {
                     Rational::new(coeff * pow2, Int::one())
                 }
             }
         }
-    }
+    };
 }
 
 impl_from_float!(f32, 23);
@@ -928,7 +921,10 @@ impl std::str::FromStr for Rational {
 
     fn from_str(s: &str) -> Result<Rational, ParseRationalError> {
         match s.find('/') {
-            Some(i) => Ok(Rational::new(Int::from_str(&s[..i])?, Int::from_str(&s[i + 1..])?)),
+            Some(i) => Ok(Rational::new(
+                Int::from_str(&s[..i])?,
+                Int::from_str(&s[i + 1..])?,
+            )),
             None => Ok(Rational::new(Int::from_str(s)?, Int::one())),
         }
     }
@@ -971,17 +967,16 @@ impl One for Rational {
     }
 }
 
-
 #[cfg(test)]
 mod test {
-    use std;
-    use std::hash::{Hash, Hasher};
-    use rand::{self, Rng};
-    use test::{self, Bencher};
     use super::*;
     use ll::limb::Limb;
-    use std::str::FromStr;
     use num_traits::Zero;
+    use rand::{self, Rng};
+    use std;
+    use std::hash::{Hash, Hasher};
+    use std::str::FromStr;
+    use test::{self, Bencher};
 
     use std::cmp::Ordering;
 
@@ -1014,7 +1009,6 @@ mod test {
                 Rational::from_str($r).unwrap())),+]
         );
     }
-
 
     #[test]
     fn add() {
@@ -1168,11 +1162,16 @@ mod test {
 
     #[test]
     fn from_int_primitive() {
-        use std::usize; use std::isize;
-        use std::u64; use std::i64;
-        use std::u32; use std::i32;
-        use std::u16; use std::i16;
-        use std::u8; use std::i8;
+        use std::i16;
+        use std::i32;
+        use std::i64;
+        use std::i8;
+        use std::isize;
+        use std::u16;
+        use std::u32;
+        use std::u64;
+        use std::u8;
+        use std::usize;
 
         let (a, b) = (usize::MAX, isize::MIN);
         let (c, d) = (u64::MAX, i64::MIN);
@@ -1222,14 +1221,16 @@ mod test {
                 let gcd = n.gcd(&d);
 
                 // The reduced form
-                let (n_expected, d_expected) = (&n/&gcd, &d/&gcd);
+                let (n_expected, d_expected) = (&n / &gcd, &d / &gcd);
 
                 let r = Rational::new(n, d);
                 let (n_received, d_received) = r.into_parts();
 
                 // Test that into_parts∘new = id up to cancellation
-                assert_eq!(n_received.sign()*d_received.sign(),
-                           n_expected.sign()*d_expected.sign());
+                assert_eq!(
+                    n_received.sign() * d_received.sign(),
+                    n_expected.sign() * d_expected.sign()
+                );
                 assert_eq!(n_received.abs(), n_expected.abs());
                 assert_eq!(d_received.abs(), d_expected.abs());
             }

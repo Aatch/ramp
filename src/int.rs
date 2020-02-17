@@ -14,27 +14,21 @@
 
 //! This module holds `Int` and related types.
 
+use rand::Rng;
 use std;
-use std::cmp::{
-    Ordering,
-    Ord, Eq,
-    PartialOrd, PartialEq
-};
+use std::cmp::{Eq, Ord, Ordering, PartialEq, PartialOrd};
 use std::error::Error;
-use std::{io, mem, fmt, hash};
 use std::ops::{
-    Add, Sub, Mul, Div, Rem, Neg,
-    AddAssign, SubAssign, MulAssign, DivAssign, RemAssign,
-    Shl, Shr, BitAnd, BitOr, BitXor,
-    ShlAssign, ShrAssign, BitAndAssign, BitOrAssign, BitXorAssign,
+    Add, AddAssign, BitAnd, BitAndAssign, BitOr, BitOrAssign, BitXor, BitXorAssign, Div, DivAssign,
+    Mul, MulAssign, Neg, Rem, RemAssign, Shl, ShlAssign, Shr, ShrAssign, Sub, SubAssign,
 };
 use std::ptr::Unique;
 use std::str::FromStr;
-use rand::Rng;
+use std::{fmt, hash, io, mem};
 
 use hamming;
 use num_integer::Integer;
-use num_traits::{Num, Zero, One};
+use num_traits::{Num, One, Zero};
 
 use ll;
 use ll::limb::{BaseInt, Limb};
@@ -120,7 +114,7 @@ use traits::DivRem;
 pub struct Int {
     ptr: Unique<Limb>,
     size: i32,
-    cap: u32
+    cap: u32,
 }
 
 impl Int {
@@ -172,9 +166,11 @@ impl Int {
                 // the allocation got larger, new Limbs should be
                 // zero.
                 let self_ptr = self.limbs_uninit();
-                std::ptr::write_bytes(&mut *self_ptr.offset(old_cap as isize) as *mut _ as *mut u8,
-                                      0,
-                                      (new_cap - old_cap) * std::mem::size_of::<Limb>());
+                std::ptr::write_bytes(
+                    &mut *self_ptr.offset(old_cap as isize) as *mut _ as *mut u8,
+                    0,
+                    (new_cap - old_cap) * std::mem::size_of::<Limb>(),
+                );
             }
         }
     }
@@ -233,9 +229,7 @@ impl Int {
         } else if self.abs_size() < other.abs_size() {
             Ordering::Less
         } else {
-            unsafe {
-                ll::cmp(self.limbs(), other.limbs(), self.abs_size())
-            }
+            unsafe { ll::cmp(self.limbs(), other.limbs(), self.abs_size()) }
         }
     }
 
@@ -248,7 +242,10 @@ impl Int {
     ///
     /// This is useful for when the sign is handled elsewhere and making a copy just to change the
     /// sign is wasteful.
-    pub fn abs_hash<H>(&self, state: &mut H) where H: hash::Hasher {
+    pub fn abs_hash<H>(&self, state: &mut H)
+    where
+        H: hash::Hasher,
+    {
         use std::hash::Hash;
         let mut size = self.abs_size();
         unsafe {
@@ -267,9 +264,13 @@ impl Int {
     pub fn shrink_to_fit(&mut self) {
         let mut size = self.abs_size() as usize;
 
-        if (self.cap as usize) == size { return; } // already as small as possible
+        if (self.cap as usize) == size {
+            return;
+        } // already as small as possible
 
-        if size == 0 { size = 1; } // Keep space for at least one limb around
+        if size == 0 {
+            size = 1;
+        } // Keep space for at least one limb around
 
         self.with_raw_vec(|v| {
             v.shrink_to_fit(size);
@@ -294,15 +295,14 @@ impl Int {
         }
 
         let size = self.abs_size();
-        let mut num_digits = unsafe {
-            ll::base::num_base_digits(self.limbs(), size - 1, base as u32)
-        };
+        let mut num_digits =
+            unsafe { ll::base::num_base_digits(self.limbs(), size - 1, base as u32) };
 
         if self.sign() == -1 {
             num_digits += 1;
         }
 
-        let mut buf : Vec<u8> = Vec::with_capacity(num_digits);
+        let mut buf: Vec<u8> = Vec::with_capacity(num_digits);
 
         self.write_radix(&mut buf, base, upper).unwrap();
 
@@ -346,7 +346,9 @@ impl Int {
         }
 
         if src.len() == 0 {
-            return Err(ParseIntError { kind: ErrorKind::Empty });
+            return Err(ParseIntError {
+                kind: ErrorKind::Empty,
+            });
         }
 
         // Strip leading zeros
@@ -359,15 +361,21 @@ impl Int {
         let mut buf = Vec::with_capacity(src.len());
         for c in src.bytes() {
             let b = match c {
-                b'0' ..= b'9' => c - b'0',
-                b'A' ..= b'Z' => (c - b'A') + 10,
-                b'a' ..= b'z' => (c - b'a') + 10,
+                b'0'..=b'9' => c - b'0',
+                b'A'..=b'Z' => (c - b'A') + 10,
+                b'a'..=b'z' => (c - b'a') + 10,
                 _ => {
-                    return Err(ParseIntError { kind: ErrorKind::InvalidDigit });
+                    return Err(ParseIntError {
+                        kind: ErrorKind::InvalidDigit,
+                    });
                 }
             };
 
-            if b >= base { return Err(ParseIntError { kind: ErrorKind::InvalidDigit }); }
+            if b >= base {
+                return Err(ParseIntError {
+                    kind: ErrorKind::InvalidDigit,
+                });
+            }
 
             buf.push(b);
         }
@@ -377,7 +385,12 @@ impl Int {
         let mut i = Int::with_capacity(num_digits as u32);
 
         unsafe {
-            let size = ll::base::from_base(i.limbs_uninit(), buf.as_ptr(), buf.len() as i32, base as u32);
+            let size = ll::base::from_base(
+                i.limbs_uninit(),
+                buf.as_ptr(),
+                buf.len() as i32,
+                base as u32,
+            );
             i.size = (size as i32) * sign;
         }
 
@@ -398,7 +411,7 @@ impl Int {
             ll::divide_by_zero();
         }
         if self.sign() == 0 {
-            return (self.clone(), Int::zero())
+            return (self.clone(), Int::zero());
         }
 
         let out_size = if self.abs_size() < other.abs_size() {
@@ -415,9 +428,14 @@ impl Int {
         r.size = other.abs_size() * self.sign();
 
         unsafe {
-            ll::divrem(q.limbs_mut(), r.limbs_mut(),
-                       self.limbs(), self.abs_size(),
-                       other.limbs(), other.abs_size());
+            ll::divrem(
+                q.limbs_mut(),
+                r.limbs_mut(),
+                self.limbs(),
+                self.abs_size(),
+                other.limbs(),
+                other.abs_size(),
+            );
         }
 
         q.normalize();
@@ -442,9 +460,8 @@ impl Int {
                     signum = 1
                 }
 
-                let ret_sz = unsafe {
-                    ll::pow::num_pow_limbs(self.limbs(), self.abs_size(), exp as u32)
-                };
+                let ret_sz =
+                    unsafe { ll::pow::num_pow_limbs(self.limbs(), self.abs_size(), exp as u32) };
                 let mut ret = Int::with_capacity(ret_sz as u32);
                 ret.size = ret_sz * signum;
 
@@ -553,7 +570,7 @@ impl Int {
         debug_assert!(self.well_formed());
 
         if self.sign() < 0 {
-            return None
+            return None;
         }
 
         // the floor of a (correctly rounded) f64 sqrt gives the right
@@ -569,8 +586,7 @@ impl Int {
             self.push(Limb(sqrt as BaseInt));
             self.normalize();
 
-            Some((self,
-                  Int::from(rem)))
+            Some((self, Int::from(rem)))
         } else {
             let n = self.bit_length();
             let l = (n as usize - 1) / 4;
@@ -619,9 +635,7 @@ impl Int {
         if self.sign() == 0 {
             0
         } else {
-            unsafe {
-                ll::scan_1(self.limbs(), self.abs_size())
-            }
+            unsafe { ll::scan_1(self.limbs(), self.abs_size()) }
         }
     }
 
@@ -635,8 +649,10 @@ impl Int {
             std::usize::MAX
         } else {
             let bytes = unsafe {
-                std::slice::from_raw_parts(self.ptr.as_ref() as *const _ as *const u8,
-                                           self.abs_size() as usize * std::mem::size_of::<Limb>())
+                std::slice::from_raw_parts(
+                    self.ptr.as_ref() as *const _ as *const u8,
+                    self.abs_size() as usize * std::mem::size_of::<Limb>(),
+                )
             };
             hamming::weight(bytes) as usize
         }
@@ -651,9 +667,7 @@ impl Int {
         if *self == 0 {
             1
         } else {
-            unsafe {
-                ll::base::num_base_digits(self.limbs(), self.abs_size(), 2) as u32
-            }
+            unsafe { ll::base::num_base_digits(self.limbs(), self.abs_size(), 2) as u32 }
         }
     }
 
@@ -696,7 +710,6 @@ impl Int {
         let sign = self.sign();
 
         unsafe {
-
             if word >= self.abs_size() as u32 {
                 // the bit is beyond the end, so more space is needed,
                 // and we need to be careful to ensure it's all zero
@@ -705,7 +718,10 @@ impl Int {
                 self.ensure_capacity(word + 1);
 
                 let size = self.abs_size();
-                ll::zero(self.limbs_uninit().offset(size as isize), word as i32 - size + 1);
+                ll::zero(
+                    self.limbs_uninit().offset(size as isize),
+                    word as i32 - size + 1,
+                );
 
                 self.size = word as i32 + 1;
                 if sign < 0 {
@@ -720,11 +736,7 @@ impl Int {
             }
 
             let mut ptr = self.limbs_mut().offset(word as isize);
-            let val = if bit_val {
-                *ptr | flag
-            } else {
-                *ptr & !flag
-            };
+            let val = if bit_val { *ptr | flag } else { *ptr & !flag };
             *ptr = val;
 
             if sign < 0 {
@@ -737,16 +749,12 @@ impl Int {
 
     /// Gets the `Limbs` currently initialised or in use.
     fn limbs(&self) -> Limbs {
-        unsafe {
-            Limbs::new(self.ptr.as_ref(), 0, self.abs_size())
-        }
+        unsafe { Limbs::new(self.ptr.as_ref(), 0, self.abs_size()) }
     }
 
     /// Gets the `LimbsMut` currently initialised or in use.
     fn limbs_mut(&mut self) -> LimbsMut {
-        unsafe {
-            LimbsMut::new(self.ptr.as_mut(), 0, self.abs_size())
-        }
+        unsafe { LimbsMut::new(self.ptr.as_mut(), 0, self.abs_size()) }
     }
 
     /// Gets the `LimbsMut` to all allocated limbs.
@@ -758,9 +766,7 @@ impl Int {
     fn ensure_capacity(&mut self, cap: u32) {
         if cap > self.cap {
             let old_cap = self.cap as usize;
-            self.with_raw_vec(|v| {
-                v.reserve_exact(old_cap, cap as usize - old_cap)
-            })
+            self.with_raw_vec(|v| v.reserve_exact(old_cap, cap as usize - old_cap))
         }
     }
 
@@ -783,12 +789,12 @@ impl Int {
 
     /// Adjusts the size field so that the most-significant `Limb` is non-zero.
     fn normalize(&mut self) {
-        if self.size == 0 { return }
+        if self.size == 0 {
+            return;
+        }
         let sign = self.sign();
         unsafe {
-            while self.size != 0 &&
-                *self.ptr.as_ptr().offset((self.abs_size() - 1) as isize) == 0 {
-
+            while self.size != 0 && *self.ptr.as_ptr().offset((self.abs_size() - 1) as isize) == 0 {
                 self.size -= sign;
             }
         }
@@ -798,15 +804,15 @@ impl Int {
     /// Returns whether the `Int` is well-formed, i.e. that the size doesn't exceed the capacity and
     /// that the most significant `Limb` is non-zero.
     fn well_formed(&self) -> bool {
-        if self.size == 0 { return true; }
+        if self.size == 0 {
+            return true;
+        }
 
         if (self.abs_size() as u32) > self.cap {
             return false;
         }
 
-        let high_limb = unsafe {
-            *self.ptr.as_ptr().offset((self.abs_size() - 1) as isize)
-        };
+        let high_limb = unsafe { *self.ptr.as_ptr().offset((self.abs_size() - 1) as isize) };
 
         return high_limb != 0;
     }
@@ -850,7 +856,13 @@ impl Int {
         r.size = out_size;
 
         unsafe {
-            ll::gcd(r.limbs_mut(), a.limbs_mut(), a.abs_size(), b.limbs_mut(), b.abs_size());
+            ll::gcd(
+                r.limbs_mut(),
+                a.limbs_mut(),
+                a.abs_size(),
+                b.limbs_mut(),
+                b.abs_size(),
+            );
             r.normalize();
             r
         }
@@ -872,16 +884,12 @@ impl Int {
             return 0.0;
         }
 
-        let mut highest_limb = unsafe {
-            *self.limbs().offset((sz - 1) as isize)
-        };
+        let mut highest_limb = unsafe { *self.limbs().offset((sz - 1) as isize) };
         let leading_zeros = highest_limb.leading_zeros();
         let mut shifted = 0;
         if leading_zeros > 11 && sz > 1 {
             highest_limb = highest_limb << leading_zeros;
-            let next_limb = unsafe {
-                *self.limbs().offset((sz - 2) as isize)
-            };
+            let next_limb = unsafe { *self.limbs().offset((sz - 2) as isize) };
 
             highest_limb = highest_limb | (next_limb >> (Limb::BITS - leading_zeros as usize));
             shifted = leading_zeros;
@@ -938,8 +946,7 @@ impl Drop for Int {
     fn drop(&mut self) {
         if self.cap > 0 {
             unsafe {
-                drop(RawVec::from_raw_parts(self.ptr.as_mut(),
-                                            self.cap as usize));
+                drop(RawVec::from_raw_parts(self.ptr.as_mut(), self.cap as usize));
             }
             self.cap = 0;
             self.size = 0;
@@ -953,9 +960,7 @@ impl PartialEq<Int> for Int {
         debug_assert!(self.well_formed());
         debug_assert!(other.well_formed());
         if self.size == other.size {
-            unsafe {
-                ll::cmp(self.limbs(), other.limbs(), self.abs_size()) == Ordering::Equal
-            }
+            unsafe { ll::cmp(self.limbs(), other.limbs(), self.abs_size()) == Ordering::Equal }
         } else {
             false
         }
@@ -980,7 +985,7 @@ impl PartialEq<Int> for Limb {
     }
 }
 
-impl Eq for Int { }
+impl Eq for Int {}
 
 impl Ord for Int {
     #[inline]
@@ -989,7 +994,8 @@ impl Ord for Int {
             Ordering::Less
         } else if self.size > other.size {
             Ordering::Greater
-        } else { // Same number of digits and same sign
+        } else {
+            // Same number of digits and same sign
             // Check for zero
             if self.size == 0 {
                 return Ordering::Equal;
@@ -1039,7 +1045,10 @@ impl PartialOrd<Int> for Limb {
 }
 
 impl hash::Hash for Int {
-    fn hash<H>(&self, state: &mut H) where H: hash::Hasher {
+    fn hash<H>(&self, state: &mut H)
+    where
+        H: hash::Hasher,
+    {
         debug_assert!(self.well_formed());
 
         // Normalize the Int so we get consistent hashing (since there are multiple limb
@@ -1054,7 +1063,9 @@ impl hash::Hash for Int {
 impl AddAssign<Limb> for Int {
     fn add_assign(&mut self, other: Limb) {
         debug_assert!(self.well_formed());
-        if other == 0 { return; }
+        if other == 0 {
+            return;
+        }
 
         // No capacity means `self` is zero. Just push `other` into it
         if self.cap == 0 {
@@ -1066,7 +1077,7 @@ impl AddAssign<Limb> for Int {
             unsafe {
                 *self.limbs_uninit() = other;
                 self.size = 1;
-                return
+                return;
             }
         }
         // `self` is non-zero, reuse the storage for the result.
@@ -1123,7 +1134,6 @@ impl<'a> AddAssign<&'a Int> for Int {
             return;
         }
 
-
         if self.sign() == other.sign() {
             // Signs are the same, add the two numbers together and re-apply
             // the sign after.
@@ -1135,19 +1145,27 @@ impl<'a> AddAssign<&'a Int> for Int {
                 // if `self` is the smaller of the two we make sure it has enough space
                 // for the result
                 let (xp, xs, yp, ys) = if self.abs_size() >= other.abs_size() {
-                    (self.limbs(), self.abs_size(), other.limbs(), other.abs_size())
+                    (
+                        self.limbs(),
+                        self.abs_size(),
+                        other.limbs(),
+                        other.abs_size(),
+                    )
                 } else {
                     self.ensure_capacity(other.abs_size() as u32);
-                    (other.limbs(), other.abs_size(), self.limbs(), self.abs_size())
+                    (
+                        other.limbs(),
+                        other.abs_size(),
+                        self.limbs(),
+                        self.abs_size(),
+                    )
                 };
 
                 // Fetch the pointer first to make completely sure the compiler
                 // won't make bogus claims about nonaliasing due to the &mut
                 let ptr = self.limbs_uninit();
 
-                let carry = ll::add(ptr,
-                                    xp, xs,
-                                    yp, ys);
+                let carry = ll::add(ptr, xp, xs, yp, ys);
                 self.size = xs * sign;
                 if carry != 0 {
                     self.push(carry);
@@ -1172,10 +1190,8 @@ impl<'a> AddAssign<&'a Int> for Int {
                             self.size = 0;
                             return;
                         }
-                        Ordering::Greater =>
-                            (self.limbs(), self.size, other.limbs(), other.size),
-                        Ordering::Less =>
-                            (other.limbs(), other.size, self.limbs(), self.size)
+                        Ordering::Greater => (self.limbs(), self.size, other.limbs(), other.size),
+                        Ordering::Less => (other.limbs(), other.size, self.limbs(), self.size),
                     }
                 };
 
@@ -1183,9 +1199,7 @@ impl<'a> AddAssign<&'a Int> for Int {
                 // won't make bogus claims about nonaliasing due to the &mut
                 let ptr = self.limbs_uninit();
 
-                let _borrow = ll::sub(ptr,
-                                      xp, xs.abs(),
-                                      yp, ys.abs());
+                let _borrow = ll::sub(ptr, xp, xs.abs(), yp, ys.abs());
                 // There shouldn't be any borrow
                 debug_assert!(_borrow == 0);
 
@@ -1282,7 +1296,9 @@ impl<'a, 'b> Add<&'a Int> for &'b Int {
 impl SubAssign<Limb> for Int {
     fn sub_assign(&mut self, other: Limb) {
         debug_assert!(self.well_formed());
-        if other == 0 { return; }
+        if other == 0 {
+            return;
+        }
 
         // No capacity means `self` is zero. Just push the limb.
         if self.cap == 0 {
@@ -1367,8 +1383,9 @@ impl<'a> SubAssign<&'a Int> for Int {
                         self.ensure_capacity(other.abs_size() as u32);
                         (other.limbs(), other.size, self.limbs(), self.size, true)
                     }
-                    Ordering::Greater =>
+                    Ordering::Greater => {
                         (self.limbs(), self.size, other.limbs(), other.size, false)
+                    }
                 };
 
                 // Fetch the pointer first to make completely sure the compiler
@@ -1377,15 +1394,12 @@ impl<'a> SubAssign<&'a Int> for Int {
 
                 let _borrow = ll::sub(ptr, xp, xs.abs(), yp, ys.abs());
                 debug_assert!(_borrow == 0);
-                self.size = if flip {
-                    xs * -1
-                } else {
-                    xs
-                };
+                self.size = if flip { xs * -1 } else { xs };
             }
 
             self.normalize();
-        } else { // Different signs
+        } else {
+            // Different signs
             if self.sign() == -1 {
                 // self is negative, use addition and negation
                 self.size *= -1;
@@ -1395,10 +1409,20 @@ impl<'a> SubAssign<&'a Int> for Int {
                 unsafe {
                     // Other is negative, handle as addition
                     let (xp, xs, yp, ys) = if self.abs_size() >= other.abs_size() {
-                        (self.limbs(), self.abs_size(), other.limbs(), other.abs_size())
+                        (
+                            self.limbs(),
+                            self.abs_size(),
+                            other.limbs(),
+                            other.abs_size(),
+                        )
                     } else {
                         self.ensure_capacity(other.abs_size() as u32);
-                        (other.limbs(), other.abs_size(), self.limbs(), self.abs_size())
+                        (
+                            other.limbs(),
+                            other.abs_size(),
+                            self.limbs(),
+                            self.abs_size(),
+                        )
                     };
 
                     // Fetch the pointer first to make completely sure the compiler
@@ -1561,9 +1585,19 @@ impl<'a, 'b> Mul<&'a Int> for &'b Int {
 
         unsafe {
             let (xp, xs, yp, ys) = if self.abs_size() >= other.abs_size() {
-                (self.limbs(), self.abs_size(), other.limbs(), other.abs_size())
+                (
+                    self.limbs(),
+                    self.abs_size(),
+                    other.limbs(),
+                    other.abs_size(),
+                )
             } else {
-                (other.limbs(), other.abs_size(), self.limbs(), self.abs_size())
+                (
+                    other.limbs(),
+                    other.abs_size(),
+                    self.limbs(),
+                    self.abs_size(),
+                )
             };
             ll::mul(out.limbs_mut(), xp, xs, yp, ys);
 
@@ -1797,7 +1831,6 @@ impl RemAssign<Limb> for Int {
                 // Shrink self, since it's at least 8 times bigger than necessary
                 self.shrink_to_fit();
             }
-
         }
     }
 }
@@ -1816,7 +1849,8 @@ impl DivRem<Limb> for Int {
             return (self, Limb(0));
         }
 
-        let rem = unsafe { ll::divrem_1(self.limbs_mut(), 0, self.limbs(), self.abs_size(), other) };
+        let rem =
+            unsafe { ll::divrem_1(self.limbs_mut(), 0, self.limbs(), self.abs_size(), other) };
         self.normalize();
         return (self, rem);
     }
@@ -1918,7 +1952,9 @@ impl ShlAssign<usize> for Int {
     #[inline]
     fn shl_assign(&mut self, mut cnt: usize) {
         debug_assert!(self.well_formed());
-        if self.sign() == 0 { return; }
+        if self.sign() == 0 {
+            return;
+        }
 
         if cnt >= Limb::BITS as usize {
             let extra_limbs = (cnt / Limb::BITS as usize) as u32;
@@ -1941,7 +1977,9 @@ impl ShlAssign<usize> for Int {
 
         debug_assert!(cnt < Limb::BITS as usize);
 
-        if cnt == 0 { return; }
+        if cnt == 0 {
+            return;
+        }
 
         let size = self.abs_size();
 
@@ -1980,7 +2018,9 @@ impl ShrAssign<usize> for Int {
     #[inline]
     fn shr_assign(&mut self, mut cnt: usize) {
         debug_assert!(self.well_formed());
-        if self.sign() == 0 { return; }
+        if self.sign() == 0 {
+            return;
+        }
 
         if cnt >= Limb::BITS as usize {
             let removed_limbs = (cnt / Limb::BITS as usize) as u32;
@@ -2000,15 +2040,16 @@ impl ShrAssign<usize> for Int {
                 // Shift down a whole number of limbs
                 ll::copy_incr(shift.as_const(), ptr, new_size);
                 // Zero out the high limbs
-                ll::zero(ptr.offset(new_size as isize),
-                         removed_limbs as i32);
+                ll::zero(ptr.offset(new_size as isize), removed_limbs as i32);
 
                 self.size = new_size * self.sign();
             }
         }
 
         debug_assert!(cnt < Limb::BITS as usize);
-        if cnt == 0 { return; }
+        if cnt == 0 {
+            return;
+        }
 
         let size = self.abs_size();
 
@@ -2042,7 +2083,11 @@ impl Shr<usize> for Int {
 }
 
 #[derive(Copy, Clone)]
-enum BitOp { And, Or, Xor }
+enum BitOp {
+    And,
+    Or,
+    Xor,
+}
 
 fn bitop_ref(this: &mut Int, other: &Int, op: BitOp) -> Result<(), ()> {
     let this_sign = this.sign();
@@ -2059,7 +2104,7 @@ fn bitop_ref(this: &mut Int, other: &Int, op: BitOp) -> Result<(), ()> {
                 // complement form (NB. that if other is positive, we
                 // don't need to worry about two's complement, since
                 // bitop_limb can handle unsigned Limbs)
-                return Err(())
+                return Err(());
             } else {
                 limb = -limb;
             }
@@ -2072,7 +2117,7 @@ fn bitop_ref(this: &mut Int, other: &Int, op: BitOp) -> Result<(), ()> {
     }
 
     if this_sign < 0 || other_sign < 0 {
-        return Err(())
+        return Err(());
     }
 
     unsafe {
@@ -2140,15 +2185,13 @@ fn bitop_neg(mut a: Int, mut b: Int, op: BitOp) -> Int {
             BitOp::And => {
                 ll::and_n(a_ptr, a_ptr.as_const(), b_ptr, min_size);
 
-                (a_sign < 0 && b_sign < 0,
-                 b_sign < 0)
+                (a_sign < 0 && b_sign < 0, b_sign < 0)
             }
             BitOp::Or => {
                 ll::or_n(a_ptr, a_ptr.as_const(), b_ptr, min_size);
                 // (no need to copy trailing, a is longer than b)
 
-                (a_sign < 0 || b_sign < 0,
-                 b_sign >= 0)
+                (a_sign < 0 || b_sign < 0, b_sign >= 0)
             }
             BitOp::Xor => {
                 ll::xor_n(a_ptr, a_ptr.as_const(), b_ptr, min_size);
@@ -2156,16 +2199,11 @@ fn bitop_neg(mut a: Int, mut b: Int, op: BitOp) -> Int {
                     let ptr = a_ptr.offset(min_size as isize);
                     ll::not(ptr, ptr.as_const(), max_size - min_size);
                 }
-                ((a_sign < 0) ^ (b_sign < 0),
-                 true)
+                ((a_sign < 0) ^ (b_sign < 0), true)
             }
         };
 
-        a.size = if use_max_size {
-            max_size
-        } else {
-            min_size
-        };
+        a.size = if use_max_size { max_size } else { min_size };
         if neg_result {
             a.negate_twos_complement();
         }
@@ -2182,7 +2220,13 @@ fn bitop_neg(mut a: Int, mut b: Int, op: BitOp) -> Int {
 fn bitop_limb(a: &mut Int, b: Limb, signed: bool, op: BitOp) {
     let a_sign = a.sign();
     let b_negative = signed && b.high_bit_set();
-    let b_sign = if b_negative { -1 } else if b == 0 { 0 } else { 1 };
+    let b_sign = if b_negative {
+        -1
+    } else if b == 0 {
+        0
+    } else {
+        1
+    };
 
     if a_sign < 0 {
         a.negate_twos_complement();
@@ -2214,13 +2258,11 @@ fn bitop_limb(a: &mut Int, b: Limb, signed: bool, op: BitOp) {
             let (neg_result, use_max_size) = match op {
                 BitOp::And => {
                     *a_ptr = *a_ptr & b;
-                    (a_sign < 0 && b_sign < 0,
-                     b_sign < 0)
+                    (a_sign < 0 && b_sign < 0, b_sign < 0)
                 }
                 BitOp::Or => {
                     *a_ptr = *a_ptr | b;
-                    (a_sign < 0 || b_sign < 0,
-                     b_sign >= 0)
+                    (a_sign < 0 || b_sign < 0, b_sign >= 0)
                 }
                 BitOp::Xor => {
                     *a_ptr = *a_ptr ^ b;
@@ -2228,15 +2270,10 @@ fn bitop_limb(a: &mut Int, b: Limb, signed: bool, op: BitOp) {
                         let ptr = a_ptr.offset(min_size as isize);
                         ll::not(ptr, ptr.as_const(), max_size - min_size);
                     }
-                    ((a_sign < 0) ^ (b_sign < 0),
-                     true)
+                    ((a_sign < 0) ^ (b_sign < 0), true)
                 }
             };
-            a.size = if use_max_size {
-                max_size
-            } else {
-                min_size
-            };
+            a.size = if use_max_size { max_size } else { min_size };
             if neg_result {
                 a.negate_twos_complement();
             }
@@ -3134,7 +3171,9 @@ impl PartialEq<i32> for Int {
         // We can't fall back to the `== Limb` impl when self is negative
         // since it'll fail because of signs
         if sign < 0 {
-            if self.abs_size() > 1 { return false; }
+            if self.abs_size() > 1 {
+                return false;
+            }
             return *self.limbs() == (other.abs() as BaseInt);
         }
 
@@ -3170,13 +3209,16 @@ impl PartialOrd<i32> for Int {
             Ordering::Greater
         } else if self_sign < other_sign {
             Ordering::Less
-        } else { // Now both signs are the same, and non-zero
+        } else {
+            // Now both signs are the same, and non-zero
 
             if self_sign < 0 {
                 if self.abs_size() > 1 {
                     Ordering::Less
                 } else {
-                    self.to_single_limb().cmp(&Limb(other.abs() as BaseInt)).reverse()
+                    self.to_single_limb()
+                        .cmp(&Limb(other.abs() as BaseInt))
+                        .reverse()
                 }
             } else {
                 return self.partial_cmp(&Limb(other.abs() as BaseInt));
@@ -3222,19 +3264,23 @@ impl PartialOrd<Int> for usize {
     }
 }
 
-
 const MAX_LIMB: u64 = !0 >> (64 - Limb::BITS);
 
 // do a sign-magnitude comparison
 fn eq_64(x: &Int, mag: u64, neg: bool) -> bool {
-    let sign = if mag == 0 { 0 } else if neg { -1 } else { 1 };
+    let sign = if mag == 0 {
+        0
+    } else if neg {
+        -1
+    } else {
+        1
+    };
     if x.sign() != sign {
-        return false
+        return false;
     } else if mag == 0 {
         // we're guaranteed to have x == 0 since the signs match
-        return true
+        return true;
     }
-
 
     let abs_size = x.abs_size();
     debug_assert!(abs_size >= 1);
@@ -3249,9 +3295,8 @@ fn eq_64(x: &Int, mag: u64, neg: bool) -> bool {
         assert_eq!(Limb::BITS, 32);
 
         if abs_size == 2 {
-            let hi_limb = unsafe {*ptr.offset(1)};
-            hi_limb.0 == (mag >> 32) as BaseInt
-                && lo_limb.0 == mag as BaseInt
+            let hi_limb = unsafe { *ptr.offset(1) };
+            hi_limb.0 == (mag >> 32) as BaseInt && lo_limb.0 == mag as BaseInt
         } else {
             false
         }
@@ -3260,13 +3305,13 @@ fn eq_64(x: &Int, mag: u64, neg: bool) -> bool {
 
 fn cmp_64(x: &Int, mag: u64, neg: bool) -> Ordering {
     if mag == 0 {
-        return x.sign().cmp(&0)
+        return x.sign().cmp(&0);
     }
 
     let size = x.size;
     if (size < 0) != neg || size == 0 {
         // they have different signs
-        return size.cmp(&if neg {-1} else {1})
+        return size.cmp(&if neg { -1 } else { 1 });
     }
     let ptr = x.limbs();
     let lo_limb = *ptr;
@@ -3279,11 +3324,10 @@ fn cmp_64(x: &Int, mag: u64, neg: bool) -> Ordering {
         let hi_limb = if size.abs() == 1 {
             Limb(0)
         } else {
-            unsafe {*ptr.offset(1)}
+            unsafe { *ptr.offset(1) }
         };
 
-        (size.abs(), hi_limb.0, lo_limb.0)
-            .cmp(&(2, (mag >> 32) as BaseInt, mag as BaseInt))
+        (size.abs(), hi_limb.0, lo_limb.0).cmp(&(2, (mag >> 32) as BaseInt, mag as BaseInt))
     };
     if size < 0 && neg {
         // both negative, so the magnitude orderings need to be
@@ -3451,10 +3495,10 @@ macro_rules! impl_fmt (
     }
 );
 
-impl_fmt!(fmt::Binary,    2, "0b");
-impl_fmt!(fmt::Octal,     8, "0o");
-impl_fmt!(fmt::Display,  10, "");
-impl_fmt!(fmt::Debug,    10, "");
+impl_fmt!(fmt::Binary, 2, "0b");
+impl_fmt!(fmt::Octal, 8, "0o");
+impl_fmt!(fmt::Display, 10, "");
+impl_fmt!(fmt::Debug, 10, "");
 impl_fmt!(fmt::LowerHex, 16, false, "0x");
 impl_fmt!(fmt::UpperHex, 16, true, "0x");
 
@@ -3462,19 +3506,21 @@ impl_fmt!(fmt::UpperHex, 16, true, "0x");
 ///
 /// [`Int`]: struct.Int.html
 #[derive(Debug, Clone, PartialEq)]
-pub struct ParseIntError { kind: ErrorKind }
+pub struct ParseIntError {
+    kind: ErrorKind,
+}
 
 #[derive(Debug, Clone, PartialEq)]
 enum ErrorKind {
     Empty,
-    InvalidDigit
+    InvalidDigit,
 }
 
 impl Error for ParseIntError {
     fn description<'a>(&'a self) -> &'a str {
         match self.kind {
             ErrorKind::Empty => "cannot parse empty string",
-            ErrorKind::InvalidDigit => "invalid digit found in string"
+            ErrorKind::InvalidDigit => "invalid digit found in string",
         }
     }
 }
@@ -3581,7 +3627,7 @@ impl Zero for Int {
         Int {
             ptr: Unique::empty(),
             size: 0,
-            cap: 0
+            cap: 0,
         }
     }
 
@@ -3770,7 +3816,7 @@ impl<R: Rng> RandomInt for R {
         // If we haven't got a valid number after 10,000 tries, then something
         // has probably gone wrong, as there is a 1 in 10^3000 chance of this
         // happening, in the worst case.
-        const ITER_LIMIT : usize = 10000;
+        const ITER_LIMIT: usize = 10000;
 
         let bits = bound.bit_length() as usize;
 
@@ -3782,12 +3828,17 @@ impl<R: Rng> RandomInt for R {
         let mut count = 0;
         while count < ITER_LIMIT {
             let n = self.gen_uint(bits);
-            if n < *bound { return n; }
+            if n < *bound {
+                return n;
+            }
             count += 1;
         }
 
-        panic!("No valid number generated in {} iterations.\n\
-                Please open an issue at https://github.com/Aatch/ramp", ITER_LIMIT);
+        panic!(
+            "No valid number generated in {} iterations.\n\
+             Please open an issue at https://github.com/Aatch/ramp",
+            ITER_LIMIT
+        );
     }
 
     fn gen_int_range(&mut self, lbound: &Int, ubound: &Int) -> Int {
@@ -3798,14 +3849,14 @@ impl<R: Rng> RandomInt for R {
 
 #[cfg(test)]
 mod test {
-    use std;
-    use std::hash::{Hash, Hasher};
-    use rand::{self, Rng};
-    use test::{self, Bencher};
     use super::*;
     use ll::limb::Limb;
-    use traits::DivRem;
+    use rand::{self, Rng};
+    use std;
+    use std::hash::{Hash, Hasher};
     use std::str::FromStr;
+    use test::{self, Bencher};
+    use traits::DivRem;
 
     macro_rules! assert_mp_eq (
         ($l:expr, $r:expr) => (
@@ -3823,18 +3874,18 @@ mod test {
     #[test]
     fn from_string_10() {
         let cases = [
-            ("0",        0i32),
-            ("123456",   123456),
-            ("0123",     123),
-            ("000000",   0),
-            ("-0",       0),
-            ("-1",       -1),
+            ("0", 0i32),
+            ("123456", 123456),
+            ("0123", 123),
+            ("000000", 0),
+            ("-0", 0),
+            ("-1", -1),
             ("-123456", -123456),
-            ("-0123",   -123),
+            ("-0123", -123),
         ];
 
         for &(s, n) in cases.iter() {
-            let i : Int = s.parse().unwrap();
+            let i: Int = s.parse().unwrap();
             assert_eq!(i, n);
         }
     }
@@ -3842,17 +3893,17 @@ mod test {
     #[test]
     fn from_string_16() {
         let cases = [
-            ("0",        0i32),
-            ("abcde",    0xabcde),
-            ("0ABC",     0xabc),
+            ("0", 0i32),
+            ("abcde", 0xabcde),
+            ("0ABC", 0xabc),
             ("12AB34cd", 0x12ab34cd),
-            ("-ABC",    -0xabc),
-            ("-0def",   -0xdef),
-            ("00000000000000000", 0)
+            ("-ABC", -0xabc),
+            ("-0def", -0xdef),
+            ("00000000000000000", 0),
         ];
 
         for &(s, n) in cases.iter() {
-            let i : Int = Int::from_str_radix(s, 16).unwrap();
+            let i: Int = Int::from_str_radix(s, 16).unwrap();
             assert_eq!(i, n, "Assertion failed: {:#x} != {:#x}", i, n);
         }
     }
@@ -3860,12 +3911,14 @@ mod test {
     #[test]
     fn to_string_10() {
         let cases = [
-            ("0",        Int::zero()),
-            ("1",        Int::from(1)),
-            ("123",      Int::from(123)),
-            ("-456",     Int::from(-456)),
-            ("987654321012345678910111213",
-             Int::from_str("987654321012345678910111213").unwrap()),
+            ("0", Int::zero()),
+            ("1", Int::from(1)),
+            ("123", Int::from(123)),
+            ("-456", Int::from(-456)),
+            (
+                "987654321012345678910111213",
+                Int::from_str("987654321012345678910111213").unwrap(),
+            ),
         ];
 
         for &(s, ref n) in cases.iter() {
@@ -3876,13 +3929,15 @@ mod test {
     #[test]
     fn to_string_16() {
         let cases = [
-            ("0",        Int::zero()),
-            ("1",        Int::from(1)),
-            ("-1",       Int::from(-1)),
-            ("abc",      Int::from(0xabc)),
-            ("-456",     Int::from(-0x456)),
-            ("987654321012345678910111213",
-             Int::from_str_radix("987654321012345678910111213", 16).unwrap()),
+            ("0", Int::zero()),
+            ("1", Int::from(1)),
+            ("-1", Int::from(-1)),
+            ("abc", Int::from(0xabc)),
+            ("-456", Int::from(-0x456)),
+            (
+                "987654321012345678910111213",
+                Int::from_str_radix("987654321012345678910111213", 16).unwrap(),
+            ),
         ];
 
         for &(s, ref n) in cases.iter() {
@@ -3892,7 +3947,7 @@ mod test {
 
     #[test]
     fn num_base_digits_pow2() {
-        use ::ll::base::num_base_digits;
+        use ll::base::num_base_digits;
         let cases = [
             ("10", 2, 4), // 0b 1010
             ("15", 2, 4), // 0b 1111
@@ -3914,22 +3969,21 @@ mod test {
             ("13407807929942597099574024998205846127479365820592393377723561443721764030073546976801874298166903427690031858186486050853753882811946569946433649006084096", 2, 513), // 513 bits -> 2 Limbs
         ];
         for &(s, base, digits) in cases.iter() {
-            let i : Int = s.parse().unwrap();
+            let i: Int = s.parse().unwrap();
             unsafe {
-                assert_eq!(digits,
-                           num_base_digits(i.limbs(), i.abs_size(), base));
+                assert_eq!(digits, num_base_digits(i.limbs(), i.abs_size(), base));
             }
         }
     }
 
     #[test]
     fn num_base_digits() {
-        use ::ll::base::num_base_digits;
+        use ll::base::num_base_digits;
         let cases = [
             ("0", 15, 1),
             ("0", 58, 1),
             ("49172", 10, 5),
-            ("49172", 57, 3), // [15, 7, 38], 38 + 7*57 + 15*57**2 = 49172
+            ("49172", 57, 3),  // [15, 7, 38], 38 + 7*57 + 15*57**2 = 49172
             ("185192", 57, 3), // [56, 56, 56], 56 + 56*57 + 56*57**2 = 185192
             ("185193", 57, 4), // [1, 0, 0, 0], 1*57**3 = 185193
             ("250046", 63, 3), // [62, 62, 62], 62 + 62*63 + 62*63**2 = 250046
@@ -3938,7 +3992,7 @@ mod test {
             ("274625", 65, 4), // [1, 0, 0, 0], 1*65**3 = 274625
         ];
         for &(s, base, digits) in cases.iter() {
-            let i : Int = s.parse().unwrap();
+            let i: Int = s.parse().unwrap();
             unsafe {
                 let estimate = num_base_digits(i.limbs(), i.abs_size(), base);
                 assert!(digits == estimate || digits == estimate - 1);
@@ -3948,14 +4002,23 @@ mod test {
 
     #[test]
     fn pow() {
-        let bases = ["0", "1", "190000000000000", "192834857324591531",
-                     "340282366920938463463374607431768211456", // 2**128
-                     "100000000", "-1", "-100", "-200", "-192834857324591531",
-                     "-431343873217510631841",
-                     "-340282366920938463463374607431768211456"];
+        let bases = [
+            "0",
+            "1",
+            "190000000000000",
+            "192834857324591531",
+            "340282366920938463463374607431768211456", // 2**128
+            "100000000",
+            "-1",
+            "-100",
+            "-200",
+            "-192834857324591531",
+            "-431343873217510631841",
+            "-340282366920938463463374607431768211456",
+        ];
 
         for b in bases.iter() {
-            let b : Int = b.parse().unwrap();
+            let b: Int = b.parse().unwrap();
             let mut x = Int::one();
             for e in 0..512 {
                 let a = &b.pow(e);
@@ -4007,53 +4070,278 @@ mod test {
     #[test]
     fn pow_mod() {
         let bases = [
-            "0", "1", "190000000000000", "192834857324591531",
-            "340282366920938463463374607431768211456", "100000000", "-1", "-100", "-200",
-            "-192834857324591531", "-431343873217510631841",
-            "-340282366920938463463374607431768211456"
+            "0",
+            "1",
+            "190000000000000",
+            "192834857324591531",
+            "340282366920938463463374607431768211456",
+            "100000000",
+            "-1",
+            "-100",
+            "-200",
+            "-192834857324591531",
+            "-431343873217510631841",
+            "-340282366920938463463374607431768211456",
         ];
         let moduli = [
-            "1", "2", "77", "102847", "923847928374928374928098123", "-1", "-2", "-77", "-102847",
-            "-923847928374928374928098123"
+            "1",
+            "2",
+            "77",
+            "102847",
+            "923847928374928374928098123",
+            "-1",
+            "-2",
+            "-77",
+            "-102847",
+            "-923847928374928374928098123",
         ];
 
         let big_expt1: Int = "983459824098102".parse().unwrap();
         let big_results1 = [
-            "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "1", "1", "1", "1", "0", "1",
-            "1", "1", "1", "0", "0", "64", "81700", "650397494965841282553028378", "0", "0", "64",
-            "81700", "650397494965841282553028378", "0", "1", "14", "2984",
-            "293908402213598797808604757", "0", "1", "14", "2984", "293908402213598797808604757",
-            "0", "0", "64", "79782", "294430149849779620413037114", "0", "0", "64", "79782",
-            "294430149849779620413037114", "0", "0", "1", "45620", "410140929051586324284535549",
-            "0", "0", "1", "45620", "410140929051586324284535549", "0", "1", "1", "1", "1", "0",
-            "1", "1", "1", "1", "0", "0", "1", "64031", "36844801842501039220835119", "0", "0",
-            "1", "64031", "36844801842501039220835119", "0", "0", "15", "2604",
-            "177460521562747360312778824", "0", "0", "15", "2604", "177460521562747360312778824",
-            "0", "1", "14", "2984", "293908402213598797808604757", "0", "1", "14", "2984",
-            "293908402213598797808604757", "0", "1", "1", "18906", "873601645071303646536712038",
-            "0", "1", "1", "18906", "873601645071303646536712038", "0", "0", "64", "79782",
-            "294430149849779620413037114", "0", "0", "64", "79782", "294430149849779620413037114"
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "1",
+            "1",
+            "1",
+            "1",
+            "0",
+            "1",
+            "1",
+            "1",
+            "1",
+            "0",
+            "0",
+            "64",
+            "81700",
+            "650397494965841282553028378",
+            "0",
+            "0",
+            "64",
+            "81700",
+            "650397494965841282553028378",
+            "0",
+            "1",
+            "14",
+            "2984",
+            "293908402213598797808604757",
+            "0",
+            "1",
+            "14",
+            "2984",
+            "293908402213598797808604757",
+            "0",
+            "0",
+            "64",
+            "79782",
+            "294430149849779620413037114",
+            "0",
+            "0",
+            "64",
+            "79782",
+            "294430149849779620413037114",
+            "0",
+            "0",
+            "1",
+            "45620",
+            "410140929051586324284535549",
+            "0",
+            "0",
+            "1",
+            "45620",
+            "410140929051586324284535549",
+            "0",
+            "1",
+            "1",
+            "1",
+            "1",
+            "0",
+            "1",
+            "1",
+            "1",
+            "1",
+            "0",
+            "0",
+            "1",
+            "64031",
+            "36844801842501039220835119",
+            "0",
+            "0",
+            "1",
+            "64031",
+            "36844801842501039220835119",
+            "0",
+            "0",
+            "15",
+            "2604",
+            "177460521562747360312778824",
+            "0",
+            "0",
+            "15",
+            "2604",
+            "177460521562747360312778824",
+            "0",
+            "1",
+            "14",
+            "2984",
+            "293908402213598797808604757",
+            "0",
+            "1",
+            "14",
+            "2984",
+            "293908402213598797808604757",
+            "0",
+            "1",
+            "1",
+            "18906",
+            "873601645071303646536712038",
+            "0",
+            "1",
+            "1",
+            "18906",
+            "873601645071303646536712038",
+            "0",
+            "0",
+            "64",
+            "79782",
+            "294430149849779620413037114",
+            "0",
+            "0",
+            "64",
+            "79782",
+            "294430149849779620413037114",
         ];
 
         let big_expt2: Int = "30297523982304983".parse().unwrap();
         let big_results2 = [
-            "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "1", "1", "1", "1", "0", "1",
-            "1", "1", "1", "0", "0", "71", "95361", "176018964989535053333805796", "0", "0", "71",
-            "95361", "176018964989535053333805796", "0", "1", "70", "97130",
-            "379622449400387577033857765", "0", "1", "70", "97130", "379622449400387577033857765",
-            "0", "0", "16", "22931", "923257520141185284248663506", "0", "0", "16", "22931",
-            "923257520141185284248663506", "0", "0", "67", "61927", "735007863677635702331962114",
-            "0", "0", "67", "61927", "735007863677635702331962114", "0", "-1", "-1", "-1", "-1",
-            "0", "-1", "-1", "-1", "-1", "0", "0", "-67", "-50340", "-639061946068491056215087558",
-            "0", "0", "-67", "-50340", "-639061946068491056215087558", "0", "0", "-30", "-48472",
-            "-783769839004928514409300748", "0", "0", "-30", "-48472",
-            "-783769839004928514409300748", "0", "-1", "-70", "-97130",
-            "-379622449400387577033857765", "0", "-1", "-70", "-97130",
-            "-379622449400387577033857765", "0", "-1", "-1", "-55833",
-            "-913941961265646087594551688", "0", "-1", "-1", "-55833",
-            "-913941961265646087594551688", "0", "0", "-16", "-22931",
-            "-923257520141185284248663506", "0", "0", "-16", "-22931",
-            "-923257520141185284248663506"
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "1",
+            "1",
+            "1",
+            "1",
+            "0",
+            "1",
+            "1",
+            "1",
+            "1",
+            "0",
+            "0",
+            "71",
+            "95361",
+            "176018964989535053333805796",
+            "0",
+            "0",
+            "71",
+            "95361",
+            "176018964989535053333805796",
+            "0",
+            "1",
+            "70",
+            "97130",
+            "379622449400387577033857765",
+            "0",
+            "1",
+            "70",
+            "97130",
+            "379622449400387577033857765",
+            "0",
+            "0",
+            "16",
+            "22931",
+            "923257520141185284248663506",
+            "0",
+            "0",
+            "16",
+            "22931",
+            "923257520141185284248663506",
+            "0",
+            "0",
+            "67",
+            "61927",
+            "735007863677635702331962114",
+            "0",
+            "0",
+            "67",
+            "61927",
+            "735007863677635702331962114",
+            "0",
+            "-1",
+            "-1",
+            "-1",
+            "-1",
+            "0",
+            "-1",
+            "-1",
+            "-1",
+            "-1",
+            "0",
+            "0",
+            "-67",
+            "-50340",
+            "-639061946068491056215087558",
+            "0",
+            "0",
+            "-67",
+            "-50340",
+            "-639061946068491056215087558",
+            "0",
+            "0",
+            "-30",
+            "-48472",
+            "-783769839004928514409300748",
+            "0",
+            "0",
+            "-30",
+            "-48472",
+            "-783769839004928514409300748",
+            "0",
+            "-1",
+            "-70",
+            "-97130",
+            "-379622449400387577033857765",
+            "0",
+            "-1",
+            "-70",
+            "-97130",
+            "-379622449400387577033857765",
+            "0",
+            "-1",
+            "-1",
+            "-55833",
+            "-913941961265646087594551688",
+            "0",
+            "-1",
+            "-1",
+            "-55833",
+            "-913941961265646087594551688",
+            "0",
+            "0",
+            "-16",
+            "-22931",
+            "-923257520141185284248663506",
+            "0",
+            "0",
+            "-16",
+            "-22931",
+            "-923257520141185284248663506",
         ];
 
         // Do the calculations for small expts first. Just do up to 80
@@ -4081,7 +4369,7 @@ mod test {
                     let m: Int = m.parse().unwrap();
                     let a = b.pow_mod(&big_expt, &m);
 
-                    let expected: Int = big_results[b_i*moduli.len() + m_i].parse().unwrap();
+                    let expected: Int = big_results[b_i * moduli.len() + m_i].parse().unwrap();
                     assert_mp_eq!(a, expected);
                 }
             }
@@ -4113,21 +4401,32 @@ mod test {
             ("1", "0", "1"),
             ("1", "1", "2"),
             ("190000000000000", "1", "190000000000001"),
-            ("192834857324591531", "431343873217510631841", "431536708074835223372"),
+            (
+                "192834857324591531",
+                "431343873217510631841",
+                "431536708074835223372",
+            ),
             ("0", "-1", "-1"),
             ("1", "-1", "0"),
             ("100000000", "-1", "99999999"),
             ("-100", "-100", "-200"),
-            ("-192834857324591531", "-431343873217510631841", "-431536708074835223372"),
+            (
+                "-192834857324591531",
+                "-431343873217510631841",
+                "-431536708074835223372",
+            ),
             // (2**64 - 1) * 2**64 + 2**64 == 2**128
-            ("340282366920938463444927863358058659840", "18446744073709551616",
-             "340282366920938463463374607431768211456"),
+            (
+                "340282366920938463444927863358058659840",
+                "18446744073709551616",
+                "340282366920938463463374607431768211456",
+            ),
         ];
 
         for &(l, r, a) in cases.iter() {
-            let l : Int = l.parse().unwrap();
-            let r : Int = r.parse().unwrap();
-            let a : Int = a.parse().unwrap();
+            let l: Int = l.parse().unwrap();
+            let r: Int = r.parse().unwrap();
+            let a: Int = a.parse().unwrap();
 
             assert_mp_eq!(l + r, a);
         }
@@ -4141,23 +4440,34 @@ mod test {
             ("1", "1", "0"),
             ("0", "1", "-1"),
             ("190000000000000", "1", "189999999999999"),
-            ("192834857324591531", "431343873217510631841", "-431151038360186040310"),
+            (
+                "192834857324591531",
+                "431343873217510631841",
+                "-431151038360186040310",
+            ),
             ("0", "-1", "1"),
             ("1", "-1", "2"),
             ("100000000", "-1", "100000001"),
             ("-100", "-100", "0"),
             ("-100", "100", "-200"),
             ("237", "236", "1"),
-            ("-192834857324591531", "-431343873217510631841", "431151038360186040310"),
+            (
+                "-192834857324591531",
+                "-431343873217510631841",
+                "431151038360186040310",
+            ),
             // (2**64 - 1) * 2**64 - -2**64 == 2**128
-            ("340282366920938463444927863358058659840", "-18446744073709551616",
-             "340282366920938463463374607431768211456"),
+            (
+                "340282366920938463444927863358058659840",
+                "-18446744073709551616",
+                "340282366920938463463374607431768211456",
+            ),
         ];
 
         for &(l, r, a) in cases.iter() {
-            let l : Int = l.parse().unwrap();
-            let r : Int = r.parse().unwrap();
-            let a : Int = a.parse().unwrap();
+            let l: Int = l.parse().unwrap();
+            let r: Int = r.parse().unwrap();
+            let a: Int = a.parse().unwrap();
 
             assert_mp_eq!(&l - &r, a.clone());
             assert_mp_eq!(&l - r.clone(), a.clone());
@@ -4176,14 +4486,22 @@ mod test {
             ("8", "9", "72"),
             ("-8", "-9", "72"),
             ("8", "-9", "-72"),
-            ("1234567891011", "9876543210123", "12193263121400563935904353"),
-            ("-1234567891011", "9876543210123", "-12193263121400563935904353"),
+            (
+                "1234567891011",
+                "9876543210123",
+                "12193263121400563935904353",
+            ),
+            (
+                "-1234567891011",
+                "9876543210123",
+                "-12193263121400563935904353",
+            ),
         ];
 
         for &(l, r, a) in cases.iter() {
-            let l : Int = l.parse().unwrap();
-            let r : Int = r.parse().unwrap();
-            let a : Int = a.parse().unwrap();
+            let l: Int = l.parse().unwrap();
+            let r: Int = r.parse().unwrap();
+            let a: Int = a.parse().unwrap();
 
             assert_mp_eq!(l * r, a);
         }
@@ -4204,9 +4522,9 @@ mod test {
         ];
 
         for &(l, r, a) in cases.iter() {
-            let l : Int = l.parse().unwrap();
-            let r : Int = r.parse().unwrap();
-            let a : Int = a.parse().unwrap();
+            let l: Int = l.parse().unwrap();
+            let r: Int = r.parse().unwrap();
+            let a: Int = a.parse().unwrap();
 
             let val = &l / &r;
             assert_mp_eq!(val, a);
@@ -4227,28 +4545,44 @@ mod test {
             ("1", "2", "1"),
             ("100", "2", "0"),
             ("100", "3", "1"),
-            ("234129835798275032157029375235", "4382109473241242142341234", "2490861941946976021925083"),
+            (
+                "234129835798275032157029375235",
+                "4382109473241242142341234",
+                "2490861941946976021925083",
+            ),
             ("-2", "1", "0"),
             ("-1", "2", "-1"),
             ("-100", "2", "0"),
             ("-100", "3", "-1"),
-            ("-234129835798275032157029375235", "4382109473241242142341234", "-2490861941946976021925083"),
+            (
+                "-234129835798275032157029375235",
+                "4382109473241242142341234",
+                "-2490861941946976021925083",
+            ),
             ("2", "-1", "0"),
             ("1", "-2", "1"),
             ("100", "-2", "0"),
             ("100", "-3", "1"),
-            ("234129835798275032157029375235", "-4382109473241242142341234", "2490861941946976021925083"),
+            (
+                "234129835798275032157029375235",
+                "-4382109473241242142341234",
+                "2490861941946976021925083",
+            ),
             ("-2", "-1", "0"),
             ("-1", "-2", "-1"),
             ("-100", "-2", "0"),
             ("-100", "-3", "-1"),
-            ("-234129835798275032157029375235", "-4382109473241242142341234", "-2490861941946976021925083"),
+            (
+                "-234129835798275032157029375235",
+                "-4382109473241242142341234",
+                "-2490861941946976021925083",
+            ),
         ];
 
         for &(l, r, a) in cases.iter() {
-            let l : Int = l.parse().unwrap();
-            let r : Int = r.parse().unwrap();
-            let a : Int = a.parse().unwrap();
+            let l: Int = l.parse().unwrap();
+            let r: Int = r.parse().unwrap();
+            let a: Int = a.parse().unwrap();
 
             let val = &l % &r;
             assert_mp_eq!(val, a);
@@ -4285,18 +4619,27 @@ mod test {
             ("3", "1", "2"),
             ("4", "2", "0"),
             ("1000", "31", "39"),
-            ("15241578753238836750495351562536198787501905199875019052100",
-             "123456789012345678901234567890", "0"),
-            ("15241578753238836750495351562536198787501905199875019052099",
-             "123456789012345678901234567889", "246913578024691357802469135778"),
-            ("15241578753238836750495351562536198787501905199875019052101",
-             "123456789012345678901234567890", "1"),
-                ];
+            (
+                "15241578753238836750495351562536198787501905199875019052100",
+                "123456789012345678901234567890",
+                "0",
+            ),
+            (
+                "15241578753238836750495351562536198787501905199875019052099",
+                "123456789012345678901234567889",
+                "246913578024691357802469135778",
+            ),
+            (
+                "15241578753238836750495351562536198787501905199875019052101",
+                "123456789012345678901234567890",
+                "1",
+            ),
+        ];
 
         for &(x, sqrt, rem) in &cases {
-            let x : Int = x.parse().unwrap();
-            let sqrt : Int = sqrt.parse().unwrap();
-            let rem : Int = rem.parse().unwrap();
+            let x: Int = x.parse().unwrap();
+            let sqrt: Int = sqrt.parse().unwrap();
+            let rem: Int = rem.parse().unwrap();
 
             if x != 0 {
                 assert!((-&x).sqrt_rem().is_none());
@@ -4305,7 +4648,6 @@ mod test {
             let (s, r) = x.sqrt_rem().unwrap();
             assert_mp_eq!(s, sqrt);
             assert_mp_eq!(r, rem);
-
         }
     }
 
@@ -4318,18 +4660,42 @@ mod test {
             ("17", "-65", "17"),
             ("-17", "-65", "-81"),
             ("0", "543253451643657932075830214751263521", "0"),
-            ("-1", "543253451643657932075830214751263521", "543253451643657932075830214751263521"),
-            ("47398217493274092174042109472", "9843271092740214732017421", "152974816756326460458496"),
-            ("87641324986400000000000", "31470973247490321000000000000000", "2398658832415825854464"),
-            ("-87641324986400000000000", "31470973247490321000000000000000", "31470973245091662167584174145536"),
-            ("87641324986400000000000", "-31470973247490321000000000000000", "85242666153984174129152"),
-            ("-87641324986400000000000", "-31470973247490321000000000000000", "-31470973332732987153984174129152"),
+            (
+                "-1",
+                "543253451643657932075830214751263521",
+                "543253451643657932075830214751263521",
+            ),
+            (
+                "47398217493274092174042109472",
+                "9843271092740214732017421",
+                "152974816756326460458496",
+            ),
+            (
+                "87641324986400000000000",
+                "31470973247490321000000000000000",
+                "2398658832415825854464",
+            ),
+            (
+                "-87641324986400000000000",
+                "31470973247490321000000000000000",
+                "31470973245091662167584174145536",
+            ),
+            (
+                "87641324986400000000000",
+                "-31470973247490321000000000000000",
+                "85242666153984174129152",
+            ),
+            (
+                "-87641324986400000000000",
+                "-31470973247490321000000000000000",
+                "-31470973332732987153984174129152",
+            ),
         ];
 
         for &(l_, r_, a) in cases.iter() {
-            let l : Int = l_.parse().unwrap();
-            let r : Int = r_.parse().unwrap();
-            let a : Int = a.parse().unwrap();
+            let l: Int = l_.parse().unwrap();
+            let r: Int = r_.parse().unwrap();
+            let a: Int = a.parse().unwrap();
 
             let val = &l & &r;
             assert_mp_eq!(val, a);
@@ -4355,19 +4721,43 @@ mod test {
             ("-17", "65", "-17"),
             ("17", "-65", "-65"),
             ("-17", "-65", "-1"),
-            ("0", "543253451643657932075830214751263521", "543253451643657932075830214751263521"),
+            (
+                "0",
+                "543253451643657932075830214751263521",
+                "543253451643657932075830214751263521",
+            ),
             ("-1", "543253451643657932075830214751263521", "-1"),
-            ("47398217493274092174042109472", "9843271092740214732017421","47407907789550076062313668397"),
-            ("87641324986400000000000", "31470973247490321000000000000000", "31470973332732987153984174145536"),
-            ("-87641324986400000000000", "31470973247490321000000000000000", "-85242666153984174145536"),
-            ("87641324986400000000000", "-31470973247490321000000000000000", "-31470973245091662167584174129152"),
-            ("-87641324986400000000000", "-31470973247490321000000000000000", "-2398658832415825870848"),
+            (
+                "47398217493274092174042109472",
+                "9843271092740214732017421",
+                "47407907789550076062313668397",
+            ),
+            (
+                "87641324986400000000000",
+                "31470973247490321000000000000000",
+                "31470973332732987153984174145536",
+            ),
+            (
+                "-87641324986400000000000",
+                "31470973247490321000000000000000",
+                "-85242666153984174145536",
+            ),
+            (
+                "87641324986400000000000",
+                "-31470973247490321000000000000000",
+                "-31470973245091662167584174129152",
+            ),
+            (
+                "-87641324986400000000000",
+                "-31470973247490321000000000000000",
+                "-2398658832415825870848",
+            ),
         ];
 
         for &(l_, r_, a) in cases.iter() {
-            let l : Int = l_.parse().unwrap();
-            let r : Int = r_.parse().unwrap();
-            let a : Int = a.parse().unwrap();
+            let l: Int = l_.parse().unwrap();
+            let r: Int = r_.parse().unwrap();
+            let a: Int = a.parse().unwrap();
 
             let val = &l | &r;
             assert_mp_eq!(val, a);
@@ -4393,19 +4783,47 @@ mod test {
             ("-17", "65", "-82"),
             ("17", "-65", "-82"),
             ("-17", "-65", "80"),
-            ("0", "543253451643657932075830214751263521", "543253451643657932075830214751263521"),
-            ("-1", "543253451643657932075830214751263521", "-543253451643657932075830214751263522"),
-            ("47398217493274092174042109472", "9843271092740214732017421","47407754814733319735853209901"),
-            ("87641324986400000000000", "31470973247490321000000000000000", "31470973330334328321568348291072"),
-            ("-87641324986400000000000", "31470973247490321000000000000000", "-31470973330334328321568348291072"),
-            ("87641324986400000000000", "-31470973247490321000000000000000", "-31470973330334328321568348258304"),
-            ("-87641324986400000000000", "-31470973247490321000000000000000", "31470973330334328321568348258304"),
+            (
+                "0",
+                "543253451643657932075830214751263521",
+                "543253451643657932075830214751263521",
+            ),
+            (
+                "-1",
+                "543253451643657932075830214751263521",
+                "-543253451643657932075830214751263522",
+            ),
+            (
+                "47398217493274092174042109472",
+                "9843271092740214732017421",
+                "47407754814733319735853209901",
+            ),
+            (
+                "87641324986400000000000",
+                "31470973247490321000000000000000",
+                "31470973330334328321568348291072",
+            ),
+            (
+                "-87641324986400000000000",
+                "31470973247490321000000000000000",
+                "-31470973330334328321568348291072",
+            ),
+            (
+                "87641324986400000000000",
+                "-31470973247490321000000000000000",
+                "-31470973330334328321568348258304",
+            ),
+            (
+                "-87641324986400000000000",
+                "-31470973247490321000000000000000",
+                "31470973330334328321568348258304",
+            ),
         ];
 
         for &(l_, r_, a) in cases.iter() {
-            let l : Int = l_.parse().unwrap();
-            let r : Int = r_.parse().unwrap();
-            let a : Int = a.parse().unwrap();
+            let l: Int = l_.parse().unwrap();
+            let r: Int = r_.parse().unwrap();
+            let a: Int = a.parse().unwrap();
 
             let val = &l ^ &r;
             assert_mp_eq!(val, a);
@@ -4433,14 +4851,13 @@ mod test {
         ];
 
         for &(v, even) in cases.iter() {
-            let val : Int = v.parse().unwrap();
+            let val: Int = v.parse().unwrap();
 
             assert_eq!(val.is_even(), even);
 
             let val = -val;
             assert_eq!(val.is_even(), even);
         }
-
     }
 
     #[test]
@@ -4449,22 +4866,24 @@ mod test {
             ("0", 0),
             ("1", 0),
             ("16", 4),
-            ("3036937844145311324764506857395738547330878864826266812416", 100)
+            (
+                "3036937844145311324764506857395738547330878864826266812416",
+                100,
+            ),
         ];
 
         for &(v, count) in cases.iter() {
-            let val : Int = v.parse().unwrap();
+            let val: Int = v.parse().unwrap();
 
             assert_eq!(val.trailing_zeros(), count);
         }
-
     }
 
     #[test]
     fn arith_prim() {
         // Test that the Int/prim overloads are working as expected
 
-        let x : Int = "100".parse().unwrap();
+        let x: Int = "100".parse().unwrap();
 
         // Int op prim
         assert_mp_eq!(&x + 1usize, "101".parse().unwrap());
@@ -4498,7 +4917,7 @@ mod test {
         assert_mp_eq!(&x % 2i32, "0".parse().unwrap());
         assert_mp_eq!(&x % (-2i32), "0".parse().unwrap());
 
-        let x : Int = "5".parse().unwrap();
+        let x: Int = "5".parse().unwrap();
 
         // prim op Int
         assert_mp_eq!(1usize + &x, "6".parse().unwrap());
@@ -4552,7 +4971,7 @@ mod test {
         assert_eq!(a.add_usize(232184), Some(Int::from(897467216)));
     }
 
-    const RAND_ITER : usize = 1000;
+    const RAND_ITER: usize = 1000;
 
     #[test]
     fn div_rand() {
@@ -4581,7 +5000,6 @@ mod test {
         }
     }
 
-
     #[test]
     fn shl_rand() {
         let mut rng = rand::thread_rng();
@@ -4604,7 +5022,7 @@ mod test {
     fn shl_rand_large() {
         let mut rng = rand::thread_rng();
         for _ in 0..RAND_ITER {
-            let pow : usize = rng.gen_range(64, 8196);
+            let pow: usize = rng.gen_range(64, 8196);
             let mul_by = Int::from(2).pow(pow);
 
             let x = rng.gen_int(640);
@@ -4620,7 +5038,7 @@ mod test {
     fn shr_rand() {
         let mut rng = rand::thread_rng();
         for _ in 0..RAND_ITER {
-            let pow : usize = rng.gen_range(64, 8196);
+            let pow: usize = rng.gen_range(64, 8196);
             let x = rng.gen_int(640);
 
             let shift_up = &x << pow;
@@ -4735,10 +5153,9 @@ mod test {
 
     #[test]
     fn gen_uint_below_all_ones() {
-        static N : &'static str =
-            "000001FFFFFFFFFFFFFFFFFFFFFFFFFFF\
-             FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF\
-             FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF";
+        static N: &'static str = "000001FFFFFFFFFFFFFFFFFFFFFFFFFFF\
+                                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF\
+                                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF";
 
         let mut rng = rand::thread_rng();
 
@@ -4756,7 +5173,6 @@ mod test {
         let b = Limb(15 as BaseInt);
         assert_eq!(a + b, Int::one());
     }
-
 
     #[test]
     fn gcd() {
@@ -4782,9 +5198,9 @@ mod test {
         ];
 
         for &(l, r, a) in cases.iter() {
-            let l : Int = l.parse().unwrap();
-            let r : Int = r.parse().unwrap();
-            let a : Int = a.parse().unwrap();
+            let l: Int = l.parse().unwrap();
+            let r: Int = r.parse().unwrap();
+            let a: Int = a.parse().unwrap();
 
             let val = l.gcd(&r);
             assert_mp_eq!(val, a);
@@ -4803,17 +5219,37 @@ mod test {
             ("8", "9", "72"),
             ("11", "5", "55"),
             ("99", "17", "1683"),
-            ("18446744073709551616", "18446744073709551616", "18446744073709551616"),
-            ("18446744073709551620", "18446744073709551615", "68056473384187692703742967930579373260"),
-            ("-9223372036854775808", "-9223372036854775808", "9223372036854775808"),
-            ("-9223372036854775811", "-9223372036854775808", "85070591730234615893513767968506380288"),
-            ("-92233720368547758112345", "-235777694355", "4349330786055998253486590232462495")
+            (
+                "18446744073709551616",
+                "18446744073709551616",
+                "18446744073709551616",
+            ),
+            (
+                "18446744073709551620",
+                "18446744073709551615",
+                "68056473384187692703742967930579373260",
+            ),
+            (
+                "-9223372036854775808",
+                "-9223372036854775808",
+                "9223372036854775808",
+            ),
+            (
+                "-9223372036854775811",
+                "-9223372036854775808",
+                "85070591730234615893513767968506380288",
+            ),
+            (
+                "-92233720368547758112345",
+                "-235777694355",
+                "4349330786055998253486590232462495",
+            ),
         ];
 
         for &(l, r, a) in cases.iter() {
-            let l : Int = l.parse().unwrap();
-            let r : Int = r.parse().unwrap();
-            let a : Int = a.parse().unwrap();
+            let l: Int = l.parse().unwrap();
+            let r: Int = r.parse().unwrap();
+            let a: Int = a.parse().unwrap();
 
             let val = l.lcm(&r);
             assert_mp_eq!(val.clone(), a.clone());
@@ -4873,7 +5309,7 @@ mod test {
         let mut rng = rand::thread_rng();
 
         let x = rng.gen_int(xs * Limb::BITS);
-        let y : usize = rng.gen_range(0, ys);
+        let y: usize = rng.gen_range(0, ys);
 
         b.iter(|| {
             let z = &x.pow(y);
@@ -5147,7 +5583,7 @@ mod test {
     fn bench_rng_all_ones(b: &mut Bencher) {
         let mut rng = rand::thread_rng();
 
-        let num_bits : usize = rng.gen_range(512, 1024);
+        let num_bits: usize = rng.gen_range(512, 1024);
 
         let mut bound = Int::from(1) << num_bits;
         bound -= 1;
@@ -5157,5 +5593,4 @@ mod test {
             test::black_box(n);
         });
     }
-
 }

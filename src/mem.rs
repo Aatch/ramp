@@ -16,9 +16,9 @@
 //! be used for anything that requires an alignment greater than that.
 
 use std::alloc::{self, Alloc};
-use std::mem;
 use std::intrinsics::abort;
 use std::io::{self, Write};
+use std::mem;
 use std::ptr;
 
 use ll::limb::Limb;
@@ -32,11 +32,13 @@ unsafe fn get_usize_align_layout(size: usize) -> alloc::Layout {
     match alloc::Layout::from_size_align(size, alignment) {
         Ok(l) => l,
         Err(layout_err) => {
-            let _ = writeln!(io::stderr(),
-                             "Failed to construct mem layout (size={}, alignment={}): {}",
-                             size,
-                             alignment,
-                             layout_err);
+            let _ = writeln!(
+                io::stderr(),
+                "Failed to construct mem layout (size={}, alignment={}): {}",
+                size,
+                alignment,
+                layout_err
+            );
             abort();
         }
     }
@@ -47,10 +49,13 @@ pub unsafe fn allocate_bytes(size: usize) -> *mut u8 {
     let ret = match alloc::Global.alloc(layout.clone()) {
         Ok(p) => p.as_ptr(),
         Err(e) => {
-            writeln!(io::stderr(),
-                     "Failed to allocate memory (layout={:?}).\nError: {:?}",
-                     layout,
-                     e).unwrap();
+            writeln!(
+                io::stderr(),
+                "Failed to allocate memory (layout={:?}).\nError: {:?}",
+                layout,
+                e
+            )
+            .unwrap();
             abort();
         }
     };
@@ -67,18 +72,18 @@ pub unsafe fn deallocate_bytes(ptr: ptr::NonNull<u8>, size: usize) {
 /// Allocate for temporary storage. Ensures that the allocations are
 /// freed when the structure drops
 pub struct TmpAllocator {
-    mark: *mut Marker
+    mark: *mut Marker,
 }
 
 struct Marker {
     next: *mut Marker,
-    size: usize
+    size: usize,
 }
 
 impl TmpAllocator {
     pub fn new() -> TmpAllocator {
         TmpAllocator {
-            mark: ptr::null_mut()
+            mark: ptr::null_mut(),
         }
     }
 
@@ -105,8 +110,10 @@ impl TmpAllocator {
     pub unsafe fn allocate_2(&mut self, n1: usize, n2: usize) -> (LimbsMut, LimbsMut) {
         let mut x = self.allocate(n1 + n2);
         let mut y = x.offset(n1 as isize);
-        (LimbsMut::new(&mut *x, 0, n1 as i32),
-         LimbsMut::new(&mut *y, 0, n2 as i32))
+        (
+            LimbsMut::new(&mut *x, 0, n1 as i32),
+            LimbsMut::new(&mut *y, 0, n2 as i32),
+        )
     }
 }
 
