@@ -46,8 +46,8 @@ unsafe fn get_usize_align_layout(size: usize) -> alloc::Layout {
 
 pub unsafe fn allocate_bytes(size: usize) -> *mut u8 {
     let layout = get_usize_align_layout(size);
-    let ret = match alloc::Global.alloc(layout.clone()) {
-        Ok((p, _)) => p.as_ptr(),
+    let ret = match alloc::Global.alloc(layout.clone(), alloc::AllocInit::Zeroed) {
+        Ok(mem_block) => mem_block.ptr.as_ptr(),
         Err(e) => {
             writeln!(
                 io::stderr(),
