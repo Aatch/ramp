@@ -15,7 +15,7 @@
 //! Memory management functions. The base functions align to a pointer-width, so they shouldn't
 //! be used for anything that requires an alignment greater than that.
 
-use std::alloc::{self, AllocRef};
+use std::alloc::{self, Alloc};
 use std::intrinsics::abort;
 use std::io::{self, Write};
 use std::mem;
@@ -46,8 +46,8 @@ unsafe fn get_usize_align_layout(size: usize) -> alloc::Layout {
 
 pub unsafe fn allocate_bytes(size: usize) -> *mut u8 {
     let layout = get_usize_align_layout(size);
-    let ret = match alloc::Global.alloc(layout.clone(), alloc::AllocInit::Zeroed) {
-        Ok(mem_block) => mem_block.ptr.as_ptr(),
+    let ret = match alloc::Global.alloc(layout.clone()) {
+        Ok(mem_block) => mem_block.as_ptr(),
         Err(e) => {
             writeln!(
                 io::stderr(),
