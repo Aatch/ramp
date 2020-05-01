@@ -3621,7 +3621,7 @@ impl_from_for_prim!(unsigned u8, u16, u32, u64, u128, usize);
 impl Zero for Int {
     fn zero() -> Int {
         Int {
-            ptr: Unique::empty(),
+            ptr: Unique::dangling(),
             size: 0,
             cap: 0,
         }
