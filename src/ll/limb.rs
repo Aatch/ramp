@@ -13,12 +13,9 @@
 //    limitations under the License.
 
 use std;
-use std::ops::{
-    Add, Sub, Mul, Div, Rem, Neg,
-    Shl, Shr, Not, BitAnd, BitOr, BitXor
-};
 use std::cmp::{Ordering, PartialEq, PartialOrd};
 use std::fmt;
+use std::ops::{Add, BitAnd, BitOr, BitXor, Div, Mul, Neg, Not, Rem, Shl, Shr, Sub};
 
 use std::intrinsics::assume;
 
@@ -48,16 +45,18 @@ pub struct Limb(pub BaseInt);
 
 impl Clone for Limb {
     #[inline(always)]
-    fn clone(&self) -> Limb { *self }
+    fn clone(&self) -> Limb {
+        *self
+    }
 }
 
 impl Limb {
     #[cfg(target_pointer_width = "32")]
-    pub const BITS : usize = 32;
+    pub const BITS: usize = 32;
     #[cfg(target_pointer_width = "64")]
-    pub const BITS : usize = 64;
+    pub const BITS: usize = 64;
 
-    pub const B : Limb = Limb(1 << (Limb::BITS / 2));
+    pub const B: Limb = Limb(1 << (Limb::BITS / 2));
 
     /// Returns the high half of the limb
     #[inline(always)]
@@ -148,7 +147,7 @@ impl Limb {
 }
 
 impl Add<Limb> for Limb {
-    type Output=Limb;
+    type Output = Limb;
 
     #[inline(always)]
     fn add(self, other: Limb) -> Limb {
@@ -157,7 +156,7 @@ impl Add<Limb> for Limb {
 }
 
 impl Add<BaseInt> for Limb {
-    type Output=Limb;
+    type Output = Limb;
 
     #[inline(always)]
     fn add(self, other: BaseInt) -> Limb {
@@ -166,7 +165,7 @@ impl Add<BaseInt> for Limb {
 }
 
 impl Add<bool> for Limb {
-    type Output=Limb;
+    type Output = Limb;
 
     #[inline(always)]
     fn add(self, other: bool) -> Limb {
@@ -175,7 +174,7 @@ impl Add<bool> for Limb {
 }
 
 impl Add<Limb> for BaseInt {
-    type Output=Limb;
+    type Output = Limb;
 
     #[inline(always)]
     fn add(self, other: Limb) -> Limb {
@@ -184,7 +183,7 @@ impl Add<Limb> for BaseInt {
 }
 
 impl Sub<Limb> for Limb {
-    type Output=Limb;
+    type Output = Limb;
 
     #[inline(always)]
     fn sub(self, other: Limb) -> Limb {
@@ -193,7 +192,7 @@ impl Sub<Limb> for Limb {
 }
 
 impl Sub<BaseInt> for Limb {
-    type Output=Limb;
+    type Output = Limb;
 
     #[inline(always)]
     fn sub(self, other: BaseInt) -> Limb {
@@ -202,7 +201,7 @@ impl Sub<BaseInt> for Limb {
 }
 
 impl Sub<bool> for Limb {
-    type Output=Limb;
+    type Output = Limb;
 
     #[inline(always)]
     fn sub(self, other: bool) -> Limb {
@@ -211,7 +210,7 @@ impl Sub<bool> for Limb {
 }
 
 impl Sub<Limb> for BaseInt {
-    type Output=Limb;
+    type Output = Limb;
 
     #[inline(always)]
     fn sub(self, other: Limb) -> Limb {
@@ -220,7 +219,7 @@ impl Sub<Limb> for BaseInt {
 }
 
 impl Mul<Limb> for Limb {
-    type Output=Limb;
+    type Output = Limb;
 
     #[inline(always)]
     fn mul(self, other: Limb) -> Limb {
@@ -229,7 +228,7 @@ impl Mul<Limb> for Limb {
 }
 
 impl Mul<BaseInt> for Limb {
-    type Output=Limb;
+    type Output = Limb;
 
     #[inline(always)]
     fn mul(self, other: BaseInt) -> Limb {
@@ -238,7 +237,7 @@ impl Mul<BaseInt> for Limb {
 }
 
 impl Mul<Limb> for BaseInt {
-    type Output=Limb;
+    type Output = Limb;
 
     #[inline(always)]
     fn mul(self, other: Limb) -> Limb {
@@ -247,45 +246,53 @@ impl Mul<Limb> for BaseInt {
 }
 
 impl Div<Limb> for Limb {
-    type Output=Limb;
+    type Output = Limb;
 
     #[inline(always)]
     fn div(self, other: Limb) -> Limb {
         debug_assert!(other.0 != 0);
-        unsafe { assume(other.0 != 0); }
+        unsafe {
+            assume(other.0 != 0);
+        }
         Limb(self.0 / other.0)
     }
 }
 
 impl Div<BaseInt> for Limb {
-    type Output=Limb;
+    type Output = Limb;
 
     #[inline(always)]
     fn div(self, other: BaseInt) -> Limb {
         debug_assert!(other != 0);
-        unsafe { assume(other != 0); }
+        unsafe {
+            assume(other != 0);
+        }
         Limb(self.0 / other)
     }
 }
 
 impl Rem<Limb> for Limb {
-    type Output=Limb;
+    type Output = Limb;
 
     #[inline(always)]
     fn rem(self, other: Limb) -> Limb {
         debug_assert!(other.0 != 0);
-        unsafe { assume(other.0 != 0); }
+        unsafe {
+            assume(other.0 != 0);
+        }
         Limb(self.0 % other.0)
     }
 }
 
 impl Rem<BaseInt> for Limb {
-    type Output=Limb;
+    type Output = Limb;
 
     #[inline(always)]
     fn rem(self, other: BaseInt) -> Limb {
         debug_assert!(other != 0);
-        unsafe { assume(other != 0); }
+        unsafe {
+            assume(other != 0);
+        }
         Limb(self.0 % other)
     }
 }
@@ -299,8 +306,11 @@ impl Neg for Limb {
     }
 }
 
-impl<I> Shl<I> for Limb where BaseInt: Shl<I, Output=BaseInt> {
-    type Output=Limb;
+impl<I> Shl<I> for Limb
+where
+    BaseInt: Shl<I, Output = BaseInt>,
+{
+    type Output = Limb;
 
     #[inline(always)]
     fn shl(self, other: I) -> Limb {
@@ -308,8 +318,11 @@ impl<I> Shl<I> for Limb where BaseInt: Shl<I, Output=BaseInt> {
     }
 }
 
-impl<I> Shr<I> for Limb where BaseInt: Shr<I, Output=BaseInt> {
-    type Output=Limb;
+impl<I> Shr<I> for Limb
+where
+    BaseInt: Shr<I, Output = BaseInt>,
+{
+    type Output = Limb;
 
     #[inline(always)]
     fn shr(self, other: I) -> Limb {
@@ -372,16 +385,24 @@ impl PartialOrd<Limb> for Limb {
     }
 
     #[inline(always)]
-    fn lt(&self, other: &Limb) -> bool { self.0 <  other.0 }
+    fn lt(&self, other: &Limb) -> bool {
+        self.0 < other.0
+    }
 
     #[inline(always)]
-    fn le(&self, other: &Limb) -> bool { self.0 <= other.0 }
+    fn le(&self, other: &Limb) -> bool {
+        self.0 <= other.0
+    }
 
     #[inline(always)]
-    fn gt(&self, other: &Limb) -> bool { self.0 >  other.0 }
+    fn gt(&self, other: &Limb) -> bool {
+        self.0 > other.0
+    }
 
     #[inline(always)]
-    fn ge(&self, other: &Limb) -> bool { self.0 >= other.0 }
+    fn ge(&self, other: &Limb) -> bool {
+        self.0 >= other.0
+    }
 }
 
 impl PartialEq<BaseInt> for Limb {
@@ -403,16 +424,24 @@ impl PartialOrd<BaseInt> for Limb {
     }
 
     #[inline(always)]
-    fn lt(&self, other: &BaseInt) -> bool { self.0 <  *other }
+    fn lt(&self, other: &BaseInt) -> bool {
+        self.0 < *other
+    }
 
     #[inline(always)]
-    fn le(&self, other: &BaseInt) -> bool { self.0 <= *other }
+    fn le(&self, other: &BaseInt) -> bool {
+        self.0 <= *other
+    }
 
     #[inline(always)]
-    fn gt(&self, other: &BaseInt) -> bool { self.0 >  *other }
+    fn gt(&self, other: &BaseInt) -> bool {
+        self.0 > *other
+    }
 
     #[inline(always)]
-    fn ge(&self, other: &BaseInt) -> bool { self.0 >= *other }
+    fn ge(&self, other: &BaseInt) -> bool {
+        self.0 >= *other
+    }
 }
 
 impl fmt::Debug for Limb {
@@ -435,9 +464,12 @@ pub fn mul(u: Limb, v: Limb) -> (Limb, Limb) {
             let mut high: Limb = Limb(0);
             let mut low: Limb  = Limb(0);
             unsafe {
-                asm!("mulq $3"
-                     : "={rdx}"(high.0), "={rax}"(low.0)
-                     : "{rax}"(u.0), "r"(v.0));
+                asm!(
+                    "mul {v}", // multiply u by v and store in high:low
+                    v = in(reg) v.0,
+                    inout("rax") u.0 => low.0,
+                    out("rdx") high.0
+                );
             }
 
             (high, low)
@@ -449,9 +481,12 @@ pub fn mul(u: Limb, v: Limb) -> (Limb, Limb) {
             let mut high: Limb = Limb(0);
             let mut low: Limb  = Limb(0);
             unsafe {
-                asm!("mull $3"
-                     : "={edx}"(high.0), "={eax}"(low.0)
-                     : "{eax}"(u.0), "r"(v.0));
+                asm!(
+                    "mul {v}", // multiply u by v and store in high:low
+                    v = in(reg) v.0,
+                    inout("eax") u.0 => low.0,
+                    out("edx") high.0
+                );
             }
 
             (high, low)
@@ -513,31 +548,20 @@ pub fn mul(u: Limb, v: Limb) -> (Limb, Limb) {
 #[inline(always)]
 pub fn add_2(ah: Limb, al: Limb, bh: Limb, bl: Limb) -> (Limb, Limb) {
     if_cfg! {
-        #[cfg(all(not(feature="fallbacks"),target_arch="x86_64"))]
+        #[cfg(all(not(feature="fallbacks"), any(target_arch="x86_64", target_arch="x86")))]
         #[inline(always)]
         fn add_2_impl(ah: Limb, al: Limb, bh: Limb, bl: Limb) -> (Limb, Limb) {
             let mut high: Limb = Limb(0);
             let mut low: Limb  = Limb(0);
             unsafe {
-                asm!("addq $4, $0
-                      adcq $5, $1"
-                     : "=r"(low.0), "=r"(high.0)
-                     : "0"(al.0), "1"(ah.0), "r"(bl.0), "r"(bh.0));
-            }
-
-            (high, low)
-        }
-
-        #[cfg(all(not(feature="fallbacks"),target_arch="x86"))]
-        #[inline(always)]
-        fn add_2_impl(ah: Limb, al: Limb, bh: Limb, bl: Limb) -> (Limb, Limb) {
-            let mut high: Limb = Limb(0);
-            let mut low: Limb  = Limb(0);
-            unsafe {
-                asm!("addl $4, $0
-                      adcl $5, $1"
-                     : "=r"(low.0), "=r"(high.0)
-                     : "0"(al.0), "1"(ah.0), "r"(bl.0), "r"(bh.0));
+                asm!(
+                    "add {0}, {bl}", // adds bl to al and stores in low
+                    "adc {1}, {bh}", // adds bh to ah with carry and stores in high
+                    inout(reg) al.0 => low.0,
+                    inout(reg) ah.0 => high.0,
+                    bl = in(reg) bl.0,
+                    bh = in(reg) bh.0,
+                );
             }
 
             (high, low)
@@ -573,31 +597,20 @@ pub fn add_2(ah: Limb, al: Limb, bh: Limb, bl: Limb) -> (Limb, Limb) {
 #[inline(always)]
 pub fn sub_2(ah: Limb, al: Limb, bh: Limb, bl: Limb) -> (Limb, Limb) {
     if_cfg! {
-        #[cfg(all(not(feature="fallbacks"),target_arch="x86_64"))]
+        #[cfg(all(not(feature="fallbacks"), any(target_arch="x86_64", target_arch="x86")))]
         #[inline(always)]
         fn sub_2_impl(ah: Limb, al: Limb, bh: Limb, bl: Limb) -> (Limb, Limb) {
             let mut high: Limb = Limb(0);
             let mut low: Limb  = Limb(0);
             unsafe {
-                asm!("subq $4, $0
-                      sbbq $5, $1"
-                     : "=r"(low.0), "=r"(high.0)
-                     : "0"(al.0), "1"(ah.0), "r"(bl.0), "r"(bh.0));
-            }
-
-            (high, low)
-        }
-
-        #[cfg(all(not(feature="fallbacks"),target_arch="x86"))]
-        #[inline(always)]
-        fn sub_2_impl(ah: Limb, al: Limb, bh: Limb, bl: Limb) -> (Limb, Limb) {
-            let mut high: Limb = Limb(0);
-            let mut low: Limb  = Limb(0);
-            unsafe {
-                asm!("subl $4, $0
-                      sbbl $5, $1"
-                     : "=r"(low.0), "=r"(high.0)
-                     : "0"(al.0), "1"(ah.0), "r"(bl.0), "r"(bh.0));
+                asm!(
+                    "sub {0}, {bl}", // subtracts bl from al and stores in low
+                    "sbb {1}, {bh}", // subtracts bh from ah with carry and stores in high
+                    inout(reg) al.0 => low.0,
+                    inout(reg) ah.0 => high.0,
+                    bl = in(reg) bl.0,
+                    bh = in(reg) bh.0
+                );
             }
 
             (high, low)
@@ -638,7 +651,6 @@ pub fn sub_2(ah: Limb, al: Limb, bh: Limb, bl: Limb) -> (Limb, Limb) {
  */
 #[inline(always)]
 pub fn div(nh: Limb, nl: Limb, d: Limb) -> (Limb, Limb) {
-
     if_cfg! {
         #[cfg(all(not(feature="fallbacks"),target_arch="x86_64"))]
         #[inline(always)]
@@ -646,9 +658,12 @@ pub fn div(nh: Limb, nl: Limb, d: Limb) -> (Limb, Limb) {
             let mut q: Limb = Limb(0);
             let mut r: Limb = Limb(0);
             unsafe {
-                asm!("divq $4"
-                     : "={rdx}"(r.0), "={rax}"(q.0)
-                     : "0"(nh.0), "1"(nl.0), "r"(d.0));
+                asm!(
+                    "div {d}", // divide nh:nl by d and store the quotient in q and remainder in r
+                    d = in(reg) d.0,
+                    inout("rax") nl.0 => q.0,
+                    inout("rdx") nh.0 => r.0
+                );
             }
             (q, r)
         }
@@ -659,9 +674,12 @@ pub fn div(nh: Limb, nl: Limb, d: Limb) -> (Limb, Limb) {
             let mut q: Limb = Limb(0);
             let mut r: Limb = Limb(0);
             unsafe {
-                asm!("divl $4"
-                     : "={edx}"(r.0), "={eax}"(q.0)
-                     : "0"(nh.0), "1"(nl.0), "r"(d.0));
+                asm!(
+                    "div {d}", // divide nh:nl by d and store the quotient in q and remainder in r
+                    d = in(reg) d.0,
+                    inout("eax") nl.0 => q.0,
+                    inout("edx") nh.0 => r.0
+                );
             }
             (q, r)
         }
@@ -765,13 +783,39 @@ pub fn div_preinv(nh: Limb, nl: Limb, d: Limb, dinv: Limb) -> (Limb, Limb) {
 
 #[test]
 fn test_bug_div_1() {
-    let (q,r) = div(Limb(0), Limb(10), Limb((usize::max_value()/2+1) as BaseInt));
+    let (q, r) = div(
+        Limb(0),
+        Limb(10),
+        Limb((usize::max_value() / 2 + 1) as BaseInt),
+    );
     assert_eq!((q.0, r.0), (0, 10));
 }
 
 #[cfg(target_pointer_width = "64")]
 #[test]
 fn test_bug_mul_1() {
-    let (h,l) = mul(Limb(18446744073709551615), Limb(7868907223611932671));
-    assert_eq!((h.0,l.0), (7868907223611932670, 10577836850097618945));
+    let (h, l) = mul(Limb(18446744073709551615), Limb(7868907223611932671));
+    assert_eq!((h.0, l.0), (7868907223611932670, 10577836850097618945));
+}
+
+#[test]
+fn test_add_2() {
+    let (h, l) = add_2(Limb(4), Limb(2), Limb(3), Limb(1));
+    assert_eq!((h.0, l.0), (7, 3));
+}
+
+#[test]
+fn test_sub_2() {
+    let (h, l) = sub_2(Limb(4), Limb(2), Limb(3), Limb(1));
+    assert_eq!((h.0, l.0), (1, 1));
+}
+
+#[test]
+fn test_div() {
+    let (q, r) = div(
+        Limb(2),
+        Limb(0),
+        Limb((usize::max_value() / 2 + 1) as BaseInt),
+    );
+    assert_eq!((q.0, r.0), (4, 0));
 }

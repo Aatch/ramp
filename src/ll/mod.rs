@@ -75,40 +75,35 @@
 //! * Sizes come after the matching pointers. For example, `add_n` takes two pointers and a length,
 //!   the length applies to both pointers and so comes after both of them.
 
-use std::intrinsics::abort;
 use std::cmp::Ordering;
+use std::intrinsics::abort;
 
 mod addsub;
-mod mul;
-mod div;
 mod bit;
+mod div;
 mod gcd;
+mod mul;
 
-pub mod pow;
 pub mod base;
 pub mod limb;
 pub mod limb_ptr;
+pub mod pow;
 use self::limb::Limb;
 
 use ll::limb_ptr::{Limbs, LimbsMut};
 
+pub use self::addsub::{add, add_1, add_n, decr, incr, sub, sub_1, sub_n};
 pub use self::bit::{
-    shl, shr,
-    and_n, and_not_n, nand_n,
-    or_n, or_not_n, nor_n, xor_n,
-    not,
-    scan_1, scan_0,
-    twos_complement
+    and_n, and_not_n, nand_n, nor_n, not, or_n, or_not_n, scan_0, scan_1, shl, shr,
+    twos_complement, xor_n,
 };
-pub use self::addsub::{add_n, sub_n, add, sub, add_1, sub_1, incr, decr};
-pub use self::mul::{addmul_1, submul_1, mul_1, mul, sqr};
-pub use self::div::{divrem_1, divrem_2, divrem};
+pub use self::div::{divrem, divrem_1, divrem_2};
 pub use self::gcd::gcd;
+pub use self::mul::{addmul_1, mul, mul_1, sqr, submul_1};
 
 #[inline(always)]
 pub unsafe fn overlap(xp: LimbsMut, xs: i32, yp: Limbs, ys: i32) -> bool {
-    xp.offset(xs as isize).as_const() > yp
-        && yp.offset(ys as isize) > xp.as_const()
+    xp.offset(xs as isize).as_const() > yp && yp.offset(ys as isize) > xp.as_const()
 }
 
 #[inline(always)]
@@ -159,8 +154,11 @@ pub unsafe fn copy_decr(src: Limbs, dst: LimbsMut, mut n: i32) {
  */
 #[inline]
 pub unsafe fn copy_rest(src: Limbs, dst: LimbsMut, n: i32, start: i32) {
-    copy_incr(src.offset(start as isize), dst.offset(start as isize),
-               n - start);
+    copy_incr(
+        src.offset(start as isize),
+        dst.offset(start as isize),
+        n - start,
+    );
 }
 
 #[inline]
@@ -189,7 +187,7 @@ pub fn divide_by_zero() -> ! {
     if cfg!(debug_assertions) {
         panic!("divide by zero")
     } else {
-        unsafe { abort() }
+        abort();
     }
 }
 
@@ -198,7 +196,9 @@ pub fn divide_by_zero() -> ! {
  */
 pub unsafe fn is_zero(mut np: Limbs, mut nn: i32) -> bool {
     while nn > 0 {
-        if *np != 0 { return false; }
+        if *np != 0 {
+            return false;
+        }
         np = np.offset(1);
         nn -= 1;
     }
@@ -237,7 +237,8 @@ pub unsafe fn cmp(xp: Limbs, yp: Limbs, n: i32) -> Ordering {
 
 #[doc(hidden)]
 #[allow(unused_must_use)]
-#[cold] #[inline(never)]
+#[cold]
+#[inline(never)]
 pub unsafe fn dump(lbl: &str, mut p: Limbs, mut n: i32) {
     use std::io::{self, Write};
     let stdout = io::stdout();
@@ -289,7 +290,9 @@ mod test {
 
     #[test]
     fn test_add() {
-        let a; let b; let mut c;
+        let a;
+        let b;
+        let mut c;
 
         let (ap, asz) = make_limbs!(const a, 1);
         let (bp, bsz) = make_limbs!(const b, 2);
@@ -301,7 +304,9 @@ mod test {
 
         assert_eq!(c[0], 3);
 
-        let a; let b; let mut c;
+        let a;
+        let b;
+        let mut c;
 
         let (ap, asz) = make_limbs!(const a, !0);
         let (bp, bsz) = make_limbs!(const b, 5);
@@ -312,7 +317,9 @@ mod test {
         }
         assert_eq!(c[0], 4);
 
-        let a; let b; let mut c;
+        let a;
+        let b;
+        let mut c;
 
         let (ap, asz) = make_limbs!(const a, !0, 0);
         let (bp, bsz) = make_limbs!(const b, 5);
@@ -323,7 +330,9 @@ mod test {
         }
         assert_eq!(c, [4, 1]);
 
-        let a; let b; let mut c;
+        let a;
+        let b;
+        let mut c;
 
         let (ap, asz) = make_limbs!(const a, !0, !9);
         let (bp, bsz) = make_limbs!(const b, 5, 10);
@@ -337,12 +346,14 @@ mod test {
 
     #[test]
     fn test_add_self() {
-        let a; let mut b;
+        let a;
+        let mut b;
 
         let (ap, asz) = make_limbs!(const a, !0, !9);
         let bp = make_limbs!(out b, 2);
         let bsz = 2;
-        b[0] = Limb(5); b[1] = Limb(10);
+        b[0] = Limb(5);
+        b[1] = Limb(10);
 
         unsafe {
             assert_eq!(add(bp, ap, asz, bp.as_const(), bsz), 1);
@@ -352,7 +363,9 @@ mod test {
 
     #[test]
     fn test_sub() {
-        let a; let b; let mut c;
+        let a;
+        let b;
+        let mut c;
 
         let (ap, asz) = make_limbs!(const a, 2);
         let (bp, bsz) = make_limbs!(const b, 1);
@@ -364,7 +377,9 @@ mod test {
 
         assert_eq!(c[0], 1);
 
-        let a; let b; let mut c;
+        let a;
+        let b;
+        let mut c;
 
         let (ap, asz) = make_limbs!(const a, 0, 2);
         let (bp, bsz) = make_limbs!(const b, 1);
@@ -376,7 +391,9 @@ mod test {
 
         assert_eq!(c, [!0, 1]);
 
-        let a; let b; let mut c;
+        let a;
+        let b;
+        let mut c;
         let (ap, asz) = make_limbs!(const a, 0, 2);
         let (bp, bsz) = make_limbs!(const b, 2, 1);
         let cp = make_limbs!(out c, 2);
@@ -390,12 +407,14 @@ mod test {
 
     #[test]
     fn test_sub_self() {
-        let a; let mut b;
+        let a;
+        let mut b;
 
         let (ap, asz) = make_limbs!(const a, 0, 2);
         let bp = make_limbs!(out b, 2);
         let bsz = 2;
-        b[0] = Limb(2); b[1] = Limb(1);
+        b[0] = Limb(2);
+        b[1] = Limb(1);
 
         unsafe {
             assert_eq!(sub(bp, ap, asz, bp.as_const(), bsz), 0);
@@ -420,7 +439,8 @@ mod test {
 
     #[test]
     fn test_mul_1() {
-        let a; let mut b;
+        let a;
+        let mut b;
         let (ap, asz) = make_limbs!(const a, 10);
         let bp = make_limbs!(out b, 1);
 
@@ -430,7 +450,8 @@ mod test {
 
         assert_eq!(b, [200]);
 
-        let a; let mut b;
+        let a;
+        let mut b;
         let (ap, asz) = make_limbs!(const a, !1);
         let bp = make_limbs!(out b, 1);
 
@@ -440,7 +461,8 @@ mod test {
 
         assert_eq!(b, [!3]);
 
-        let a; let mut b;
+        let a;
+        let mut b;
         let (ap, asz) = make_limbs!(const a, 10, 10);
         let bp = make_limbs!(out b, 2);
 
@@ -453,7 +475,9 @@ mod test {
 
     #[test]
     fn test_mul() {
-        let a; let b; let mut c;
+        let a;
+        let b;
+        let mut c;
 
         let (ap, asz) = make_limbs!(const a, 2);
         let (bp, bsz) = make_limbs!(const b, 2);
@@ -465,7 +489,9 @@ mod test {
 
         assert_eq!(c, [4, 0]);
 
-        let a; let b; let mut c;
+        let a;
+        let b;
+        let mut c;
 
         let (ap, asz) = make_limbs!(const a, !1);
         let (bp, bsz) = make_limbs!(const b, 2);
@@ -477,7 +503,9 @@ mod test {
 
         assert_eq!(c, [!3, 1]);
 
-        let a; let b; let mut c;
+        let a;
+        let b;
+        let mut c;
 
         let (ap, asz) = make_limbs!(const a, !1, 1);
         let (bp, bsz) = make_limbs!(const b, 4);
@@ -489,7 +517,9 @@ mod test {
 
         assert_eq!(c, [!7, 7, 0]);
 
-        let a; let b; let mut c;
+        let a;
+        let b;
+        let mut c;
         let (ap, asz) = make_limbs!(const a, !1, 1);
         let (bp, bsz) = make_limbs!(const b, 0, 1);
         let cp = make_limbs!(out c, 4);
@@ -499,23 +529,23 @@ mod test {
         }
 
         assert_eq!(c, [0, !1, 1, 0]);
-
     }
 
     #[test]
     fn test_mul_large() {
-
         // Warning, dragons lie ahead, mostly to avoid writing out 150-limb numbers
 
-        let a; let b; let mut c;
+        let a;
+        let b;
+        let mut c;
         // Abuse the fact that fixed-size arrays and tuples are laid out sequentially in memory
-        let expected : [Limb; 73] = unsafe {
+        let expected: [Limb; 73] = unsafe {
             ::std::mem::transmute((
                 Limb(1),
                 [Limb(0); 29],
                 [Limb(!0); 13],
                 Limb(!1),
-                [Limb(!0); 29]
+                [Limb(!0); 29],
             ))
         };
 
@@ -534,19 +564,21 @@ mod test {
             mul(cp, ap, 43, bp, 30);
         }
 
-        let ep : &[Limb] = &expected;
-        let cp : &[Limb] = &c;
+        let ep: &[Limb] = &expected;
+        let cp: &[Limb] = &c;
         assert_eq!(cp, ep);
 
-        let a; let b; let mut c;
+        let a;
+        let b;
+        let mut c;
         // Abuse the fact that fixed-size arrays and tuples are laid out sequentially in memory
-        let expected : [Limb; 150] = unsafe {
+        let expected: [Limb; 150] = unsafe {
             ::std::mem::transmute((
                 Limb(1),
                 [Limb(0); 25],
                 [Limb(!0); 98],
                 Limb(!1),
-                [Limb(!0); 25]
+                [Limb(!0); 25],
             ))
         };
 
@@ -565,14 +597,15 @@ mod test {
             mul(cp, ap, 124, bp, 26);
         }
 
-        let ep : &[Limb] = &expected;
-        let cp : &[Limb] = &c;
+        let ep: &[Limb] = &expected;
+        let cp: &[Limb] = &c;
         assert_eq!(cp, ep);
     }
 
     #[test]
     fn test_divrem_1() {
-        let a; let mut b;
+        let a;
+        let mut b;
 
         let (ap, asz) = make_limbs!(const a, 2);
         let bp = make_limbs!(out b, 1);
@@ -583,7 +616,8 @@ mod test {
 
         assert_eq!(b, [1]);
 
-        let a; let mut b;
+        let a;
+        let mut b;
 
         let (ap, asz) = make_limbs!(const a, 7);
         let bp = make_limbs!(out b, 1);
@@ -594,7 +628,8 @@ mod test {
 
         assert_eq!(b, [7]);
 
-        let a; let mut b;
+        let a;
+        let mut b;
 
         let (ap, asz) = make_limbs!(const a, 7);
         let bp = make_limbs!(out b, 1);
@@ -605,7 +640,8 @@ mod test {
 
         assert_eq!(b, [3]);
 
-        let a; let mut b;
+        let a;
+        let mut b;
 
         let (ap, asz) = make_limbs!(const a, 0, 1);
         let bp = make_limbs!(out b, 2);
@@ -616,7 +652,8 @@ mod test {
 
         assert_eq!(b, [1 << (Limb::BITS - 2), 0 as limb::BaseInt]);
 
-        let a; let mut b;
+        let a;
+        let mut b;
 
         let (ap, asz) = make_limbs!(const a, 5);
         let bp = make_limbs!(out b, 2);
@@ -630,7 +667,10 @@ mod test {
 
     #[test]
     fn test_divrem() {
-        let a; let b; let mut q; let mut r;
+        let a;
+        let b;
+        let mut q;
+        let mut r;
 
         let (ap, asz) = make_limbs!(const a, 4, 3, 4);
         let (bp, bsz) = make_limbs!(const b, 1, !0);
@@ -644,7 +684,10 @@ mod test {
         assert_eq!(q, [4, 0]);
         assert_eq!(r, [0, 7]);
 
-        let a; let b; let mut q; let mut r;
+        let a;
+        let b;
+        let mut q;
+        let mut r;
 
         let (ap, asz) = make_limbs!(const a, 0, 4, 3, 4, 2);
         let (bp, bsz) = make_limbs!(const b, 0, !1);
@@ -658,7 +701,10 @@ mod test {
         assert_eq!(q, [19, 8, 2, 0]);
         assert_eq!(r, [0, 42]);
 
-        let a; let b; let mut q; let mut r;
+        let a;
+        let b;
+        let mut q;
+        let mut r;
 
         let (ap, asz) = make_limbs!(const a, 8, 1, 3, 4, 1);
         let (bp, bsz) = make_limbs!(const b, 0, 1);
@@ -673,7 +719,10 @@ mod test {
         assert_eq!(r, [8, 0]);
 
         {
-            let a; let b; let mut q; let mut r;
+            let a;
+            let b;
+            let mut q;
+            let mut r;
 
             // (B^4 - 1)(B^8 - 1)
             let (ap, asz) = make_limbs!(const a, 1, 0, 0, 0, !0, !0, !0, !0, !1, !0, !0, !0);
@@ -698,36 +747,28 @@ mod test {
 
         let (ap, asz) = make_limbs!(const a, 256);
 
-        let pos = unsafe {
-            scan_1(ap, asz)
-        };
+        let pos = unsafe { scan_1(ap, asz) };
 
         assert_eq!(pos, 8);
 
         let a;
         let (ap, asz) = make_limbs!(const a, 0, 256);
 
-        let pos = unsafe {
-            scan_1(ap, asz)
-        };
+        let pos = unsafe { scan_1(ap, asz) };
 
         assert_eq!(pos, Limb::BITS as u32 + 8);
 
         let a;
         let (ap, asz) = make_limbs!(const a, !256);
 
-        let pos = unsafe {
-            scan_0(ap, asz)
-        };
+        let pos = unsafe { scan_0(ap, asz) };
 
         assert_eq!(pos, 8);
 
         let a;
         let (ap, asz) = make_limbs!(const a, !0, !256);
 
-        let pos = unsafe {
-            scan_0(ap, asz)
-        };
+        let pos = unsafe { scan_0(ap, asz) };
 
         assert_eq!(pos, Limb::BITS as u32 + 8);
     }

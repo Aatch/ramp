@@ -12,30 +12,28 @@
 //    See the License for the specific language governing permissions and
 //    limitations under the License.
 
-#![crate_type="lib"]
-#![crate_name="ramp"]
-
+#![crate_type = "lib"]
+#![crate_name = "ramp"]
 #![feature(core_intrinsics, asm, allocator_api)]
-#![feature(step_trait, ptr_internals, raw_vec_internals)]
-
+#![feature(step_trait, step_trait_ext, ptr_internals, raw_vec_internals)]
 #![cfg_attr(test, feature(test))]
 
 #[cfg(test)]
 extern crate test;
 
 extern crate alloc;
-extern crate ieee754;
-extern crate rand;
 extern crate hamming;
+extern crate ieee754;
 extern crate num_integer;
 extern crate num_traits;
+extern crate rand;
 
 pub mod ll;
 mod mem;
 
-pub mod traits;
 pub mod int;
 pub mod rational;
+pub mod traits;
 
 // Re-exports
 

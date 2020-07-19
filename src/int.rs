@@ -24,7 +24,7 @@ use std::ops::{
 };
 use std::ptr::Unique;
 use std::str::FromStr;
-use std::{fmt, hash, io, mem};
+use std::{fmt, hash, io};
 
 use hamming;
 use num_integer::Integer;
@@ -3694,7 +3694,7 @@ impl Integer for Int {
     }
 }
 
-impl std::iter::Step for Int {
+unsafe impl std::iter::Step for Int {
     fn steps_between(start: &Int, end: &Int) -> Option<usize> {
         let diff = (start - end).abs();
 
@@ -3706,24 +3706,12 @@ impl std::iter::Step for Int {
         }
     }
 
-    fn replace_one(&mut self) -> Self {
-        mem::replace(self, Self::one())
+    fn forward_checked(start: Int, n: usize) -> Option<Self> {
+        Some(start + Int::from(n))
     }
 
-    fn replace_zero(&mut self) -> Self {
-        mem::replace(self, Self::zero())
-    }
-
-    fn add_one(&self) -> Self {
-        self + 1
-    }
-
-    fn sub_one(&self) -> Self {
-        self - 1
-    }
-
-    fn add_usize(&self, n: usize) -> Option<Self> {
-        Some(self + Int::from(n))
+    fn backward_checked(start: Int, n: usize) -> Option<Self> {
+        Some(start - Int::from(n))
     }
 }
 
@@ -4962,9 +4950,14 @@ mod test {
 
         assert_eq!(Int::steps_between(&a, &b), Some(897136687));
         assert_eq!(Int::steps_between(&a, &b), Int::steps_between(&b, &a));
-        assert_eq!(a.add_one(), Int::from(897235033));
-        assert_eq!(a.sub_one(), Int::from(897235031));
-        assert_eq!(a.add_usize(232184), Some(Int::from(897467216)));
+        assert_eq!(
+            Int::forward_checked(a.clone(), 232184),
+            Some(Int::from(897467216))
+        );
+        assert_eq!(
+            Int::backward_checked(a.clone(), 897467216),
+            Some(Int::from(-232184))
+        );
     }
 
     const RAND_ITER: usize = 1000;
