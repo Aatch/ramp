@@ -1,0 +1,1 @@
+initSidebarItems({"struct":[["Int","An arbitrary-precision signed integer."],["ParseIntError","Error that arises when parsing an [`Int`]."]],"trait":[["RandomInt","Trait for generating random `Int`s."]]});

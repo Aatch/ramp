@@ -1,0 +1,105 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="API documentation for the Rust `ll` mod in crate `ramp`."><meta name="keywords" content="rust, rustlang, rust-lang, ll"><title>ramp::ll - Rust</title><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../light.css"  id="themeStyle"><link rel="stylesheet" type="text/css" href="../../dark.css" disabled ><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled ><script src="../../storage.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="shortcut icon" href="../../favicon.ico"><style type="text/css">#crate-search{background-image:url("../../down-arrow.svg");}</style></head><body class="rustdoc mod"><!--[if lte IE 8]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu">&#9776;</div><a href='../../ramp/index.html'><div class='logo-container'><img src='../../rust-logo.png' alt='logo'></div></a><p class='location'>Module ll</p><div class="sidebar-elems"><div class="block items"><ul><li><a href="#modules">Modules</a></li><li><a href="#functions">Functions</a></li></ul></div><p class='location'><a href='../index.html'>ramp</a></p><script>window.sidebarCurrent = {name: 'll', ty: 'mod', relpath: '../'};</script><script defer src="../sidebar-items.js"></script></div></nav><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!"><img src="../../brush.svg" width="18" alt="Pick another theme!"></button><div id="theme-choices"></div></div><script src="../../theme.js"></script><nav class="sub"><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" disabled autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><a id="settings-menu" href="../../settings.html"><img src="../../wheel.svg" width="18" alt="Change settings"></a></div></form></nav><section id="main" class="content"><h1 class='fqn'><span class='out-of-band'><span id='render-detail'><a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">[<span class='inner'>&#x2212;</span>]</a></span><a class='srclink' href='../../src/ramp/ll/mod.rs.html#15-775' title='goto source code'>[src]</a></span><span class='in-band'>Module <a href='../index.html'>ramp</a>::<wbr><a class="mod" href=''>ll</a></span></h1><div class='docblock'><p>This module provides the low-level operations for working with arbitrary precision numbers.</p>
+<h2 id="overview" class="section-header"><a href="#overview">Overview</a></h2>
+<p>This module forms the core of the library. As such, the functions are required to be highly
+performant, even small inefficiencies can cause a large impact given how frequently some of
+these functions are called. <code>addmul</code> for example is one of the most frequently called functions
+in the library, so an efficiencies there will be multiplied out to almost the entire library.</p>
+<p>There are no real restrictions on the functions that can implemented in here. Exposed functions
+should be generally useful to high-level code, but otherwise any operation that can be more
+efficiently implemented here and then exposed by a higher-level API is a candidate.</p>
+<p>The functions in this module assume that all inputs are valid, though some checking is performed
+in debug builds.</p>
+<h2 id="limbs" class="section-header"><a href="#limbs">Limbs</a></h2>
+<p>A <code>Limb</code> is a single &quot;digit&quot; in an arbitrary-precision integer. To explain, consider the
+standard base we work in, base-10. Base-10 uses represents numbers as a sequence of the digits
+0-9. The number 251 is 2 x 10^2 + 5 x 10^1 + 1 x 10^0. Similarly base-16 (hexadecimal) uses
+sixteen digits and a base of 16 to represent numbers.</p>
+<p>A <code>Limb</code> is one word, with N bits (32 on a 32-bit platform, 64 on a 64-bit platform), so it can
+represent 2^N unique values. It can therefore form the basis of a base-2^N number system. The
+word &quot;Limb&quot; is used by GMP to distinguish it from a regular numerical digit, and there is no
+obvious reason to use different terminology.</p>
+<p><code>Limb</code> itself implements a number of useful methods. The basic mathematical operators are
+implemented to provide wrapping behaviour by default. The most basic operations are also
+implemented on <code>Limb</code>, notably multiplication with a two-word output and division of a two-word
+numerator by a one-word denominator. The implementations of these operations are done with
+inline assembly on x86 platforms with a Rust implementation as fallback.</p>
+<h2 id="integer-representation" class="section-header"><a href="#integer-representation">Integer representation</a></h2>
+<p>Integers are passed around as pointers to a series of <code>Limb</code>s. The limbs are stored
+least-significant first. If required, a size parameter is also provided, but otherwise is
+omitted when it can be inferred from other sources of information. This is the case with the
+output pointers used to store the result, they are assumed to have enough memory store the
+result as the maximum output size is bounded by the size of the inputs.</p>
+<p>The integers are not required to be &quot;normalized&quot; in most cases. That is, they may have
+zero-value limbs in the highest positions. Functions should aim to avoid requiring normalized
+integers but otherwise explicitly document said requirement.</p>
+<h2 id="memory-allocation" class="section-header"><a href="#memory-allocation">Memory allocation</a></h2>
+<p>No function will allocate memory for a return value. However, it is sometimes required to
+allocate &quot;scratch space&quot; for storing intermediate values. This scratch space is always temporary
+and freed before the function returns. Functions that need to make heavy use of scratch space
+while also being recursive, are split so that scratch space can be re-used.</p>
+<h2 id="argument-conventions" class="section-header"><a href="#argument-conventions">Argument Conventions</a></h2>
+<p>There are no hard-and-fast rules for the argument conventions in this module. There are however
+some general conventions:</p>
+<ul>
+<li>Output/Result pointer goes first (if applicable).</li>
+<li>Pointer and matching size are kept close together in the argument list.</li>
+<li>Sizes come after the matching pointers. For example, <code>add_n</code> takes two pointers and a length,
+the length applies to both pointers and so comes after both of them.</li>
+</ul>
+</div><h2 id='modules' class='section-header'><a href="#modules">Modules</a></h2>
+<table><tr class='module-item'><td><a class="mod" href="base/index.html" title='ramp::ll::base mod'>base</a></td><td class='docblock-short'><p>Base conversion utilities</p>
+</td></tr><tr class='module-item'><td><a class="mod" href="limb/index.html" title='ramp::ll::limb mod'>limb</a></td><td class='docblock-short'></td></tr><tr class='module-item'><td><a class="mod" href="limb_ptr/index.html" title='ramp::ll::limb_ptr mod'>limb_ptr</a></td><td class='docblock-short'></td></tr><tr class='module-item'><td><a class="mod" href="pow/index.html" title='ramp::ll::pow mod'>pow</a></td><td class='docblock-short'></td></tr></table><h2 id='functions' class='section-header'><a href="#functions">Functions</a></h2>
+<table><tr class='module-item'><td><a class="fn" href="fn.add.html" title='ramp::ll::add fn'>add</a><a title='unsafe function' href='#'><sup>⚠</sup></a></td><td class='docblock-short'></td></tr><tr class='module-item'><td><a class="fn" href="fn.add_1.html" title='ramp::ll::add_1 fn'>add_1</a><a title='unsafe function' href='#'><sup>⚠</sup></a></td><td class='docblock-short'></td></tr><tr class='module-item'><td><a class="fn" href="fn.add_n.html" title='ramp::ll::add_n fn'>add_n</a><a title='unsafe function' href='#'><sup>⚠</sup></a></td><td class='docblock-short'><p>Adds the <code>n</code> least signficant limbs of <code>xp</code> and <code>yp</code>, storing the result in {wp, n}.
+If there was a carry, it is returned.</p>
+</td></tr><tr class='module-item'><td><a class="fn" href="fn.addmul_1.html" title='ramp::ll::addmul_1 fn'>addmul_1</a><a title='unsafe function' href='#'><sup>⚠</sup></a></td><td class='docblock-short'><p>Multiplies the <code>n</code> least-signficiant digits of <code>xp</code> by <code>vl</code> and adds them to the <code>n</code>
+least-significant digits of <code>wp</code>. Returns the highest limb of the result.</p>
+</td></tr><tr class='module-item'><td><a class="fn" href="fn.and_n.html" title='ramp::ll::and_n fn'>and_n</a><a title='unsafe function' href='#'><sup>⚠</sup></a></td><td class='docblock-short'><p>Performs a bitwise &quot;and&quot; (<code>&amp;</code>) of the n least signficant limbs of <code>xp</code> and <code>yp</code>, storing the
+result in <code>wp</code></p>
+</td></tr><tr class='module-item'><td><a class="fn" href="fn.and_not_n.html" title='ramp::ll::and_not_n fn'>and_not_n</a><a title='unsafe function' href='#'><sup>⚠</sup></a></td><td class='docblock-short'><p>Performs a bitwise and of the n least signficant limbs of <code>xp</code> and <code>yp</code>, with the limbs of <code>yp</code>
+being first inverted. The result is stored in <code>wp</code>.</p>
+</td></tr><tr class='module-item'><td><a class="fn" href="fn.cmp.html" title='ramp::ll::cmp fn'>cmp</a><a title='unsafe function' href='#'><sup>⚠</sup></a></td><td class='docblock-short'><p>Compares the <code>n</code> least-significant limbs of <code>xp</code> and <code>yp</code>, returning whether
+{xp, n} is less than, equal to or greater than {yp, n}</p>
+</td></tr><tr class='module-item'><td><a class="fn" href="fn.copy_decr.html" title='ramp::ll::copy_decr fn'>copy_decr</a><a title='unsafe function' href='#'><sup>⚠</sup></a></td><td class='docblock-short'><p>Copies the <code>n</code> limbs from <code>src</code> to <code>dst</code> in a decremental fashion.</p>
+</td></tr><tr class='module-item'><td><a class="fn" href="fn.copy_incr.html" title='ramp::ll::copy_incr fn'>copy_incr</a><a title='unsafe function' href='#'><sup>⚠</sup></a></td><td class='docblock-short'><p>Copies the <code>n</code> limbs from <code>src</code> to <code>dst</code> in an incremental fashion.</p>
+</td></tr><tr class='module-item'><td><a class="fn" href="fn.copy_rest.html" title='ramp::ll::copy_rest fn'>copy_rest</a><a title='unsafe function' href='#'><sup>⚠</sup></a></td><td class='docblock-short'><p>Copies the <code>n - start</code> limbs from <code>src + start</code> to <code>dst + start</code></p>
+</td></tr><tr class='module-item'><td><a class="fn" href="fn.decr.html" title='ramp::ll::decr fn'>decr</a><a title='unsafe function' href='#'><sup>⚠</sup></a></td><td class='docblock-short'></td></tr><tr class='module-item'><td><a class="fn" href="fn.divide_by_zero.html" title='ramp::ll::divide_by_zero fn'>divide_by_zero</a></td><td class='docblock-short'><p>Called when a divide by zero occurs.</p>
+</td></tr><tr class='module-item'><td><a class="fn" href="fn.divrem.html" title='ramp::ll::divrem fn'>divrem</a><a title='unsafe function' href='#'><sup>⚠</sup></a></td><td class='docblock-short'><p>Divides {np, ns} by {dp, ds}. If ns &lt;= ds, the quotient is stored in {qp, 1}, otherwise
+the quotient is stored to {qp, (ns - ds) + 1}. The remainder is always stored to {rp, ds}.</p>
+</td></tr><tr class='module-item'><td><a class="fn" href="fn.divrem_1.html" title='ramp::ll::divrem_1 fn'>divrem_1</a><a title='unsafe function' href='#'><sup>⚠</sup></a></td><td class='docblock-short'><p>Divides the <code>xs</code> least-significant limbs at <code>xp</code> by <code>d</code>, storing the result in {qp, qxn + xs}.</p>
+</td></tr><tr class='module-item'><td><a class="fn" href="fn.divrem_2.html" title='ramp::ll::divrem_2 fn'>divrem_2</a><a title='unsafe function' href='#'><sup>⚠</sup></a></td><td class='docblock-short'></td></tr><tr class='module-item'><td><a class="fn" href="fn.gcd.html" title='ramp::ll::gcd fn'>gcd</a><a title='unsafe function' href='#'><sup>⚠</sup></a></td><td class='docblock-short'></td></tr><tr class='module-item'><td><a class="fn" href="fn.incr.html" title='ramp::ll::incr fn'>incr</a><a title='unsafe function' href='#'><sup>⚠</sup></a></td><td class='docblock-short'></td></tr><tr class='module-item'><td><a class="fn" href="fn.is_zero.html" title='ramp::ll::is_zero fn'>is_zero</a><a title='unsafe function' href='#'><sup>⚠</sup></a></td><td class='docblock-short'><p>Checks that all <code>nn</code> limbs in <code>np</code> are zero</p>
+</td></tr><tr class='module-item'><td><a class="fn" href="fn.mul.html" title='ramp::ll::mul fn'>mul</a><a title='unsafe function' href='#'><sup>⚠</sup></a></td><td class='docblock-short'><p>Multiplies <code>{xp, xs}</code> by <code>{yp, ys}</code>, storing the result to <code>{wp, xs + ys}</code>.</p>
+</td></tr><tr class='module-item'><td><a class="fn" href="fn.mul_1.html" title='ramp::ll::mul_1 fn'>mul_1</a><a title='unsafe function' href='#'><sup>⚠</sup></a></td><td class='docblock-short'><p>Multiplies the <code>n</code> least-significant limbs of <code>xp</code> by <code>vl</code> storing the <code>n</code> least-significant
+limbs of the product in <code>{wp, n}</code>.</p>
+</td></tr><tr class='module-item'><td><a class="fn" href="fn.nand_n.html" title='ramp::ll::nand_n fn'>nand_n</a><a title='unsafe function' href='#'><sup>⚠</sup></a></td><td class='docblock-short'><p>Performs a bitwise &quot;nand&quot; of the n least signficant limbs of <code>xp</code> and <code>yp</code>, storing the
+result in <code>wp</code></p>
+</td></tr><tr class='module-item'><td><a class="fn" href="fn.nor_n.html" title='ramp::ll::nor_n fn'>nor_n</a><a title='unsafe function' href='#'><sup>⚠</sup></a></td><td class='docblock-short'><p>Performs a bitwise &quot;nor&quot; of the n least signficant limbs of <code>xp</code> and <code>yp</code>, storing the
+result in <code>wp</code></p>
+</td></tr><tr class='module-item'><td><a class="fn" href="fn.normalize.html" title='ramp::ll::normalize fn'>normalize</a><a title='unsafe function' href='#'><sup>⚠</sup></a></td><td class='docblock-short'><p>Returns the size of the integer pointed to by <code>p</code> such that the most
+significant limb is non-zero.</p>
+</td></tr><tr class='module-item'><td><a class="fn" href="fn.not.html" title='ramp::ll::not fn'>not</a><a title='unsafe function' href='#'><sup>⚠</sup></a></td><td class='docblock-short'><p>Performs a bitwise inversion (&quot;not&quot;) of the n least signficant limbs of <code>xp</code>, storing the
+result in <code>wp</code></p>
+</td></tr><tr class='module-item'><td><a class="fn" href="fn.or_n.html" title='ramp::ll::or_n fn'>or_n</a><a title='unsafe function' href='#'><sup>⚠</sup></a></td><td class='docblock-short'><p>Performs a bitwise &quot;or&quot; (<code>|</code>) of the n least signficant limbs of <code>xp</code> and <code>yp</code>, storing the
+result in <code>wp</code></p>
+</td></tr><tr class='module-item'><td><a class="fn" href="fn.or_not_n.html" title='ramp::ll::or_not_n fn'>or_not_n</a><a title='unsafe function' href='#'><sup>⚠</sup></a></td><td class='docblock-short'><p>Performs a bitwise &quot;or&quot; of the n least signficant limbs of <code>xp</code> and <code>yp</code>, with the limbs of <code>yp</code>
+being first inverted. The result is stored in <code>wp</code>.</p>
+</td></tr><tr class='module-item'><td><a class="fn" href="fn.overlap.html" title='ramp::ll::overlap fn'>overlap</a><a title='unsafe function' href='#'><sup>⚠</sup></a></td><td class='docblock-short'></td></tr><tr class='module-item'><td><a class="fn" href="fn.same_or_decr.html" title='ramp::ll::same_or_decr fn'>same_or_decr</a><a title='unsafe function' href='#'><sup>⚠</sup></a></td><td class='docblock-short'></td></tr><tr class='module-item'><td><a class="fn" href="fn.same_or_incr.html" title='ramp::ll::same_or_incr fn'>same_or_incr</a><a title='unsafe function' href='#'><sup>⚠</sup></a></td><td class='docblock-short'></td></tr><tr class='module-item'><td><a class="fn" href="fn.same_or_separate.html" title='ramp::ll::same_or_separate fn'>same_or_separate</a><a title='unsafe function' href='#'><sup>⚠</sup></a></td><td class='docblock-short'></td></tr><tr class='module-item'><td><a class="fn" href="fn.scan_0.html" title='ramp::ll::scan_0 fn'>scan_0</a><a title='unsafe function' href='#'><sup>⚠</sup></a></td><td class='docblock-short'><p>Scans for the first 0 bit starting from the least-significant bit the the most, returning
+the bit index.</p>
+</td></tr><tr class='module-item'><td><a class="fn" href="fn.scan_1.html" title='ramp::ll::scan_1 fn'>scan_1</a><a title='unsafe function' href='#'><sup>⚠</sup></a></td><td class='docblock-short'><p>Scans for the first 1 bit starting from the least-significant bit the the most, returning
+the bit index.</p>
+</td></tr><tr class='module-item'><td><a class="fn" href="fn.shl.html" title='ramp::ll::shl fn'>shl</a><a title='unsafe function' href='#'><sup>⚠</sup></a></td><td class='docblock-short'><p>Performs a bit-shift of the limbs in {xp, xs}, left by <code>cnt</code> bits storing the result in {rp,
+rs}. The top-most shifted bits are returned.</p>
+</td></tr><tr class='module-item'><td><a class="fn" href="fn.shr.html" title='ramp::ll::shr fn'>shr</a><a title='unsafe function' href='#'><sup>⚠</sup></a></td><td class='docblock-short'><p>Performs a bit-shift of the limbs in {xp, xs}, right by <code>cnt</code> bits storing the result in {rp,
+rs}. The bottom-most shifted bits are returned.</p>
+</td></tr><tr class='module-item'><td><a class="fn" href="fn.sqr.html" title='ramp::ll::sqr fn'>sqr</a><a title='unsafe function' href='#'><sup>⚠</sup></a></td><td class='docblock-short'><p>Squares the number in <code>{xp, xs}</code> storing the result in <code>{wp, xs*2}</code>.
+This is slightly more efficient than regular multiplication with both
+inputs the same.</p>
+</td></tr><tr class='module-item'><td><a class="fn" href="fn.sub.html" title='ramp::ll::sub fn'>sub</a><a title='unsafe function' href='#'><sup>⚠</sup></a></td><td class='docblock-short'></td></tr><tr class='module-item'><td><a class="fn" href="fn.sub_1.html" title='ramp::ll::sub_1 fn'>sub_1</a><a title='unsafe function' href='#'><sup>⚠</sup></a></td><td class='docblock-short'></td></tr><tr class='module-item'><td><a class="fn" href="fn.sub_n.html" title='ramp::ll::sub_n fn'>sub_n</a><a title='unsafe function' href='#'><sup>⚠</sup></a></td><td class='docblock-short'><p>Subtracts the <code>n</code> least signficant limbs of <code>yp</code> from <code>xp</code>, storing the result in {wp, n}.
+If there was a borrow from a higher-limb (i.e., the result would be negative), it is returned.</p>
+</td></tr><tr class='module-item'><td><a class="fn" href="fn.submul_1.html" title='ramp::ll::submul_1 fn'>submul_1</a><a title='unsafe function' href='#'><sup>⚠</sup></a></td><td class='docblock-short'><p>Multiplies the <code>n</code> least-signficiant digits of <code>xp</code> by <code>vl</code> and subtracts them from the <code>n</code>
+least-significant digits of <code>wp</code>. Returns the highest limb of the result, adjust for borrow.</p>
+</td></tr><tr class='module-item'><td><a class="fn" href="fn.twos_complement.html" title='ramp::ll::twos_complement fn'>twos_complement</a><a title='unsafe function' href='#'><sup>⚠</sup></a></td><td class='docblock-short'><p>Computes the two's complement of the <code>xs</code> least significant words
+of <code>xp</code>. The result is stored the result in <code>wp</code>, and a carry is
+returned, if there is one.</p>
+</td></tr><tr class='module-item'><td><a class="fn" href="fn.xor_n.html" title='ramp::ll::xor_n fn'>xor_n</a><a title='unsafe function' href='#'><sup>⚠</sup></a></td><td class='docblock-short'><p>Performs a bitwise &quot;xor&quot; (<code>^</code>) of the n least signficant limbs of <code>xp</code> and <code>yp</code>, storing the
+result in <code>wp</code></p>
+</td></tr><tr class='module-item'><td><a class="fn" href="fn.zero.html" title='ramp::ll::zero fn'>zero</a><a title='unsafe function' href='#'><sup>⚠</sup></a></td><td class='docblock-short'></td></tr></table></section><section id="search" class="content hidden"></section><section class="footer"></section><script>window.rootPath = "../../";window.currentCrate = "ramp";</script><script src="../../main.js"></script><script defer src="../../search-index.js"></script></body></html>

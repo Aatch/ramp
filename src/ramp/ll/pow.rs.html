@@ -1,0 +1,289 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source to the Rust file `src/ll/pow.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>pow.rs.html -- source</title><link rel="stylesheet" type="text/css" href="../../../normalize.css"><link rel="stylesheet" type="text/css" href="../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../../light.css"  id="themeStyle"><link rel="stylesheet" type="text/css" href="../../../dark.css" disabled ><link rel="stylesheet" type="text/css" href="../../../ayu.css" disabled ><script src="../../../storage.js"></script><noscript><link rel="stylesheet" href="../../../noscript.css"></noscript><link rel="shortcut icon" href="../../../favicon.ico"><style type="text/css">#crate-search{background-image:url("../../../down-arrow.svg");}</style></head><body class="rustdoc source"><!--[if lte IE 8]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu">&#9776;</div><a href='../../../ramp/index.html'><div class='logo-container'><img src='../../../rust-logo.png' alt='logo'></div></a></nav><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!"><img src="../../../brush.svg" width="18" alt="Pick another theme!"></button><div id="theme-choices"></div></div><script src="../../../theme.js"></script><nav class="sub"><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" disabled autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><a id="settings-menu" href="../../../settings.html"><img src="../../../wheel.svg" width="18" alt="Change settings"></a></div></form></nav><section id="main" class="content"><pre class="line-numbers"><span id="1">  1</span>
+<span id="2">  2</span>
+<span id="3">  3</span>
+<span id="4">  4</span>
+<span id="5">  5</span>
+<span id="6">  6</span>
+<span id="7">  7</span>
+<span id="8">  8</span>
+<span id="9">  9</span>
+<span id="10"> 10</span>
+<span id="11"> 11</span>
+<span id="12"> 12</span>
+<span id="13"> 13</span>
+<span id="14"> 14</span>
+<span id="15"> 15</span>
+<span id="16"> 16</span>
+<span id="17"> 17</span>
+<span id="18"> 18</span>
+<span id="19"> 19</span>
+<span id="20"> 20</span>
+<span id="21"> 21</span>
+<span id="22"> 22</span>
+<span id="23"> 23</span>
+<span id="24"> 24</span>
+<span id="25"> 25</span>
+<span id="26"> 26</span>
+<span id="27"> 27</span>
+<span id="28"> 28</span>
+<span id="29"> 29</span>
+<span id="30"> 30</span>
+<span id="31"> 31</span>
+<span id="32"> 32</span>
+<span id="33"> 33</span>
+<span id="34"> 34</span>
+<span id="35"> 35</span>
+<span id="36"> 36</span>
+<span id="37"> 37</span>
+<span id="38"> 38</span>
+<span id="39"> 39</span>
+<span id="40"> 40</span>
+<span id="41"> 41</span>
+<span id="42"> 42</span>
+<span id="43"> 43</span>
+<span id="44"> 44</span>
+<span id="45"> 45</span>
+<span id="46"> 46</span>
+<span id="47"> 47</span>
+<span id="48"> 48</span>
+<span id="49"> 49</span>
+<span id="50"> 50</span>
+<span id="51"> 51</span>
+<span id="52"> 52</span>
+<span id="53"> 53</span>
+<span id="54"> 54</span>
+<span id="55"> 55</span>
+<span id="56"> 56</span>
+<span id="57"> 57</span>
+<span id="58"> 58</span>
+<span id="59"> 59</span>
+<span id="60"> 60</span>
+<span id="61"> 61</span>
+<span id="62"> 62</span>
+<span id="63"> 63</span>
+<span id="64"> 64</span>
+<span id="65"> 65</span>
+<span id="66"> 66</span>
+<span id="67"> 67</span>
+<span id="68"> 68</span>
+<span id="69"> 69</span>
+<span id="70"> 70</span>
+<span id="71"> 71</span>
+<span id="72"> 72</span>
+<span id="73"> 73</span>
+<span id="74"> 74</span>
+<span id="75"> 75</span>
+<span id="76"> 76</span>
+<span id="77"> 77</span>
+<span id="78"> 78</span>
+<span id="79"> 79</span>
+<span id="80"> 80</span>
+<span id="81"> 81</span>
+<span id="82"> 82</span>
+<span id="83"> 83</span>
+<span id="84"> 84</span>
+<span id="85"> 85</span>
+<span id="86"> 86</span>
+<span id="87"> 87</span>
+<span id="88"> 88</span>
+<span id="89"> 89</span>
+<span id="90"> 90</span>
+<span id="91"> 91</span>
+<span id="92"> 92</span>
+<span id="93"> 93</span>
+<span id="94"> 94</span>
+<span id="95"> 95</span>
+<span id="96"> 96</span>
+<span id="97"> 97</span>
+<span id="98"> 98</span>
+<span id="99"> 99</span>
+<span id="100">100</span>
+<span id="101">101</span>
+<span id="102">102</span>
+<span id="103">103</span>
+<span id="104">104</span>
+<span id="105">105</span>
+<span id="106">106</span>
+<span id="107">107</span>
+<span id="108">108</span>
+<span id="109">109</span>
+<span id="110">110</span>
+<span id="111">111</span>
+<span id="112">112</span>
+<span id="113">113</span>
+<span id="114">114</span>
+<span id="115">115</span>
+<span id="116">116</span>
+<span id="117">117</span>
+<span id="118">118</span>
+<span id="119">119</span>
+<span id="120">120</span>
+<span id="121">121</span>
+<span id="122">122</span>
+<span id="123">123</span>
+<span id="124">124</span>
+<span id="125">125</span>
+<span id="126">126</span>
+<span id="127">127</span>
+<span id="128">128</span>
+<span id="129">129</span>
+<span id="130">130</span>
+<span id="131">131</span>
+<span id="132">132</span>
+<span id="133">133</span>
+<span id="134">134</span>
+<span id="135">135</span>
+<span id="136">136</span>
+<span id="137">137</span>
+<span id="138">138</span>
+<span id="139">139</span>
+<span id="140">140</span>
+<span id="141">141</span>
+<span id="142">142</span>
+<span id="143">143</span>
+</pre><div class="example-wrap"><pre class="rust ">
+<span class="comment">// Copyright 2015 The Ramp Developers</span>
+<span class="comment">//</span>
+<span class="comment">//    Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);</span>
+<span class="comment">//    you may not use this file except in compliance with the License.</span>
+<span class="comment">//    You may obtain a copy of the License at</span>
+<span class="comment">//</span>
+<span class="comment">//        http://www.apache.org/licenses/LICENSE-2.0</span>
+<span class="comment">//</span>
+<span class="comment">//    Unless required by applicable law or agreed to in writing, software</span>
+<span class="comment">//    distributed under the License is distributed on an &quot;AS IS&quot; BASIS,</span>
+<span class="comment">//    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.</span>
+<span class="comment">//    See the License for the specific language governing permissions and</span>
+<span class="comment">//    limitations under the License.</span>
+
+<span class="kw">use</span> <span class="ident">ll</span>;
+<span class="kw">use</span> <span class="ident">ll</span>::<span class="ident">limb</span>::<span class="ident">Limb</span>;
+<span class="kw">use</span> <span class="ident">mem</span>;
+
+<span class="kw">use</span> <span class="ident">ll</span>::<span class="ident">limb_ptr</span>::{<span class="ident">Limbs</span>, <span class="ident">LimbsMut</span>};
+
+<span class="doccomment">/**
+ * Takes `{ap, an}` to the power of `exp` and stores the result to `wp`. `wp` is
+ * assumed to have enough space to store the result (which can be calculated using
+ * `num_pow_limbs`
+ *
+ * `{wp, an*exp}` must be disjoint from `{ap, an}`.
+ * `{ap, an}` must not be zero.
+ * `exp` must be greater than 2
+ */</span>
+<span class="kw">pub</span> <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">pow</span>(<span class="kw-2">mut</span> <span class="ident">wp</span>: <span class="ident">LimbsMut</span>, <span class="kw-2">mut</span> <span class="ident">ap</span>: <span class="ident">Limbs</span>, <span class="kw-2">mut</span> <span class="ident">an</span>: <span class="ident">i32</span>, <span class="kw-2">mut</span> <span class="ident">exp</span>: <span class="ident">u32</span>) {
+    <span class="macro">debug_assert</span><span class="macro">!</span>(<span class="ident">exp</span> <span class="op">&gt;</span> <span class="number">2</span>);
+    <span class="macro">debug_assert</span><span class="macro">!</span>(<span class="op">!</span><span class="ident">ll</span>::<span class="ident">is_zero</span>(<span class="ident">ap</span>, <span class="ident">an</span>));
+
+    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">wn</span> <span class="op">=</span> <span class="ident">num_pow_limbs</span>(<span class="ident">ap</span>, <span class="ident">an</span>, <span class="ident">exp</span>);
+    <span class="macro">debug_assert</span><span class="macro">!</span>(<span class="op">!</span><span class="ident">ll</span>::<span class="ident">overlap</span>(<span class="ident">wp</span>, <span class="ident">wn</span>, <span class="ident">ap</span>, <span class="ident">an</span>));
+
+    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">tmp</span> <span class="op">=</span> <span class="ident">mem</span>::<span class="ident">TmpAllocator</span>::<span class="ident">new</span>();
+
+    <span class="ident">ll</span>::<span class="ident">zero</span>(<span class="ident">wp</span>, <span class="ident">wn</span>);
+
+    <span class="comment">// (m * 2**K)**exp == m**exp * 2**(K*exp)</span>
+    <span class="kw">while</span> <span class="kw-2">*</span><span class="ident">ap</span> <span class="op">==</span> <span class="number">0</span> {
+        <span class="ident">ap</span> <span class="op">=</span> <span class="ident">ap</span>.<span class="ident">offset</span>(<span class="number">1</span>);
+        <span class="ident">an</span> <span class="op">-=</span> <span class="number">1</span>;
+        <span class="ident">wp</span> <span class="op">=</span> <span class="ident">wp</span>.<span class="ident">offset</span>(<span class="ident">exp</span> <span class="kw">as</span> <span class="ident">isize</span>);
+        <span class="ident">wn</span> <span class="op">-=</span> <span class="ident">exp</span> <span class="kw">as</span> <span class="ident">i32</span>;
+    }
+    <span class="kw">let</span> <span class="ident">trailing</span> <span class="op">=</span> (<span class="kw-2">*</span><span class="ident">ap</span>).<span class="ident">trailing_zeros</span>() <span class="kw">as</span> <span class="ident">u32</span>;
+
+    <span class="kw">let</span> <span class="ident">sz</span> <span class="op">=</span> <span class="ident">wn</span> <span class="kw">as</span> <span class="ident">usize</span>;
+
+    <span class="comment">// An extra limb of scratch space is needed because the length</span>
+    <span class="comment">// estimation is precise: if you&#39;re doing something like x**7, the</span>
+    <span class="comment">// final multiplication is ``x**3 * x**4`. These could have</span>
+    <span class="comment">// lengths, like, say, 30 and 40 limbs, so the multiplication can</span>
+    <span class="comment">// take at most 30 + 40 + 1 limbs, and the multiplication</span>
+    <span class="comment">// algorithm will write to all of them, possibly putting a zero in</span>
+    <span class="comment">// the very highest limb... however, the x**7 length estimator may</span>
+    <span class="comment">// work out that the final result actually fits into only 70</span>
+    <span class="comment">// limbs, so if we don&#39;t account for this mismatch we risk memory</span>
+    <span class="comment">// corruption.</span>
+    <span class="comment">//</span>
+    <span class="comment">// (Examples of such x are 2**(k L), where k &gt; 0 is an integer and</span>
+    <span class="comment">// L is the number of bits in a limb.)</span>
+    <span class="kw">let</span> (<span class="ident">bp</span>, <span class="ident">scratch</span>) <span class="op">=</span> <span class="ident">tmp</span>.<span class="ident">allocate_2</span>(<span class="ident">sz</span>, <span class="ident">sz</span> <span class="op">+</span> <span class="number">1</span>);
+    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">bn</span> <span class="op">=</span> <span class="ident">an</span>;
+
+    <span class="kw">if</span> <span class="ident">trailing</span> <span class="op">&gt;</span> <span class="number">0</span> {
+        <span class="ident">ll</span>::<span class="ident">shr</span>(<span class="ident">bp</span>, <span class="ident">ap</span>, <span class="ident">an</span>, <span class="ident">trailing</span>);
+    } <span class="kw">else</span> {
+        <span class="ident">ll</span>::<span class="ident">copy_incr</span>(<span class="ident">ap</span>, <span class="ident">bp</span>, <span class="ident">an</span>);
+    }
+
+    <span class="comment">// Calculate the amount we&#39;ll need to shift by at the end,</span>
+    <span class="comment">// we need to adjust wp here because the shift functions only</span>
+    <span class="comment">// work with shifts of &lt; Limb::BITS</span>
+    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">shift</span> <span class="op">=</span> <span class="ident">trailing</span> <span class="op">*</span> <span class="ident">exp</span>;
+    <span class="kw">while</span> <span class="ident">shift</span> <span class="op">&gt;=</span> <span class="ident">Limb</span>::<span class="ident">BITS</span> <span class="kw">as</span> <span class="ident">u32</span> {
+        <span class="ident">shift</span> <span class="op">-=</span> <span class="ident">Limb</span>::<span class="ident">BITS</span> <span class="kw">as</span> <span class="ident">u32</span>;
+        <span class="ident">wp</span> <span class="op">=</span> <span class="ident">wp</span>.<span class="ident">offset</span>(<span class="number">1</span>);
+    }
+
+    <span class="kw-2">*</span><span class="ident">wp</span> <span class="op">=</span> <span class="ident">Limb</span>(<span class="number">1</span>);
+    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">wn</span> <span class="op">=</span> <span class="number">1</span>;
+
+    <span class="kw">loop</span> {
+        <span class="kw">if</span> (<span class="ident">exp</span> <span class="op">&amp;</span> <span class="number">1</span>) <span class="op">==</span> <span class="number">1</span> {
+            <span class="kw">if</span> <span class="ident">wn</span> <span class="op">&gt;</span> <span class="ident">bn</span> {
+                <span class="ident">ll</span>::<span class="ident">mul</span>(<span class="ident">scratch</span>, <span class="ident">wp</span>.<span class="ident">as_const</span>(), <span class="ident">wn</span>, <span class="ident">bp</span>.<span class="ident">as_const</span>(), <span class="ident">bn</span>);
+            } <span class="kw">else</span> {
+                <span class="ident">ll</span>::<span class="ident">mul</span>(<span class="ident">scratch</span>, <span class="ident">bp</span>.<span class="ident">as_const</span>(), <span class="ident">bn</span>, <span class="ident">wp</span>.<span class="ident">as_const</span>(), <span class="ident">wn</span>);
+            }
+            <span class="ident">wn</span> <span class="op">=</span> <span class="ident">ll</span>::<span class="ident">normalize</span>(<span class="ident">scratch</span>.<span class="ident">as_const</span>(), <span class="ident">wn</span> <span class="op">+</span> <span class="ident">bn</span>);
+            <span class="ident">ll</span>::<span class="ident">copy_incr</span>(<span class="ident">scratch</span>.<span class="ident">as_const</span>(), <span class="ident">wp</span>, <span class="ident">wn</span>);
+        }
+
+        <span class="ident">exp</span> <span class="op">&gt;&gt;</span><span class="op">=</span> <span class="number">1</span>;
+
+        <span class="comment">// Do this check before the base multiplication so we don&#39;t</span>
+        <span class="comment">// end up needing more space than necessary</span>
+        <span class="kw">if</span> <span class="ident">exp</span> <span class="op">==</span> <span class="number">0</span> {
+            <span class="kw">break</span>;
+        }
+
+        <span class="ident">ll</span>::<span class="ident">sqr</span>(<span class="ident">scratch</span>, <span class="ident">bp</span>.<span class="ident">as_const</span>(), <span class="ident">bn</span>);
+        <span class="ident">bn</span> <span class="op">=</span> <span class="ident">ll</span>::<span class="ident">normalize</span>(<span class="ident">scratch</span>.<span class="ident">as_const</span>(), <span class="ident">bn</span> <span class="op">+</span> <span class="ident">bn</span>);
+
+        <span class="ident">ll</span>::<span class="ident">copy_incr</span>(<span class="ident">scratch</span>.<span class="ident">as_const</span>(), <span class="ident">bp</span>, <span class="ident">bn</span>);
+
+    }
+
+    <span class="kw">if</span> <span class="ident">shift</span> <span class="op">&gt;</span> <span class="number">0</span> {
+        <span class="kw">let</span> <span class="ident">v</span> <span class="op">=</span> <span class="ident">ll</span>::<span class="ident">shl</span>(<span class="ident">wp</span>, <span class="ident">wp</span>.<span class="ident">as_const</span>(), <span class="ident">wn</span>, <span class="ident">shift</span>);
+        <span class="kw">if</span> <span class="ident">v</span> <span class="op">&gt;</span> <span class="number">0</span> {
+            <span class="kw-2">*</span><span class="ident">wp</span>.<span class="ident">offset</span>(<span class="ident">wn</span> <span class="kw">as</span> <span class="ident">isize</span>) <span class="op">=</span> <span class="ident">v</span>;
+        }
+    }
+}
+
+<span class="doccomment">/// Calculates the number of limbs required to store the result of taking</span>
+<span class="doccomment">/// `{xp, xn}` to the power of `exp`</span>
+<span class="kw">pub</span> <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">num_pow_limbs</span>(<span class="ident">xp</span>: <span class="ident">Limbs</span>, <span class="ident">xn</span>: <span class="ident">i32</span>, <span class="ident">exp</span>: <span class="ident">u32</span>) <span class="op">-&gt;</span> <span class="ident">i32</span> {
+    <span class="comment">// This is a better approximation of log_b(x^e) than simply using the</span>
+    <span class="comment">// the number of digits, n.</span>
+    <span class="comment">// Instead it uses the most significant digit, a, to calculate</span>
+    <span class="comment">// e*log_b(a*b^(n-1)), which is e*(log_b(a) + n - 1)</span>
+    <span class="kw">let</span> <span class="ident">n</span> <span class="op">=</span> <span class="ident">xn</span> <span class="op">-</span> <span class="number">1</span>;
+    <span class="kw">let</span> <span class="ident">high_limb</span> <span class="op">=</span> <span class="kw-2">*</span><span class="ident">xp</span>.<span class="ident">offset</span>(<span class="ident">n</span> <span class="kw">as</span> <span class="ident">isize</span>);
+
+    <span class="comment">// Calculate log_2(a), this is because floor(log_b(a)) will always be</span>
+    <span class="comment">// 0</span>
+    <span class="kw">let</span> <span class="ident">lg2</span> <span class="op">=</span> <span class="ident">Limb</span>::<span class="ident">BITS</span> <span class="kw">as</span> <span class="ident">u32</span> <span class="op">-</span> <span class="ident">high_limb</span>.<span class="ident">leading_zeros</span>() <span class="kw">as</span> <span class="ident">u32</span>;
+
+    <span class="comment">// Get e*log_2(a)</span>
+    <span class="kw">let</span> <span class="ident">lg2e</span> <span class="op">=</span> <span class="ident">exp</span> <span class="kw">as</span> <span class="ident">i32</span> <span class="op">*</span> <span class="ident">lg2</span> <span class="kw">as</span> <span class="ident">i32</span>;
+
+    <span class="comment">// Now convert it to log_b using the formula</span>
+    <span class="comment">// log_a(x) = log_b(x) / log_b(a)</span>
+    <span class="kw">let</span> <span class="ident">elog_b</span> <span class="op">=</span> <span class="ident">lg2e</span> <span class="op">/</span> <span class="ident">Limb</span>::<span class="ident">BITS</span> <span class="kw">as</span> <span class="ident">i32</span>;
+
+    <span class="comment">// Add a final 1 to account for the error in the estimate</span>
+    <span class="ident">elog_b</span> <span class="op">+</span> (<span class="ident">exp</span> <span class="kw">as</span> <span class="ident">i32</span> <span class="op">*</span> <span class="ident">n</span>) <span class="op">+</span> <span class="number">1</span>
+}
+</pre></div>
+</section><section id="search" class="content hidden"></section><section class="footer"></section><script>window.rootPath = "../../../";window.currentCrate = "ramp";</script><script src="../../../main.js"></script><script src="../../../source-script.js"></script><script src="../../../source-files.js"></script><script defer src="../../../search-index.js"></script></body></html>

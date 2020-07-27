@@ -1,0 +1,1 @@
+initSidebarItems({"struct":[["ParseRationalError","Error that arises when parsing a [`Rational`]."],["Rational","An arbitrary-precision rational number."]]});

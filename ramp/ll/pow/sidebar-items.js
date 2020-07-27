@@ -1,0 +1,1 @@
+initSidebarItems({"fn":[["num_pow_limbs","Calculates the number of limbs required to store the result of taking `{xp, xn}` to the power of `exp`"],["pow","Takes `{ap, an}` to the power of `exp` and stores the result to `wp`. `wp` is assumed to have enough space to store the result (which can be calculated using `num_pow_limbs`"]]});
