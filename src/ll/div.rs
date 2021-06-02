@@ -12,14 +12,14 @@
 //    See the License for the specific language governing permissions and
 //    limitations under the License.
 
-use std::intrinsics::assume;
 use std::cmp::{self, Ordering};
+use std::intrinsics::assume;
 
-use mem;
+use super::{overlap, same_or_separate};
 use ll;
 use ll::limb::{self, Limb};
-use super::{same_or_separate, overlap};
 use ll::limb_ptr::{Limbs, LimbsMut};
+use mem;
 
 /**
  * Divides the `xs` least-significant limbs at `xp` by `d`, storing the result in {qp, qxn + xs}.
@@ -27,8 +27,7 @@ use ll::limb_ptr::{Limbs, LimbsMut};
  * Specifically, the integer part is stored in {qp+qxn, xs} and the fractional part (if any) is
  * stored in {qp, qxn}. The remainder is returned.
  */
-pub unsafe fn divrem_1(mut qp: LimbsMut, qxn: i32,
-                       xp: Limbs, mut xs: i32, d: Limb) -> Limb {
+pub unsafe fn divrem_1(mut qp: LimbsMut, qxn: i32, xp: Limbs, mut xs: i32, d: Limb) -> Limb {
     debug_assert!(qxn >= 0);
     debug_assert!(xs >= 0);
     debug_assert!(d != 0);
@@ -39,7 +38,9 @@ pub unsafe fn divrem_1(mut qp: LimbsMut, qxn: i32,
     assume(d != 0);
 
     let mut n = xs + qxn;
-    if n == 0 { return Limb(0); }
+    if n == 0 {
+        return Limb(0);
+    }
 
     // FIXME (#49): this is used for bounds checks below, which may be
     // unnecessary.
@@ -146,13 +147,11 @@ pub unsafe fn divrem_1(mut qp: LimbsMut, qxn: i32,
     }
 }
 
-pub unsafe fn divrem_2(mut qp: LimbsMut, qxn: i32,
-                       mut np: LimbsMut, ns: i32,
-                       dp: Limbs) -> Limb {
+pub unsafe fn divrem_2(mut qp: LimbsMut, qxn: i32, mut np: LimbsMut, ns: i32, dp: Limbs) -> Limb {
     debug_assert!(ns >= 2);
     debug_assert!(qxn >= 0);
     debug_assert!((*dp.offset(1)).high_bit_set());
-    debug_assert!(!overlap(qp, ns-2+qxn, np.as_const(), ns) || qp >= np.offset(2));
+    debug_assert!(!overlap(qp, ns - 2 + qxn, np.as_const(), ns) || qp >= np.offset(2));
 
     np = np.offset((ns - 2) as isize);
 
@@ -257,9 +256,7 @@ fn divrem_3by2(n2: Limb, n1: Limb, n0: Limb, d1: Limb, d0: Limb, dinv: Limb) -> 
  * Divides {np, ns} by {dp, ds}. If ns <= ds, the quotient is stored in {qp, 1}, otherwise
  * the quotient is stored to {qp, (ns - ds) + 1}. The remainder is always stored to {rp, ds}.
  */
-pub unsafe fn divrem(mut qp: LimbsMut, mut rp: LimbsMut,
-                     np: Limbs, ns: i32,
-                     dp: Limbs, ds: i32) {
+pub unsafe fn divrem(mut qp: LimbsMut, mut rp: LimbsMut, np: Limbs, ns: i32, dp: Limbs, ds: i32) {
     // Space for at least one limb is always needed, even if
     // (logarithmically) the result will be so small that negative
     // would work.
@@ -296,7 +293,10 @@ pub unsafe fn divrem(mut qp: LimbsMut, mut rp: LimbsMut,
                 *rp = *np_tmp;
                 *rp.offset(1) = *np_tmp.offset(1);
             } else {
-                let dtmp = [*dp << cnt, (*dp.offset(1) << cnt) | *dp >> (Limb::BITS - cnt)];
+                let dtmp = [
+                    *dp << cnt,
+                    (*dp.offset(1) << cnt) | *dp >> (Limb::BITS - cnt),
+                ];
                 let dp_tmp = Limbs::new(&dtmp[0], 0, dtmp.len() as i32);
 
                 let np_tmp = tmp.allocate((ns + 1) as usize);
@@ -310,7 +310,7 @@ pub unsafe fn divrem(mut qp: LimbsMut, mut rp: LimbsMut,
                     *qp.offset((ns - 2) as isize) = qhl;
                 }
 
-                *rp = (*np_tmp >> cnt) | (*np_tmp.offset(1) << Limb::BITS - cnt);
+                *rp = (*np_tmp >> cnt) | (*np_tmp.offset(1) << (Limb::BITS - cnt));
                 *rp.offset(1) = *np_tmp.offset(1) >> cnt;
             }
             return;
@@ -345,8 +345,10 @@ pub unsafe fn divrem(mut qp: LimbsMut, mut rp: LimbsMut,
                 dp_tmp = dtmp.as_const();
             }
 
-            let dinv = invert_pi(*dp_tmp.offset((ds - 1) as isize),
-                                 *dp_tmp.offset((ds - 2) as isize));
+            let dinv = invert_pi(
+                *dp_tmp.offset((ds - 1) as isize),
+                *dp_tmp.offset((ds - 2) as isize),
+            );
             let qh = sb_div(qp, np_tmp, ns_tmp, dp_tmp, ds, dinv);
             if qh > 0 {
                 *qp.offset((ns - ds) as isize) = qh;
@@ -359,7 +361,6 @@ pub unsafe fn divrem(mut qp: LimbsMut, mut rp: LimbsMut,
             }
         }
     }
-
 }
 
 /**
@@ -378,10 +379,7 @@ pub unsafe fn divrem(mut qp: LimbsMut, mut rp: LimbsMut,
  *
  * It is also assumed that `ns >= ds`.
  */
-unsafe fn sb_div(qp: LimbsMut,
-                 np: LimbsMut, ns: i32,
-                 dp: Limbs, ds: i32,
-                 dinv: Limb) -> Limb {
+unsafe fn sb_div(qp: LimbsMut, np: LimbsMut, ns: i32, dp: Limbs, ds: i32, dinv: Limb) -> Limb {
     debug_assert!(ds > 2);
     debug_assert!(ns >= ds);
     debug_assert!((*dp.offset((ds - 1) as isize)).high_bit_set());
@@ -434,7 +432,14 @@ unsafe fn sb_div(qp: LimbsMut,
             *np = r0;
 
             if cy {
-                n2 = d1 + n2 + ll::add_n(np.offset(-ds), np.offset(-ds).as_const(), dp, (ds + 1) as i32);
+                n2 = d1
+                    + n2
+                    + ll::add_n(
+                        np.offset(-ds),
+                        np.offset(-ds).as_const(),
+                        dp,
+                        (ds + 1) as i32,
+                    );
                 q - 1
             } else {
                 q

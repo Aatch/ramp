@@ -18,7 +18,7 @@ fn main() {
 
     gen_bases(&mut f);
 
-    if let Ok(_) = env::var("CARGO_FEATURE_ASM") {
+    if env::var("CARGO_FEATURE_ASM").is_ok() {
         compile_asm();
     }
 }

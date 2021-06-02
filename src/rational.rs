@@ -59,13 +59,10 @@ impl Rational {
         assert!(d != 0, "Denominator is zero");
 
         if n == 0 {
-            return Rational {
-                n: n,
-                d: Int::one(),
-            };
+            return Rational { n, d: Int::one() };
         }
 
-        let mut rat = Rational { n: n, d: d };
+        let mut rat = Rational { n, d };
 
         rat.normalize();
 
