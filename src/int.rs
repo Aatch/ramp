@@ -588,7 +588,7 @@ impl Int {
         }
     }
 
-    /// Returns the number of trailing one bits (i.e. the population count) for this `Int`
+    /// Returns the number of one bits (i.e. the population count) for this `Int`
     ///
     /// If this number is negative, it has infinitely many ones (in two's complement). Therefore,
     /// this method returns `usize::MAX` for negative numbers.
