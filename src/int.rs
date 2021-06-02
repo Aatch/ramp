@@ -3694,7 +3694,7 @@ impl Integer for Int {
     }
 }
 
-unsafe impl std::iter::Step for Int {
+impl std::iter::Step for Int {
     fn steps_between(start: &Int, end: &Int) -> Option<usize> {
         let diff = (start - end).abs();
 
@@ -5011,7 +5011,7 @@ mod test {
     fn shl_rand_large() {
         let mut rng = rand::thread_rng();
         for _ in 0..RAND_ITER {
-            let pow: usize = rng.gen_range(64, 8196);
+            let pow: usize = rng.gen_range(64..8196);
             let mul_by = Int::from(2).pow(pow);
 
             let x = rng.gen_int(640);
@@ -5027,7 +5027,7 @@ mod test {
     fn shr_rand() {
         let mut rng = rand::thread_rng();
         for _ in 0..RAND_ITER {
-            let pow: usize = rng.gen_range(64, 8196);
+            let pow: usize = rng.gen_range(64..8196);
             let x = rng.gen_int(640);
 
             let shift_up = &x << pow;
@@ -5298,7 +5298,7 @@ mod test {
         let mut rng = rand::thread_rng();
 
         let x = rng.gen_int(xs * Limb::BITS);
-        let y: usize = rng.gen_range(0, ys);
+        let y: usize = rng.gen_range(0..ys);
 
         b.iter(|| {
             let z = &x.pow(y);
@@ -5572,7 +5572,7 @@ mod test {
     fn bench_rng_all_ones(b: &mut Bencher) {
         let mut rng = rand::thread_rng();
 
-        let num_bits: usize = rng.gen_range(512, 1024);
+        let num_bits: usize = rng.gen_range(512..1024);
 
         let mut bound = Int::from(1) << num_bits;
         bound -= 1;

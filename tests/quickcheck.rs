@@ -1,33 +1,33 @@
-#[cfg(feature="rust-gmp")]
+#[cfg(feature = "rust-gmp")]
 extern crate gmp;
-#[cfg(not(feature="rust-gmp"))]
+#[cfg(not(feature = "rust-gmp"))]
 extern crate num_bigint;
-#[cfg(not(feature="rust-gmp"))]
-extern crate num_traits;
-#[cfg(not(feature="rust-gmp"))]
+#[cfg(not(feature = "rust-gmp"))]
 extern crate num_integer;
+#[cfg(not(feature = "rust-gmp"))]
+extern crate num_traits;
 
 #[macro_use]
 extern crate quickcheck;
 
 extern crate ramp;
 
-#[cfg(feature="rust-gmp")]
+#[cfg(feature = "rust-gmp")]
 pub use gmp::mpz::Mpz as RefImpl;
-#[cfg(not(feature="rust-gmp"))]
-pub use num_bigint::BigInt as RefImpl;
-#[cfg(feature="rust-gmp")]
+#[cfg(feature = "rust-gmp")]
 pub use gmp::mpz::Mpz as RefImplU;
-#[cfg(not(feature="rust-gmp"))]
+#[cfg(not(feature = "rust-gmp"))]
+pub use num_bigint::BigInt as RefImpl;
+#[cfg(not(feature = "rust-gmp"))]
 pub use num_bigint::BigUint as RefImplU;
 
-#[cfg(not(feature="rust-gmp"))]
+#[cfg(not(feature = "rust-gmp"))]
 use num_traits::sign::Signed;
 
-use ramp::Int;
 use ramp::traits::DivRem;
+use ramp::Int;
 
-use quickcheck::{Gen, Arbitrary, TestResult};
+use quickcheck::{Arbitrary, Gen, TestResult};
 use std::fmt::Write;
 
 #[cfg(feature = "full-quickcheck")]
@@ -35,12 +35,12 @@ const RANGE_MULT: usize = 200;
 #[cfg(not(feature = "full-quickcheck"))]
 const RANGE_MULT: usize = 20;
 
-#[cfg(feature="rust-gmp")]
-fn ref_from_hex(a:&str) -> RefImpl {
+#[cfg(feature = "rust-gmp")]
+fn ref_from_hex(a: &str) -> RefImpl {
     RefImpl::from_str_radix(a, 16).unwrap()
 }
-#[cfg(not(feature="rust-gmp"))]
-fn ref_from_hex(a:&str) -> RefImpl {
+#[cfg(not(feature = "rust-gmp"))]
+fn ref_from_hex(a: &str) -> RefImpl {
     RefImpl::parse_bytes(a.as_bytes(), 16).unwrap()
 }
 
@@ -60,18 +60,19 @@ impl BigIntStr {
     }
 }
 
-impl<'a> From<&'a BigIntStr> for (Int,RefImpl) {
-    fn from(s:&'a BigIntStr) -> (Int, RefImpl) {
-        (Int::from_str_radix(&s.0, 16).unwrap(),
-        ref_from_hex(&s.0))
+impl<'a> From<&'a BigIntStr> for (Int, RefImpl) {
+    fn from(s: &'a BigIntStr) -> (Int, RefImpl) {
+        (Int::from_str_radix(&s.0, 16).unwrap(), ref_from_hex(&s.0))
     }
 }
 
-#[cfg(not(feature="rust-gmp"))]
-impl<'a> From<&'a BigIntStr> for (Int,RefImplU) {
+#[cfg(not(feature = "rust-gmp"))]
+impl<'a> From<&'a BigIntStr> for (Int, RefImplU) {
     fn from(s: &'a BigIntStr) -> (Int, RefImplU) {
-        (Int::from_str_radix(&s.0, 16).unwrap().abs(),
-        ref_from_hex(&s.0).abs().to_biguint().unwrap())
+        (
+            Int::from_str_radix(&s.0, 16).unwrap().abs(),
+            ref_from_hex(&s.0).abs().to_biguint().unwrap(),
+        )
     }
 }
 
@@ -87,8 +88,7 @@ impl Arbitrary for BigIntStr {
 
         let raw_size = g.size();
 
-        let size = std::cmp::max(g.gen_range(raw_size / RANGE_MULT, raw_size * RANGE_MULT),
-                                 1);
+        let size = std::cmp::max(g.gen_range(raw_size / RANGE_MULT, raw_size * RANGE_MULT), 1);
 
         // negative numbers are rarer
         let neg = g.gen::<u8>() % 4 == 0;
@@ -115,11 +115,7 @@ impl Arbitrary for BigIntStr {
             // This is trying to imitate gmp's`mpz_rrandomb`, which,
             // apparently, seem to uncover more edge cases than truly
             // uniform bits.
-            let limit = if sticky.is_none() {
-                16 + 4
-            } else {
-                16 * 20
-            };
+            let limit = if sticky.is_none() { 16 + 4 } else { 16 * 20 };
             let raw_digit = g.gen_range(0, limit);
 
             let digit = if raw_digit < 16 {
@@ -147,10 +143,10 @@ impl Arbitrary for BigIntStr {
                 // small numbers strink slowly.
                 let rate = match string.0.len() {
                     0 => 0,
-                    1 ..= 10 => 1,
-                    11 ..= 100 => 5,
-                    100 ..= 1000 => 25,
-                    _ => 125
+                    1..=10 => 1,
+                    11..=100 => 5,
+                    101..=1000 => 25,
+                    _ => 125,
                 };
                 for _ in 0..rate {
                     string.0.pop();
@@ -215,7 +211,7 @@ quickcheck! {
     }
 }
 
-#[cfg(feature="rust-gmp")]
+#[cfg(feature = "rust-gmp")]
 quickcheck! {
     fn pow(a: BigIntStr, b: u32) -> TestResult {
         if b > (RANGE_MULT as u32)/10 {
@@ -259,13 +255,15 @@ quickcheck! {
     }
 }
 
-#[cfg(feature="rust-gmp")]
-fn tstbit(ag:&RefImpl, i:usize) -> bool { ag.tstbit(i) }
+#[cfg(feature = "rust-gmp")]
+fn tstbit(ag: &RefImpl, i: usize) -> bool {
+    ag.tstbit(i)
+}
 
-#[cfg(not(feature="rust-gmp"))]
-fn tstbit(ag:&RefImplU, i:usize) -> bool {
-    use num_traits::One;
+#[cfg(not(feature = "rust-gmp"))]
+fn tstbit(ag: &RefImplU, i: usize) -> bool {
     use num_bigint::BigUint;
+    use num_traits::One;
     (ag >> i) & BigUint::one() == BigUint::one()
 }
 
@@ -288,7 +286,7 @@ quickcheck! {
     }
 }
 
-#[cfg(feature="rust-gmp")]
+#[cfg(feature = "rust-gmp")]
 quickcheck! {
     fn count_ones(a: BigIntStr) -> TestResult {
         let (ar, ag) = a.parse();
@@ -297,7 +295,7 @@ quickcheck! {
     }
 }
 
-#[cfg(not(feature="rust-gmp"))]
+#[cfg(not(feature = "rust-gmp"))]
 quickcheck! {
     fn count_ones(a: BigIntStr) -> TestResult {
         let (ar, ag) = a.parse_u();
@@ -308,7 +306,7 @@ quickcheck! {
     }
 }
 
-#[cfg(feature="rust-gmp")]
+#[cfg(feature = "rust-gmp")]
 quickcheck! {
     fn bit_length(a: BigIntStr) -> TestResult {
         let (ar, ag) = a.parse();
@@ -317,7 +315,7 @@ quickcheck! {
     }
 }
 
-#[cfg(not(feature="rust-gmp"))]
+#[cfg(not(feature = "rust-gmp"))]
 quickcheck! {
     fn bit_length(a: BigIntStr) -> TestResult {
         let (ar, ag) = a.parse();
@@ -334,7 +332,7 @@ quickcheck! {
     }
 }
 
-#[cfg(feature="rust-gmp")]
+#[cfg(feature = "rust-gmp")]
 quickcheck! {
     fn set_bit(a: BigIntStr, bit: u16, b: bool) -> TestResult {
         let (mut ar, mut ag) = a.parse();
@@ -414,7 +412,9 @@ quickcheck! {
 // operators
 
 macro_rules! expr {
-    ($e: expr) => { $e }
+    ($e: expr) => {
+        $e
+    };
 }
 
 macro_rules! test_binop {
@@ -643,7 +643,6 @@ mod neg {
         }
     }
 }
-
 
 macro_rules! test_shiftop {
     ($($name: ident: $op: tt, $assign: tt;)*) => {

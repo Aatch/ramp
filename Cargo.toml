@@ -24,11 +24,11 @@ full-quickcheck = []
 
 [dependencies]
 ieee754 = "0.2"
-rand = "0.5"
+rand = "0.8"
 hamming = "0.1"
 num-traits = "0.1.35"
 num-integer = "0.1.32"
-rust-gmp = { version = "0.2", optional = true }
+rust-gmp = { version = "0.5", optional = true }
 
 [build-dependencies]
 num-bigint = "0.1"
