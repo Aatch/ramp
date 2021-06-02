@@ -1,8 +1,8 @@
 #![allow(unused_must_use)]
 
 extern crate cc;
-extern crate rustc_cfg;
 extern crate num_bigint;
+extern crate rustc_cfg;
 
 use std::env;
 use std::fs::File;
@@ -29,11 +29,13 @@ fn main() {
 fn compile_asm() {
     if let Ok(target) = env::var("TARGET") {
         if let Ok(host) = env::var("HOST") {
-            if host != target { panic!("Cross compiling not currently supported"); }
+            if host != target {
+                panic!("Cross compiling not currently supported");
+            }
 
             // Currently only supported for 64-bit linux
-            if (target.contains("x86-64") || target.contains("x86_64")) && target.contains("linux")  {
-
+            if (target.contains("x86-64") || target.contains("x86_64")) && target.contains("linux")
+            {
                 let asm_srcs = &[
                     "src/ll/asm/addsub_n.S",
                     "src/ll/asm/mul_1.S",
@@ -54,9 +56,11 @@ fn gen_bases(f: &mut File) {
 
     // Base '0' and Base '1' don't make any sense, but having
     // entries for them makes the code that uses them simpler.
-    f.write_all(b"static BASES : [Base; 257] = [
+    f.write_all(
+        b"static BASES : [Base; 257] = [
     /*   0 */ Base { digits_per_limb: 0, big_base: ::ll::limb::Limb(0) },
-    /*   1 */ Base { digits_per_limb: 0, big_base: ::ll::limb::Limb(0) },\n");
+    /*   1 */ Base { digits_per_limb: 0, big_base: ::ll::limb::Limb(0) },\n",
+    );
 
     // Generate entries up to base 256, which is the largest base
     // where a digit still fits in a single byte.
@@ -67,10 +71,10 @@ fn gen_bases(f: &mut File) {
     f.write_all(b"];\n");
 }
 
-fn gen_base(f: &mut File, limb_size: usize, base: usize) {
+fn gen_base(f: &mut File, limb_size: u64, base: usize) {
     let mut digits_per_limb = 1;
-    let base_as_bigint:BigUint = base.into();
-    let mut big_base:BigUint = base_as_bigint.clone();
+    let base_as_bigint: BigUint = base.into();
+    let mut big_base: BigUint = base_as_bigint.clone();
     // Loop through, multiplying `big_base` by `base` until
     // `big_base` is bigger than 2^limb_size
     loop {
@@ -85,7 +89,7 @@ fn gen_base(f: &mut File, limb_size: usize, base: usize) {
             }
             break;
         }
-        digits_per_limb +=1;
+        digits_per_limb += 1;
         big_base = base_big_base;
     }
 
@@ -95,11 +99,18 @@ fn gen_base(f: &mut File, limb_size: usize, base: usize) {
         big_base = base.trailing_zeros().into();
     }
 
-    writeln!(f, "    /* {:3} */ Base {{ digits_per_limb: {}, big_base: ::ll::limb::Limb(0x{:x}) }},",
-             base, digits_per_limb, big_base);
+    writeln!(
+        f,
+        "    /* {:3} */ Base {{ digits_per_limb: {}, big_base: ::ll::limb::Limb(0x{:x}) }},",
+        base, digits_per_limb, big_base
+    );
 }
 
-fn get_target_limb_size() -> usize {
-    let cfg = rustc_cfg::Cfg::new(env::var_os("TARGET").unwrap()).unwrap();
-    return cfg.target_pointer_width.parse().unwrap();
+fn get_target_limb_size() -> u64 {
+    let target = env::var_os("TARGET")
+        .expect("no build target given")
+        .into_string()
+        .expect("build target isn't unicode");
+    let cfg = rustc_cfg::Cfg::of(&target).expect("couldn't load config of target env");
+    cfg.target_pointer_width.parse().unwrap()
 }

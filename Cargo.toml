@@ -26,15 +26,15 @@ full-quickcheck = []
 ieee754 = "0.2"
 rand = "0.8"
 hamming = "0.1"
-num-traits = "0.1.35"
-num-integer = "0.1.32"
+num-traits = "0.2"
+num-integer = "0.1"
 rust-gmp = { version = "0.5", optional = true }
 
 [build-dependencies]
-num-bigint = "0.1"
-rustc-cfg = "0.2"
+num-bigint = "0.4"
+rustc-cfg = "0.4"
 cc = "1.0"
 
 [dev-dependencies]
-num-bigint = "0.1"
+num-bigint = "0.4"
 quickcheck = "0.6"
