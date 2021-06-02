@@ -1,3 +1,5 @@
+use std::{convert::TryInto, fmt::Write};
+
 #[cfg(feature = "rust-gmp")]
 extern crate gmp;
 #[cfg(not(feature = "rust-gmp"))]
@@ -28,7 +30,6 @@ use ramp::traits::DivRem;
 use ramp::Int;
 
 use quickcheck::{Arbitrary, Gen, TestResult};
-use std::fmt::Write;
 
 #[cfg(feature = "full-quickcheck")]
 const RANGE_MULT: usize = 200;
@@ -300,7 +301,7 @@ quickcheck! {
     fn count_ones(a: BigIntStr) -> TestResult {
         let (ar, ag) = a.parse_u();
 
-        let ones = (0..ag.bits()).filter(|&idx| tstbit(&ag, idx)).count();
+        let ones = (0..ag.bits()).filter(|&idx| tstbit(&ag, idx.try_into().unwrap())).count();
 
         TestResult::from_bool(ar.count_ones() == ones)
     }
