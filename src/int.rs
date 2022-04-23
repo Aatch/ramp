@@ -3719,6 +3719,24 @@ impl std::iter::Step for Int {
     }
 }
 
+impl<Rhs> std::iter::Sum<Rhs> for Int
+where
+    Self: Add<Rhs, Output = Self>,
+{
+    fn sum<I: Iterator<Item = Rhs>>(iter: I) -> Self {
+        iter.fold(Self::zero(), |acc, rhs| acc + rhs)
+    }
+}
+
+impl<Rhs> std::iter::Product<Rhs> for Int
+where
+    Self: Mul<Rhs, Output = Self>,
+{
+    fn product<I: Iterator<Item = Rhs>>(iter: I) -> Self {
+        iter.fold(Self::one(), |acc, rhs| acc * rhs)
+    }
+}
+
 /// Trait for generating random `Int`s.
 ///
 /// # Example
@@ -4961,6 +4979,22 @@ mod test {
         assert_eq!(
             Int::backward_checked(a.clone(), 897467216),
             Some(Int::from(-232184))
+        );
+    }
+
+    #[test]
+    fn sum() {
+        assert_eq!(
+            std::array::IntoIter::new([897235032, 98345]).sum::<Int>(),
+            Int::from(897333377)
+        );
+    }
+
+    #[test]
+    fn product() {
+        assert_eq!(
+            std::array::IntoIter::new([897235032, 98345]).product::<Int>(),
+            Int::from(897235032) * 98345
         );
     }
 
