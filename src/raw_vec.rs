@@ -1,5 +1,5 @@
-//! This file is modified from
-//! https://raw.githubusercontent.com/rust-lang/rust/c212fc4aa7719613e5254e9051ea03a93558fef4/library/alloc/src/raw_vec.rs
+// This file is modified from
+// https://raw.githubusercontent.com/rust-lang/rust/c212fc4aa7719613e5254e9051ea03a93558fef4/library/alloc/src/raw_vec.rs
 
 use core::alloc::LayoutError;
 use core::intrinsics;

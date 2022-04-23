@@ -12,6 +12,13 @@
 //    See the License for the specific language governing permissions and
 //    limitations under the License.
 
+//! # Deprecated
+//!
+//! **This crate is no longer being maintained.**
+//!
+//! Fortunately, there's [lots of alternatives](https://crates.io/keywords/bignum) to `ramp`.
+//! Thanks for the good times :`)
+
 #![crate_type = "lib"]
 #![crate_name = "ramp"]
 #![feature(core_intrinsics, allocator_api)]

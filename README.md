@@ -1,3 +1,10 @@
+# Deprecated
+
+**This crate is no longer being maintained.**
+
+Fortunately, there's [lots of alternatives](https://crates.io/keywords/bignum) to `ramp`. Thanks for the good times :`)
+
+
 # RAMP - Rust Arithmetic in Multiple Precision
 
 [![Build Status](https://travis-ci.org/Aatch/ramp.svg?branch=master)](https://travis-ci.org/Aatch/ramp)
