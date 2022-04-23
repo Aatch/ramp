@@ -13,6 +13,7 @@
 //    limitations under the License.
 
 use std;
+use std::arch::asm;
 use std::cmp::{Ordering, PartialEq, PartialOrd};
 use std::fmt;
 use std::ops::{Add, BitAnd, BitOr, BitXor, Div, Mul, Neg, Not, Rem, Shl, Shr, Sub};

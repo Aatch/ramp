@@ -14,6 +14,7 @@
 
 //! This module holds `Int` and related types.
 
+use alloc::alloc::Global;
 use rand::Rng;
 use std;
 use std::cmp::{Eq, Ord, Ordering, PartialEq, PartialOrd};
@@ -33,8 +34,7 @@ use num_traits::{Num, One, Zero};
 use ll;
 use ll::limb::{BaseInt, Limb};
 use ll::limb_ptr::{Limbs, LimbsMut};
-
-use alloc::raw_vec::RawVec;
+use raw_vec::RawVec;
 
 use traits::DivRem;
 
@@ -146,7 +146,7 @@ impl Int {
     fn with_raw_vec<F: FnOnce(&mut RawVec<Limb>)>(&mut self, f: F) {
         unsafe {
             let old_cap = self.cap as usize;
-            let mut vec = RawVec::from_raw_parts(self.ptr.as_mut(), old_cap);
+            let mut vec = RawVec::from_raw_parts_in(self.ptr.as_mut(), old_cap, Global);
             // if `f` panics, let `vec` do the cleaning up, not self.
             self.cap = 0;
 
@@ -946,7 +946,11 @@ impl Drop for Int {
     fn drop(&mut self) {
         if self.cap > 0 {
             unsafe {
-                drop(RawVec::from_raw_parts(self.ptr.as_mut(), self.cap as usize));
+                drop(RawVec::from_raw_parts_in(
+                    self.ptr.as_mut(),
+                    self.cap as usize,
+                    Global,
+                ));
             }
             self.cap = 0;
             self.size = 0;

@@ -14,14 +14,15 @@
 
 #![crate_type = "lib"]
 #![crate_name = "ramp"]
-#![feature(core_intrinsics, asm, allocator_api)]
-#![feature(step_trait, ptr_internals, raw_vec_internals)]
+#![feature(core_intrinsics, allocator_api)]
+#![feature(step_trait, ptr_internals, try_reserve_kind, raw_vec_internals)]
 #![cfg_attr(test, feature(test))]
 
 #[cfg(test)]
 extern crate test;
 
 extern crate alloc;
+extern crate core;
 extern crate hamming;
 extern crate ieee754;
 extern crate num_integer;
@@ -30,6 +31,7 @@ extern crate rand;
 
 pub mod ll;
 mod mem;
+mod raw_vec;
 
 pub mod int;
 pub mod rational;
