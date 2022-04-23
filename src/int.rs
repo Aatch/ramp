@@ -4985,7 +4985,7 @@ mod test {
     #[test]
     fn sum() {
         assert_eq!(
-            std::array::IntoIter::new([897235032, 98345]).sum::<Int>(),
+            [897235032, 98345].iter().cloned().sum::<Int>(),
             Int::from(897333377)
         );
     }
@@ -4993,7 +4993,7 @@ mod test {
     #[test]
     fn product() {
         assert_eq!(
-            std::array::IntoIter::new([897235032, 98345]).product::<Int>(),
+            [897235032, 98345].iter().cloned().product::<Int>(),
             Int::from(897235032) * 98345
         );
     }
